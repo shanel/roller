@@ -2,21 +2,17 @@ package roller
 
 import (
 	"fmt"
-	"golang.org/x/net/context"
 	"html/template"
 	"math"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"strconv"
-	"sync"
+	//	"sync"
 	"time"
 
 	"appengine"
-	"appengine/blobstore"
 	"appengine/datastore"
-	"appengine/image"
-	"google.golang.org/appengine/log"
+	"appengine/file"
 	// Maybe use this later?
 	//"appengine/user"
 )
@@ -29,47 +25,52 @@ func init() {
 }
 
 // As we create urls for the die images, store them here so we don't keep making them
-var diceURLs = map[string]*url.URL{}
+var diceURLs = map[string]string{}
+var dieCounter int64
+var roomCounter int64
 
 type Room struct{}
 
 type Die struct {
-	sync.RWMutex
+	//	sync.RWMutex
 	Size      string // for fate dice this won't be an integer
 	Result    int    // For fate dice make this one of three very large numbers?
 	ResultStr string
 	Color     string
 	Label     string
-	x         int
-	y         int
+	X         int
+	Y         int
 	Key       *datastore.Key
 	Timestamp time.Time
 	Image     string
 }
 
 func (d *Die) updatePosition(x, y int) {
-	d.Lock()
-	defer d.Unlock()
-	d.x = x
-	d.y = y
+	//	d.Lock()
+	//	defer d.Unlock()
+	d.X = x
+	d.Y = y
 }
 
 func (d *Die) getPosition() (int, int) {
-	d.RLock()
-	defer d.RUnlock()
-	return d.x, d.y
+	//	d.RLock()
+	//	defer d.RUnlock()
+	return d.X, d.Y
 }
 
 // roomKey creates a new room entity key.
 func roomKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, "Room", "default_room", 0, nil)
+	roomCounter++
+	return datastore.NewKey(c, "Room", "", roomCounter, nil)
 }
 
 // dieKey creates a new die entity key.
 func dieKey(c appengine.Context, roomKey *datastore.Key) *datastore.Key {
-	return datastore.NewKey(c, "Die", "", 0, roomKey)
+	dieCounter++
+	return datastore.NewKey(c, "Die", "", dieCounter, roomKey)
 }
 
+// TODO(shanel): Have a button to create a new room
 func newRoom(c appengine.Context) (string, error) {
 	k, err := datastore.Put(c, roomKey(c), &Room{})
 	if err != nil {
@@ -78,11 +79,52 @@ func newRoom(c appengine.Context) (string, error) {
 	return k.Encode(), nil
 }
 
+func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, length int) error {
+	dice := make([]*Die, 0, length)
+	keys := make([]*datastore.Key, 0, length)
+	for size, v := range sizes {
+		count, err := strconv.Atoi(v)
+		if err != nil {
+			continue
+		}
+		for i := 0; i < count; i++ {
+			r, rs := getNewResult(size)
+			diu, err := getDieImageURL(c, size, rs)
+			if err != nil {
+				c.Infof("could not get die image: %v", err)
+			}
+			dk := dieKey(c, roomKey)
+			d := Die{
+				Size:      size,
+				Result:    r,
+				ResultStr: rs,
+				Key:       dk,
+				Timestamp: time.Now(),
+				Image:     diu,
+			}
+			dice = append(dice, &d)
+			keys = append(keys, dk)
+		}
+	}
+	keyStrings := []string{}
+	for _, k := range keys {
+		keyStrings = append(keyStrings, k.Encode())
+	}
+	rk, err := datastore.PutMulti(c, keys, dice)
+	if err != nil {
+		return fmt.Errorf("could not create new dice: %v", err)
+	}
+	if len(rk) != len(keys) {
+		return fmt.Errorf("wrong number of keys returned: got %v, want %v", len(rk), len(keys))
+	}
+	return nil
+}
+
 func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 	r, rs := getNewResult(size)
 	diu, err := getDieImageURL(c, size, rs)
 	if err != nil {
-		log.Errorf(context.Background(), "could not get die image url: %v", err)
+		return fmt.Errorf("could not get die image: %v", err)
 	}
 	d := Die{
 		Size:      size,
@@ -90,8 +132,9 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 		ResultStr: rs,
 		Key:       dieKey(c, roomKey),
 		Timestamp: time.Now(),
-		Image:     diu.String(),
+		Image:     diu,
 	}
+	// TODO(shanel): Refactor to use PutMulti instead
 	_, err = datastore.Put(c, d.Key, &d)
 	if err != nil {
 		return fmt.Errorf("could not create new die: %v", err)
@@ -104,8 +147,8 @@ func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Order("Result")
-	dice := []Die{}
+	q := datastore.NewQuery("Die").Ancestor(k).Order("Result").Limit(10)
+	dice := make([]Die, 0, 10)
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
 	}
@@ -124,50 +167,48 @@ func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
 		if err != nil {
 			break
 		}
+		// TODO(shanel): Refactor to use DeleteMulti
 		err = datastore.Delete(c, d)
 		if err != nil {
-			log.Errorf(context.Background(), "problem deleting dice: %v", err)
+			return fmt.Errorf("problem deleting room dice: %v", err)
 		}
 	}
 	return nil
 }
 
-func getDieImageURL(c appengine.Context, size, result string) (*url.URL, error) {
+func getDieImageURL(c appengine.Context, size, result string) (string, error) {
+	// Fate dice silliness
+	ft := map[string]string{"-": "minus", "+": "plus", " ": "zero"}
+	if _, ok := ft[result]; ok {
+		result = ft[result]
+	}
 	d := fmt.Sprintf("d%s/%s.png", size, result)
 	// Should this have a mutex?
 	if u, ok := diceURLs[d]; ok {
 		return u, nil
 	}
-	path := fmt.Sprintf("//gs/visual-dice-roller/die_images/%s", d)
-	k, err := blobstore.BlobKeyForFile(c, path)
+	bucket, err := file.DefaultBucketName(c)
 	if err != nil {
-		return nil, fmt.Errorf("could not find image: %v", err)
+		return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
 	}
-	u, err := image.ServingURL(c, k, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate image url: %v", err)
-	}
-	diceURLs[d] = u
-	return u, nil
+	path := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	diceURLs[d] = path
+	return path, nil
 }
 
-func getDeleteImageURL(c appengine.Context) (*url.URL, error) {
+func getDeleteImageURL(c appengine.Context) (string, error) {
 	d := "delete.png"
 	// Should this have a mutex?
 	if u, ok := diceURLs[d]; ok {
 		return u, nil
 	}
-	path := fmt.Sprintf("//gs/visual-dice-roller/die_images/%s", d)
-	k, err := blobstore.BlobKeyForFile(c, path)
+	bucket, err := file.DefaultBucketName(c)
 	if err != nil {
-		return nil, fmt.Errorf("could not find image: %v", err)
+		return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
 	}
-	u, err := image.ServingURL(c, k, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate image url: %v", err)
-	}
-	diceURLs[d] = u
-	return u, nil
+	path := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	diceURLs[d] = path
+	return path, nil
 }
 
 func updateDieLocation(c appengine.Context, encodedDieKey string, x, y int) error {
@@ -188,7 +229,7 @@ func updateDieLocation(c appengine.Context, encodedDieKey string, x, y int) erro
 }
 
 func getNewResult(kind string) (int, string) {
-	rand.Seed(int64(time.Now().Nanosecond()))
+	rand.Seed(int64(time.Now().Unix()))
 	s, err := strconv.Atoi(kind)
 	if err != nil {
 		// Assume fate die
@@ -232,7 +273,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	dice, err := getRoomDice(c, room)
 	if err != nil {
 		// Can probably nuke this once done testing - it'll spam the logs
-		log.Errorf(context.Background(), "could not get dice for room %v", room)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	// now we need a template for the whole page, and in the short term just print out strings of dice
 
@@ -250,7 +291,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
     <p><b>Results:</b></p>
     <hr>
     {{range .}}
-      <p><b>d{{.Size}}</b>: {{.ResultStr}} <img src="{{.Image}}"></p>
+      <p><img src="{{.Image}}"></p>
     {{end}}
     <form action="/roll" method="post">
       <div><textarea name="d4" rows="1" cols="2"></textarea>d4</div>
@@ -262,7 +303,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
       <div><textarea name="dF" rows="1" cols="2"></textarea>dF</div>
       <div><input type="submit" value="Roll"></div>
     </form>
-    <form action="clear" method="post">
+    <form action="/clear" method="post">
       <div><input type="submit" value="Clear"></div>
     </form>
   </body>
@@ -274,7 +315,6 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 // already existing dice).
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	ctx := context.Background()
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
 	if err != nil {
@@ -282,45 +322,48 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		room, err := newRoom(c)
 		if err != nil {
 			// TODO(shanel): This should probably say something more...
-			log.Errorf(ctx, "room problem: %v", err)
-			http.NotFound(w, r)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+		cookie := &http.Cookie{Name: "dice_room", Value: room}
+		http.SetCookie(w, cookie)
+		roomCookie = cookie
 	}
 	// Eventually split these all into separate go routines
 	roomKey, err := datastore.DecodeKey(roomCookie.Value)
 	if err != nil {
-		log.Errorf(ctx, "error decoding room key: %v", err)
-		http.NotFound(w, r)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	toRoll := map[string]string{
 		"4":  r.FormValue("d4"),
 		"6":  r.FormValue("d6"),
-		"8":  r.FormValue("d4"),
-		"10": r.FormValue("d4"),
-		"12": r.FormValue("d4"),
-		"20": r.FormValue("d4"),
-		"F":  r.FormValue("d4"),
+		"8":  r.FormValue("d8"),
+		"10": r.FormValue("d10"),
+		"12": r.FormValue("d12"),
+		"20": r.FormValue("d20"),
+		"F":  r.FormValue("dF"),
 	}
+	var counter int
 	for k, v := range toRoll {
-		count, err := strconv.Atoi(v)
-		if err != nil {
-			continue
-		}
-		for i := 0; i < count; i++ {
-			if err = newDie(c, k, roomKey); err != nil {
-				log.Errorf(ctx, "problem getting new die: %v", err)
-			}
-		}
-
+		counter++
 	}
+	//	for k, v := range toRoll {
+	//		count, err := strconv.Atoi(v)
+	//		if err != nil {
+	//			continue
+	//		}
+	//		for i := 0; i < count; i++ {
+	if err = newRoll(c, toRoll, roomKey, counter); err != nil {
+		c.Errorf("%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	//		}
+	//
+	//	}
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	ctx := context.Background()
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
 	if err != nil {
@@ -328,8 +371,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 		room, err := newRoom(c)
 		if err != nil {
 			// TODO(shanel): This should probably say something more...
-			log.Errorf(ctx, "room problem: %v", err)
-			http.NotFound(w, r)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
 		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
@@ -337,7 +379,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	// Eventually split these all into separate go routines
 	err = clearRoomDice(c, roomCookie.Value)
 	if err != nil {
-		log.Errorf(ctx, "issues clearing dice: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
