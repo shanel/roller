@@ -17,7 +17,9 @@ import (
 	//"appengine/user"
 )
 
-// TODO(shanel): Not sure this is even needed now
+// TODO(shanel): Would it make sense to have room updates for #refreshable
+// and dice updates for individual dice? maybe just refresh the dice's divs
+// as they are updated?
 type roomUpdates struct {
 	sync.Mutex
 	m map[string]int64
