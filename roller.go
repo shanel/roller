@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
-	//	"sync"
+	"sync"
 	"time"
 
 	"appengine"
@@ -17,17 +17,45 @@ import (
 	//"appengine/user"
 )
 
+// TODO(shanel): Not sure this is even needed now
+type roomUpdates struct {
+	sync.Mutex
+	m map[string]int64
+}
+
+func (r *roomUpdates) updated(room string) {
+	r.Lock()
+	defer r.Unlock()
+	r.m[room] = time.Now().Unix()
+}
+
+func (r *roomUpdates) refresh(room string) bool {
+	r.Lock()
+	defer r.Unlock()
+	if lastUpdate, ok := r.m[room]; ok {
+		// value should be 2 or 3 likely
+		if (time.Now().Unix() - lastUpdate) < 1 {
+			return true
+		}
+		r.m[room] = 0
+	}
+	return false
+}
+
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/roll", roll)
 	http.HandleFunc("/clear", clear)
+	http.HandleFunc("/move", move)
+	http.HandleFunc("/refresh", refresh)
 }
 
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
 var dieCounter int64
 var roomCounter int64
+var updates = roomUpdates{m: map[string]int64{}}
 
 type Room struct{}
 
@@ -38,21 +66,22 @@ type Die struct {
 	ResultStr string
 	Color     string
 	Label     string
-	X         int
-	Y         int
+	X         float64
+	Y         float64
 	Key       *datastore.Key
+	KeyStr    string
 	Timestamp time.Time
 	Image     string
 }
 
-func (d *Die) updatePosition(x, y int) {
+func (d *Die) updatePosition(x, y float64) {
 	//	d.Lock()
 	//	defer d.Unlock()
 	d.X = x
 	d.Y = y
 }
 
-func (d *Die) getPosition() (int, int) {
+func (d *Die) getPosition() (float64, float64) {
 	//	d.RLock()
 	//	defer d.RUnlock()
 	return d.X, d.Y
@@ -79,6 +108,8 @@ func newRoom(c appengine.Context) (string, error) {
 	return k.Encode(), nil
 }
 
+// TODO(shanel): After anything that changes the room, update the roomUpdates map so clients can check
+// in to see if they should refresh
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, length int) error {
 	dice := make([]*Die, 0, length)
 	keys := make([]*datastore.Key, 0, length)
@@ -99,6 +130,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				Result:    r,
 				ResultStr: rs,
 				Key:       dk,
+				KeyStr:    dk.Encode(),
 				Timestamp: time.Now(),
 				Image:     diu,
 			}
@@ -211,7 +243,7 @@ func getDeleteImageURL(c appengine.Context) (string, error) {
 	return path, nil
 }
 
-func updateDieLocation(c appengine.Context, encodedDieKey string, x, y int) error {
+func updateDieLocation(c appengine.Context, encodedDieKey string, x, y float64) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -277,22 +309,169 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 	// now we need a template for the whole page, and in the short term just print out strings of dice
 
+	cookie := &http.Cookie{Name: "dice_room", Value: room}
+	http.SetCookie(w, cookie)
 	if err := roomTemplate.Execute(w, dice); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+func refresh(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	ref := updates.refresh(keyStr)
+	c.Infof("checking refresh for %v: %v", keyStr, ref)
+	fmt.Fprintf(w, "%v", ref)
+}
+
+func move(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
+	if err != nil {
+		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
+	}
+	y, err := strconv.ParseFloat(r.Form.Get("y"), 64)
+	if err != nil {
+		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
+	}
+	err = updateDieLocation(c, keyStr, x, y)
+	if err != nil {
+		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
+	}
+	roomCookie, err := r.Cookie("dice_room")
+	if err == nil {
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+	}
+	updates.updated(roomCookie.Value)
+}
+
+
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
   <head>
     <title>Dice Roller</title>
+  <link rel="stylesheet" type="text/css" src="drag.css" />
+  <script src="http://code.interactjs.io/v1.2.9/interact.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script type="text/javascript" language="javascript">
+
+
+
+// target elements with the "draggable" class
+interact('.draggable')
+  .draggable({
+    // enable inertial throwing
+    inertia: true,
+    // keep the element within the area of it's parent
+//    restrict: {
+//      restriction: "parent",
+//      endOnly: true,
+//      elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
+//    },
+    // enable autoScroll
+    autoScroll: true,
+
+    // call this function on every dragmove event
+    onmove: dragMoveListener,
+    // call this function on every dragend event
+//    onend: function (event) {
+//      var textEl = event.target.querySelector('p');
+//
+//      textEl && (textEl.textContent =
+//        'moved a distance of '
+//        + (Math.sqrt(event.dx * event.dx +
+//                     event.dy * event.dy)|0) + 'px');
+//    }
+  });
+
+  function dragMoveListener (event) {
+    var target = event.target,
+        // keep the dragged position in the data-x/data-y attributes
+        x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx,
+        y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+
+
+    // translate the element
+    target.style.webkitTransform =
+    target.style.transform =
+      'translate(' + x + 'px, ' + y + 'px)';
+
+    // update the posiion attributes
+    target.setAttribute('data-x', x);
+    target.setAttribute('data-y', y);
+
+    $.post('move', {'id': target.id, 'x': x, 'y': y});
+
+  }
+
+  // this is used later in the resizing and gesture demos
+  window.dragMoveListener = dragMoveListener;
+
+/* The dragging code for '.draggable' from the demo above
+ * applies to this demo as well so it doesn't have to be repeated. */
+
+// enable draggables to be dropped into this
+interact('.dropzone').dropzone({
+  // only accept elements matching this CSS selector
+  accept: '#yes-drop',
+  // Require a 75% element overlap for a drop to be possible
+  overlap: 0.75,
+
+  // listen for drop related events:
+
+  ondropactivate: function (event) {
+    // add active dropzone feedback
+    event.target.classList.add('drop-active');
+  },
+  ondragenter: function (event) {
+    var draggableElement = event.relatedTarget,
+        dropzoneElement = event.target;
+
+    // feedback the possibility of a drop
+    dropzoneElement.classList.add('drop-target');
+    draggableElement.classList.add('can-drop');
+    draggableElement.textContent = 'Dragged in';
+  },
+  ondragleave: function (event) {
+    // remove the drop feedback style
+    event.target.classList.remove('drop-target');
+    event.relatedTarget.classList.remove('can-drop');
+    event.relatedTarget.textContent = 'Dragged out';
+  },
+  ondrop: function (event) {
+    event.relatedTarget.textContent = 'Dropped';
+  },
+  ondropdeactivate: function (event) {
+    // remove active dropzone feedback
+    event.target.classList.remove('drop-active');
+    event.target.classList.remove('drop-target');
+  }
+});
+
+ function autoRefresh_div() {
+     var room = (window.location.href).split("=")[1];
+     $.post("/refresh", {
+             id: room
+         })
+         .done(function(data) {
+             var b = data;
+             var t = 'true';
+	     console.log(b);
+             console.log(t);
+             if (b == t) {
+                 $("#refreshable").load(window.location.href + " #refreshable");
+             };
+         });
+ }
+ 
+  setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
+  </script>
   </head>
   <body>
-    <p><b>Results:</b></p>
-    <hr>
-    {{range .}}
-      <p><img src="{{.Image}}"></p>
-    {{end}}
     <form action="/roll" method="post">
       <div><textarea name="d4" rows="1" cols="2"></textarea>d4</div>
       <div><textarea name="d6" rows="1" cols="2"></textarea>d6</div>
@@ -306,6 +485,32 @@ var roomTemplate = template.Must(template.New("room").Parse(`
     <form action="/clear" method="post">
       <div><input type="submit" value="Clear"></div>
     </form>
+    <p><b>Results:</b></p>
+    <hr>
+    <div id="refreshable">
+    {{range .}}
+      <div id="{{.KeyStr}}" class="draggable" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
+        <img src="{{.Image}}">
+      </div>
+    {{end}}
+    </div>
+    <br>
+    <br>
+<div id="drag-1" class="draggable">
+  <p> You can drag one element </p>
+</div>
+<div id="drag-2" class="draggable">
+    <p> with each pointer </p>
+</div>
+<br>
+<div id="no-drop" class="draggable drag-drop"> #no-drop </div>
+
+<div id="yes-drop" class="draggable drag-drop"> #yes-drop </div>
+
+<div id="outer-dropzone" class="dropzone">
+  #outer-dropzone
+  <div id="inner-dropzone" class="dropzone">#inner-dropzone</div>
+ </div>
   </body>
 </html>
 `))
@@ -343,7 +548,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"F":  r.FormValue("dF"),
 	}
 	var counter int
-	for k, v := range toRoll {
+	for _, _ = range toRoll {
 		counter++
 	}
 	//	for k, v := range toRoll {
@@ -359,6 +564,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	//		}
 	//
 	//	}
+	updates.updated(roomKey.Encode())
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
@@ -381,6 +587,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	updates.updated(roomCookie.Value)
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
