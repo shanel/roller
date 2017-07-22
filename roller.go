@@ -378,6 +378,7 @@ interact('.draggable')
 
     // call this function on every dragmove event
     onmove: dragMoveListener,
+    onend: dragMoveEnd,
     // call this function on every dragend event
 //    onend: function (event) {
 //      var textEl = event.target.querySelector('p');
@@ -388,6 +389,26 @@ interact('.draggable')
 //                     event.dy * event.dy)|0) + 'px');
 //    }
   });
+  function dragMoveEnd (event) {
+    var target = event.target,
+        // keep the dragged position in the data-x/data-y attributes
+        x = (parseFloat(target.getAttribute('data-x')) || 0),
+        y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+
+
+    // translate the element
+    target.style.webkittransform =
+    target.style.transform =
+      'translate(' + x + 'px, ' + y + 'px)';
+
+    // update the posiion attributes
+    target.setAttribute('data-x', x);
+    target.setAttribute('data-y', y);
+
+    $.post('move', {'id': target.id, 'x': x, 'y': y});
+
+  }
 
   function dragMoveListener (event) {
     var target = event.target,
@@ -398,7 +419,7 @@ interact('.draggable')
 
 
     // translate the element
-    target.style.webkitTransform =
+    target.style.webkittransform =
     target.style.transform =
       'translate(' + x + 'px, ' + y + 'px)';
 
@@ -406,7 +427,6 @@ interact('.draggable')
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
-    $.post('move', {'id': target.id, 'x': x, 'y': y});
 
   }
 
