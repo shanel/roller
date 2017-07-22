@@ -386,7 +386,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
   <head>
     <title>Dice Roller</title>
   <link rel="stylesheet" type="text/css" src="css/drag.css" />
-  <!-- <script src="js/client.js"></script> -->
+  <!-- <script src="js/fingerprintjs2.js"></script> -->
   <script src="http://code.interactjs.io/v1.2.9/interact.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script type="text/javascript" language="javascript">
@@ -505,8 +505,13 @@ interact('.dropzone').dropzone({
   }
 });
 
-var client = new ClientJS();
-var fingerprint = client.getFingerprint();
+var fingerprint = "";
+new Fingerprint2().get(function(result, components){
+  console.log(result); //a hash, representing your device fingerprint
+  console.log(components); // an array of FP components
+  fingerprint = result;
+});
+
 $.cookie("dice_roller_fp", fingerprint);
 
  function autoRefresh_div() {
