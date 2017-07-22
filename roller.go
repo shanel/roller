@@ -349,8 +349,8 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	fp := r.Form.Get("fp")
-	ref := updates.refresh(keyStr, fp, 1)
+	fp := r.RemoteAddr + r.UserAgent()
+	ref := updates.refresh(keyStr, fp, 3)
 	c.Infof("checking refresh for %v, (fp: %v): %v", keyStr, fp, ref)
 	fmt.Fprintf(w, "%v", ref)
 }
@@ -359,7 +359,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	fp := r.Form.Get("fp")
+	fp := r.RemoteAddr + r.UserAgent()
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -437,7 +437,7 @@ interact('.draggable')
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
-    $.post('move', {'id': target.id, 'x': x, 'y': y, 'fp': fingerprint});
+    $.post('move', {'id': target.id, 'x': x, 'y': y});
 
   }
 
@@ -505,20 +505,11 @@ interact('.dropzone').dropzone({
   }
 });
 
-var fingerprint = "";
-new Fingerprint2().get(function(result, components){
-  console.log(result); //a hash, representing your device fingerprint
-  console.log(components); // an array of FP components
-  fingerprint = result;
-});
-
-$.cookie("dice_roller_fp", fingerprint);
 
  function autoRefresh_div() {
      var room = (window.location.href).split("=")[1];
      $.post("/refresh", {
              id: room,
-	     fp: fingerprint,
          })
          .done(function(data) {
 		 // need to cycle through the |-spearated list
@@ -541,7 +532,7 @@ $.cookie("dice_roller_fp", fingerprint);
          });
  }
  
-  setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
+  setInterval('autoRefresh_div()', 2000); // refresh div after 2 second
   </script>
   </head>
   <body>
@@ -637,11 +628,11 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	//		}
 	//
 	//	}
-	fp, err := r.Cookie("dice_roller_fp")
-	if err != nil {
-		c.Errorf("couldn't find fingerprint")
-	}
-	updates.updated(roomKey.Encode(), roomKey.Encode(), fp.Value)
+//	fp, err := r.Cookie("dice_roller_fp")
+//	if err != nil {
+//		c.Errorf("couldn't find fingerprint")
+//	}
+	updates.updated(roomKey.Encode(), roomKey.Encode(), r.RemoteAddr + r.UserAgent())
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
@@ -664,11 +655,11 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	fp, err := r.Cookie("dice_roller_fp")
-	if err != nil {
-		c.Errorf("couldn't find fingerprint")
-	}
-	updates.updated(roomCookie.Value, roomCookie.Value, fp.Value)
+//	fp, err := r.Cookie("dice_roller_fp")
+//	if err != nil {
+//		c.Errorf("couldn't find fingerprint")
+//	}
+	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
