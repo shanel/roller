@@ -37,7 +37,6 @@ func (r *refreshCounter) increment() int64 {
 }
 
 func updateRoom(c appengine.Context, rk string, u Update) error {
-	c.Errorf("updateRoom called!!!!!!!!!!!!!!!!!!!!!! WITH UPDATE %v", u)
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
 		return fmt.Errorf("could not decode room key %v: %v", rk, err)
@@ -68,17 +67,9 @@ func updateRoom(c appengine.Context, rk string, u Update) error {
 		return fmt.Errorf("could not marshal updates in updateRoom: %v", err)
 	}
 	r.Timestamp = t
-	c.Errorf("About to update room  %v: %v", rk, r)
 	_, err = datastore.Put(c, roomKey, &r)
 	if err != nil {
 		return fmt.Errorf("could not update room %v: %v", rk, err)
-	}
-	var newR Room
-	err = datastore.Get(c, roomKey, &newR)
-	if err == nil {
-		c.Errorf("after updating datastore, a fetch shows room %v: %v", rk, newR)
-	} else {
-		c.Errorf("there was an issue fetching the updated room %v: %v", rk, err)
 	}
 	return nil
 }
@@ -194,9 +185,7 @@ func roomKey(c appengine.Context) *datastore.Key {
 func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key {
 	//	dieCounter++
 	//	return datastore.NewKey(c, "Die", "", dieCounter, roomKey)
-	t := time.Now().UnixNano()+i
 	res := datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
-	c.Errorf("room: %v, timestamp: %v, gives key: %v", roomKey.Encode(), t, res.Encode())
 	return res
 }
 
@@ -247,7 +236,6 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	for _, k := range keys {
 		keyStrings = append(keyStrings, k.Encode())
 	}
-	c.Errorf("about to put these dice keys in: %v", keyStrings)
 	_, err := datastore.PutMulti(c, keys, dice)
 	if err != nil {
 		return fmt.Errorf("could not create new dice: %v", err)
@@ -280,7 +268,6 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 }
 
 func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
-	c.Errorf("trying to get dice for room %v", encodedRoomKey)
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
@@ -289,9 +276,6 @@ func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
-	}
-	for i, d := range dice {
-		c.Errorf("die %v: %v", i, d)
 	}
 	return dice, nil
 }
