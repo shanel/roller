@@ -447,8 +447,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
   <head>
     <title>Dice Roller</title>
   <link rel="stylesheet" type="text/css" src="css/drag.css" />
-  <!-- <script src="js/fingerprintjs2.js"></script> -->
-  <script src="https://code.interactjs.io/v1.2.9/interact.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script type="text/javascript" language="javascript">
 
