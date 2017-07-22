@@ -2,12 +2,14 @@ package roller
 
 import (
 	"fmt"
+	"crypto/md5"
 	"encoding/json"
 	"html/template"
 	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"appengine"
@@ -22,23 +24,18 @@ type Update struct {
 	Updater string
 }
 
-// TODO(shanel): Would it make sense to have room updates for #refreshable
-// and dice updates for individual dice? maybe just refresh the dice's divs
-// as they are updated?
-//type roomUpdates struct {
-//	sync.Mutex
-//	m map[string]map[string]*update
-//}
-//
-//func (r *roomUpdates) updated(room, die, fp string) {
-//	r.Lock()
-//	defer r.Unlock()
-//	if _, ok := r.m[room]; !ok {
-//		r.m[room] = map[string]*update{die: &update{time.Now().Unix(), fp}}
-//		return
-//	}
-//	r.m[room][die] = &update{time.Now().Unix(), fp}
-//}
+type refreshCounter struct {
+	sync.Mutex
+	c int64
+}
+
+func (r *refreshCounter) increment() int64 {
+	r.Lock()
+	defer r.Unlock()
+	r.c++
+	return r.c
+}
+
 
 func updateRoom(c appengine.Context, rk string, u Update) error {
 	c.Errorf("updateRoom called!!!!!!!!!!!!!!!!!!!!!! WITH UPDATE %v", u)
@@ -104,6 +101,7 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	keep := []Update{}
 	now := time.Now().Unix()
 	var umUpdates []Update
+	var send []Update
 	err = json.Unmarshal(r.Updates, &umUpdates)
 	if err != nil {
 		c.Errorf("could not unmarshal updates in refreshRoom: %v", err)
@@ -111,13 +109,12 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	}
 	for _, u := range umUpdates {
 		q := (now - u.Timestamp)
-		c.Errorf("the difference is %v, the refreshDelta is %v", q, refreshDelta)
 		if q > refreshDelta {
 			continue
 		}
 		keep = append(keep, u)
 		if u.Updater != fp {
-			out = "true"
+		        send = append(send, u)
 		}
 	}
 	r.Updates, err = json.Marshal(keep)
@@ -129,36 +126,18 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	if err != nil {
 		c.Errorf("could not create updated room %v: %v", rk, err)
 	}
+	if len(send) > 0 {
+		toHash, err := json.Marshal(send)
+		if err != nil {
+			c.Errorf("could not marshal updates to send in refreshRoom: %v", err)
+			return ""
+		}
+		out = fmt.Sprintf("%x", md5.Sum(toHash))
+	}
 	c.Errorf("For room %v and fingerprint %v the update is: %v", rk, fp, out)
 	return out
 }
 
-//func (r *roomUpdates) refresh(room, fp string, s int64) string {
-//	r.Lock()
-//	defer r.Unlock()
-//	remove := []string{}
-//	if updates, ok := r.m[room]; ok {
-//		out := make([]string, 0, len(updates))
-//		for u, t := range updates {
-//			if (time.Now().Unix() - t.timestamp) < s {
-//				if t.updater == fp {
-//					continue
-//				}
-//				if u == room {
-//					return room
-//				}
-//				out = append(out, u)
-//			} else {
-//				remove = append(remove, u)
-//			}
-//		}
-//		for _, r := range remove {
-//			delete(updates, r)
-//		}
-//		return strings.Join(out, "|")
-//	}
-//	return ""
-//}
 
 func init() {
 	http.HandleFunc("/", root)
@@ -174,7 +153,8 @@ var diceURLs = map[string]string{}
 var dieCounter int64
 var roomCounter int64
 //var updates = roomUpdates{m: map[string]map[string]*update{}}
-var refreshDelta = int64(10)
+var refreshDelta = int64(2)
+var refresher = refreshCounter{}
 
 type Room struct{
 //	Updates []update
@@ -436,13 +416,12 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO(shanel): Probably would make the most sense to try and push all updates here (ie not just rooms)
+// TODO(shanel): Updates should probably ids instead of "true" - so clients can keep track of whether they need to reload or not
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.RemoteAddr + r.UserAgent()
-//	ref := updates.refresh(keyStr, fp, 3)
 	ref := refreshRoom(c, keyStr, fp)
 	c.Infof("checking refresh for %v, (fp: %v): %v", keyStr, fp, ref)
 	fmt.Fprintf(w, "%v", ref)
@@ -598,32 +577,30 @@ interact('.dropzone').dropzone({
 
 
  function autoRefresh_div() {
-     var room = (window.location.href).split("=")[1];
-     $.post("/refresh", {
-             id: room,
-         })
+	 var room = (window.location.href).split("=")[1];
+	 $.post("/refresh", {
+		 id: room,
+	 })
          .done(function(data) {
-		 // need to cycle through the |-spearated list
-             var b = data;
-//             var item_str = data;
-//	     var items = item_str.split("|");
-//	     for (i = 0; i < items.length; i++) {
-//		     if (items[0] == "") {
-//			     break
-//		     }
-//		     console.log(items[i]);
-//		     $("#" + items[i]).load(window.location.href + " #" + items[i]);
-//	     };
-//             var t = 'true';
-             console.log(b);
-//             console.log(t);
-             if (b != "") {
-                 $("#refreshable").load(window.location.href + " #refreshable");
-             };
-         });
+		 var b = data;
+		 if (b != "") {
+			 console.log("b: " + b);
+			 if (sessionStorage.lastUpdateId) {
+				 if (b != sessionStorage.lastUpdateId) {
+					 console.log(b + " != " + sessionStorage.lastUpdateId);
+					 $("#refreshable").load(window.location.href + " #refreshable");
+					 sessionStorage.lastUpdateId = b;
+				 }
+			 } else {
+				 console.log("didn't find local storage, so setting it to " + b);
+				 $("#refreshable").load(window.location.href + " #refreshable");
+			         sessionStorage.lastUpdateId = b;
+			 }
+		 }
+	 });
  }
  
-  setInterval('autoRefresh_div()', 5000); // refresh div after 2 second
+  setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
   </script>
   </head>
   <body>
