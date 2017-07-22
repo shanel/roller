@@ -1,9 +1,9 @@
 package roller
 
 import (
-	"fmt"
 	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"math"
 	"math/rand"
@@ -21,7 +21,7 @@ import (
 
 type Update struct {
 	Timestamp int64
-	Updater string
+	Updater   string
 }
 
 type refreshCounter struct {
@@ -35,7 +35,6 @@ func (r *refreshCounter) increment() int64 {
 	r.c++
 	return r.c
 }
-
 
 func updateRoom(c appengine.Context, rk string, u Update) error {
 	c.Errorf("updateRoom called!!!!!!!!!!!!!!!!!!!!!! WITH UPDATE %v", u)
@@ -97,7 +96,6 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 		c.Errorf("could not find room %v for refresh: %v", rk, err)
 		return out
 	}
-	c.Errorf("here is room %v: %v", rk, r)
 	keep := []Update{}
 	now := time.Now().Unix()
 	var umUpdates []Update
@@ -114,7 +112,7 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 		}
 		keep = append(keep, u)
 		if u.Updater != fp {
-		        send = append(send, u)
+			send = append(send, u)
 		}
 	}
 	r.Updates, err = json.Marshal(keep)
@@ -134,10 +132,8 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 		}
 		out = fmt.Sprintf("%x", md5.Sum(toHash))
 	}
-	c.Errorf("For room %v and fingerprint %v the update is: %v", rk, fp, out)
 	return out
 }
-
 
 func init() {
 	http.HandleFunc("/", root)
@@ -146,19 +142,21 @@ func init() {
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
+	rand.Seed(int64(time.Now().Unix()))
 }
 
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
 var dieCounter int64
 var roomCounter int64
+
 //var updates = roomUpdates{m: map[string]map[string]*update{}}
 var refreshDelta = int64(2)
 var refresher = refreshCounter{}
 
-type Room struct{
-//	Updates []update
-	Updates []byte  // hooray having to use json
+type Room struct {
+	//	Updates []update
+	Updates   []byte // hooray having to use json
 	Timestamp int64
 }
 
@@ -187,14 +185,19 @@ func (d *Die) getPosition() (float64, float64) {
 
 // roomKey creates a new room entity key.
 func roomKey(c appengine.Context) *datastore.Key {
-	roomCounter++
-	return datastore.NewKey(c, "Room", "", roomCounter, nil)
+	//	roomCounter++
+	//	return datastore.NewKey(c, "Room", "", roomCounter, nil)
+	return datastore.NewKey(c, "Room", "", time.Now().UnixNano(), nil)
 }
 
 // dieKey creates a new die entity key.
-func dieKey(c appengine.Context, roomKey *datastore.Key) *datastore.Key {
-	dieCounter++
-	return datastore.NewKey(c, "Die", "", dieCounter, roomKey)
+func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key {
+	//	dieCounter++
+	//	return datastore.NewKey(c, "Die", "", dieCounter, roomKey)
+	t := time.Now().UnixNano()+i
+	res := datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
+	c.Errorf("room: %v, timestamp: %v, gives key: %v", roomKey.Encode(), t, res.Encode())
+	return res
 }
 
 // TODO(shanel): Have a button to create a new room
@@ -212,9 +215,9 @@ func newRoom(c appengine.Context) (string, error) {
 
 // TODO(shanel): After anything that changes the room, update the roomUpdates map so clients can check
 // in to see if they should refresh
-func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, length int) error {
-	dice := make([]*Die, 0, length)
-	keys := make([]*datastore.Key, 0, length)
+func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key) error {
+	dice := []*Die{}
+	keys := []*datastore.Key{}
 	for size, v := range sizes {
 		count, err := strconv.Atoi(v)
 		if err != nil {
@@ -224,9 +227,9 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 			r, rs := getNewResult(size)
 			diu, err := getDieImageURL(c, size, rs)
 			if err != nil {
-				c.Infof("could not get die image: %v", err)
+				c.Errorf("could not get die image: %v", err)
 			}
-			dk := dieKey(c, roomKey)
+			dk := dieKey(c, roomKey, int64(i))
 			d := Die{
 				Size:      size,
 				Result:    r,
@@ -244,6 +247,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	for _, k := range keys {
 		keyStrings = append(keyStrings, k.Encode())
 	}
+	c.Errorf("about to put these dice keys in: %v", keyStrings)
 	_, err := datastore.PutMulti(c, keys, dice)
 	if err != nil {
 		return fmt.Errorf("could not create new dice: %v", err)
@@ -257,11 +261,13 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 	if err != nil {
 		return fmt.Errorf("could not get die image: %v", err)
 	}
+	dk := dieKey(c, roomKey, int64(0))
 	d := Die{
 		Size:      size,
 		Result:    r,
 		ResultStr: rs,
-		Key:       dieKey(c, roomKey),
+		Key:       dk,
+		KeyStr:    dk.Encode(),
 		Timestamp: time.Now().Unix(),
 		Image:     diu,
 	}
@@ -274,14 +280,18 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 }
 
 func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
+	c.Errorf("trying to get dice for room %v", encodedRoomKey)
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Order("Result")//.Limit(10)
-	dice := make([]Die, 0, 10)
+	q := datastore.NewQuery("Die").Ancestor(k).Order("Result") //.Limit(10)
+	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
+	}
+	for i, d := range dice {
+		c.Errorf("die %v: %v", i, d)
 	}
 	return dice, nil
 }
@@ -361,7 +371,6 @@ func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float
 }
 
 func getNewResult(kind string) (int, string) {
-	rand.Seed(int64(time.Now().Unix()))
 	s, err := strconv.Atoi(kind)
 	if err != nil {
 		// Assume fate die
@@ -423,7 +432,6 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	keyStr := r.Form.Get("id")
 	fp := r.RemoteAddr + r.UserAgent()
 	ref := refreshRoom(c, keyStr, fp)
-	c.Infof("checking refresh for %v, (fp: %v): %v", keyStr, fp, ref)
 	fmt.Fprintf(w, "%v", ref)
 }
 
@@ -449,7 +457,6 @@ func move(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 	}
 }
-
 
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
@@ -680,28 +687,10 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"20": r.FormValue("d20"),
 		"F":  r.FormValue("dF"),
 	}
-	var counter int
-	for _, _ = range toRoll {
-		counter++
-	}
-	//	for k, v := range toRoll {
-	//		count, err := strconv.Atoi(v)
-	//		if err != nil {
-	//			continue
-	//		}
-	//		for i := 0; i < count; i++ {
-	if err = newRoll(c, toRoll, roomKey, counter); err != nil {
+	if err = newRoll(c, toRoll, roomKey); err != nil {
 		c.Errorf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	//		}
-	//
-	//	}
-//	fp, err := r.Cookie("dice_roller_fp")
-//	if err != nil {
-//		c.Errorf("couldn't find fingerprint")
-//	}
-//	updates.updated(roomKey.Encode(), roomKey.Encode(), r.RemoteAddr + r.UserAgent())  // remove soon
 	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
@@ -725,11 +714,11 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-//	fp, err := r.Cookie("dice_roller_fp")
-//	if err != nil {
-//		c.Errorf("couldn't find fingerprint")
-//	}
-//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
+	//	fp, err := r.Cookie("dice_roller_fp")
+	//	if err != nil {
+	//		c.Errorf("couldn't find fingerprint")
+	//	}
+	//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
 	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
