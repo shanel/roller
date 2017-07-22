@@ -133,6 +133,7 @@ func init() {
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
+	http.HandleFunc("/delete", deleteDie)
 	rand.Seed(int64(time.Now().Unix()))
 }
 
@@ -395,18 +396,42 @@ func root(w http.ResponseWriter, r *http.Request) {
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := r.URL.Query()["id"][0] // is this going to break?
+	// TODO(shanel): If the room doesn't exist we need to gracefully send them elsewhere
+	roomCookie, err := r.Cookie("dice_room")
+	if err == nil {
+		if roomCookie.Value != room {
+			http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
+		}
+	}
 	dice, err := getRoomDice(c, room)
 	if err != nil {
 		// Can probably nuke this once done testing - it'll spam the logs
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		room, err := newRoom(c)
+		if err != nil {
+			// TODO(shanel): This should probably say something more...
+			http.NotFound(w, r)
+		}
+		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+		//	http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	// now we need a template for the whole page, and in the short term just print out strings of dice
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
-	if err := roomTemplate.Execute(w, dice); err != nil {
+	del, err := getDeleteImageURL(c)
+	if err != nil {
+		c.Errorf("couldn't get delete image url: %v", err)
+	}
+	p := Passer{Del: del, Dice: dice}
+	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+type Passer struct {
+	Del string
+	Dice []Die
 }
 
 // TODO(shanel): Updates should probably ids instead of "true" - so clients can keep track of whether they need to reload or not
@@ -446,7 +471,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
   <head>
     <title>Dice Roller</title>
-  <link rel="stylesheet" type="text/css" src="css/drag.css" />
+  <link type="text/css" rel="stylesheet" href="/css/drag.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script type="text/javascript" language="javascript">
@@ -530,7 +555,7 @@ interact('.draggable')
 // enable draggables to be dropped into this
 interact('.dropzone').dropzone({
   // only accept elements matching this CSS selector
-  accept: '#yes-drop',
+//  accept: '#yes-drop',
   // Require a 75% element overlap for a drop to be possible
   overlap: 0.75,
 
@@ -540,6 +565,7 @@ interact('.dropzone').dropzone({
     // add active dropzone feedback
     event.target.classList.add('drop-active');
   },
+  // This should change the die to the X
   ondragenter: function (event) {
     var draggableElement = event.relatedTarget,
         dropzoneElement = event.target;
@@ -549,12 +575,14 @@ interact('.dropzone').dropzone({
     draggableElement.classList.add('can-drop');
     draggableElement.textContent = 'Dragged in';
   },
+  // This should put the die back to what it was.
   ondragleave: function (event) {
     // remove the drop feedback style
     event.target.classList.remove('drop-target');
     event.relatedTarget.classList.remove('can-drop');
     event.relatedTarget.textContent = 'Dragged out';
   },
+  // This should call the delete function
   ondrop: function (event) {
     event.relatedTarget.textContent = 'Dropped';
   },
@@ -610,19 +638,13 @@ interact('.dropzone').dropzone({
     <p><b>Results:</b></p>
     <hr>
     <div id="refreshable">
-    {{range .}}
+    {{range .Dice}}
       <div id="{{.KeyStr}}" class="draggable" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
         <img src="{{.Image}}">
       </div>
     {{end}}
     <br>
     <br>
-<div id="drag-1" class="draggable">
-  <p> You can drag one element </p>
-</div>
-<div id="drag-2" class="draggable">
-    <p> with each pointer </p>
-</div>
 <br>
 <div id="no-drop" class="draggable drag-drop"> #no-drop </div>
 
@@ -675,6 +697,36 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+}
+
+func deleteDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	roomCookie, err := r.Cookie("dice_room")
+	if err != nil {
+		// If no cookie, then create a room, set cookie, and redirect
+		room, err := newRoom(c)
+		if err != nil {
+			// TODO(shanel): This should probably say something more...
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+	}
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	d, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		c.Errorf("couldn't decode die key %v", keyStr)
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+	}
+	// Do we need to be worried dice will be deleted from other rooms?
+	err = datastore.Delete(c, d)
+	if err != nil {
+		c.Errorf("problem deleting room die %v from room %v: %v", keyStr, roomCookie.Value, err)
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+	}
+	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
