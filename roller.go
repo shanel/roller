@@ -2,13 +2,12 @@ package roller
 
 import (
 	"fmt"
+	"encoding/json"
 	"html/template"
 	"math"
 	"math/rand"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	"appengine"
@@ -18,57 +17,148 @@ import (
 	//"appengine/user"
 )
 
-type update struct {
-	timestamp int64
-	updater string
+type Update struct {
+	Timestamp int64
+	Updater string
 }
 
 // TODO(shanel): Would it make sense to have room updates for #refreshable
 // and dice updates for individual dice? maybe just refresh the dice's divs
 // as they are updated?
-type roomUpdates struct {
-	sync.Mutex
-//	m map[string]int64
-	m map[string]map[string]*update
+//type roomUpdates struct {
+//	sync.Mutex
+//	m map[string]map[string]*update
+//}
+//
+//func (r *roomUpdates) updated(room, die, fp string) {
+//	r.Lock()
+//	defer r.Unlock()
+//	if _, ok := r.m[room]; !ok {
+//		r.m[room] = map[string]*update{die: &update{time.Now().Unix(), fp}}
+//		return
+//	}
+//	r.m[room][die] = &update{time.Now().Unix(), fp}
+//}
+
+func updateRoom(c appengine.Context, rk string, u Update) error {
+	c.Errorf("updateRoom called!!!!!!!!!!!!!!!!!!!!!! WITH UPDATE %v", u)
+	roomKey, err := datastore.DecodeKey(rk)
+	if err != nil {
+		return fmt.Errorf("could not decode room key %v: %v", rk, err)
+	}
+	var r Room
+	t := time.Now().Unix()
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		// Couldn't find it, so create it
+		c.Errorf("couldn't find room %v, so going to create it", rk)
+		up, err := json.Marshal([]Update{})
+		if err != nil {
+			return fmt.Errorf("could not marshal update: %v", err)
+		}
+		r = Room{Updates: up, Timestamp: t}
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+		}
+	}
+	var umUpdates []Update
+	err = json.Unmarshal(r.Updates, &umUpdates)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal updates in updateRoom: %v", err)
+	}
+	umUpdates = append(umUpdates, u)
+	r.Updates, err = json.Marshal(umUpdates)
+	if err != nil {
+		return fmt.Errorf("could not marshal updates in updateRoom: %v", err)
+	}
+	r.Timestamp = t
+	c.Errorf("About to update room  %v: %v", rk, r)
+	_, err = datastore.Put(c, roomKey, &r)
+	if err != nil {
+		return fmt.Errorf("could not update room %v: %v", rk, err)
+	}
+	var newR Room
+	err = datastore.Get(c, roomKey, &newR)
+	if err == nil {
+		c.Errorf("after updating datastore, a fetch shows room %v: %v", rk, newR)
+	} else {
+		c.Errorf("there was an issue fetching the updated room %v: %v", rk, err)
+	}
+	return nil
 }
 
-func (r *roomUpdates) updated(room, die, fp string) {
-	r.Lock()
-	defer r.Unlock()
-	if _, ok := r.m[room]; !ok {
-//		r.m[room] = map[string]int64{die: time.Now().Unix()}
-		r.m[room] = map[string]*update{die: &update{time.Now().Unix(), fp}}
-		return
+// TODO(shanel): This proabably can just go back to being a true/false thing
+func refreshRoom(c appengine.Context, rk, fp string) string {
+	roomKey, err := datastore.DecodeKey(rk)
+	out := ""
+	if err != nil {
+		c.Errorf("could not decode room key %v: %v", rk, err)
+		return out
 	}
-	r.m[room][die] = &update{time.Now().Unix(), fp}
+	var r Room
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		c.Errorf("could not find room %v for refresh: %v", rk, err)
+		return out
+	}
+	c.Errorf("here is room %v: %v", rk, r)
+	keep := []Update{}
+	now := time.Now().Unix()
+	var umUpdates []Update
+	err = json.Unmarshal(r.Updates, &umUpdates)
+	if err != nil {
+		c.Errorf("could not unmarshal updates in refreshRoom: %v", err)
+		return ""
+	}
+	for _, u := range umUpdates {
+		q := (now - u.Timestamp)
+		c.Errorf("the difference is %v, the refreshDelta is %v", q, refreshDelta)
+		if q > refreshDelta {
+			continue
+		}
+		keep = append(keep, u)
+		if u.Updater != fp {
+			out = "true"
+		}
+	}
+	r.Updates, err = json.Marshal(keep)
+	if err != nil {
+		c.Errorf("could not marshal updates in refreshRoom: %v", err)
+		return ""
+	}
+	_, err = datastore.Put(c, roomKey, &r)
+	if err != nil {
+		c.Errorf("could not create updated room %v: %v", rk, err)
+	}
+	c.Errorf("For room %v and fingerprint %v the update is: %v", rk, fp, out)
+	return out
 }
 
-func (r *roomUpdates) refresh(room, fp string, s int64) string {
-	r.Lock()
-	defer r.Unlock()
-	remove := []string{}
-	if updates, ok := r.m[room]; ok {
-		out := make([]string, 0, len(updates))
-		for u, t := range updates {
-			if (time.Now().Unix() - t.timestamp) < s {
-				if t.updater == fp {
-					continue
-				}
-				if u == room {
-					return room
-				}
-				out = append(out, u)
-			} else {
-				remove = append(remove, u)
-			}
-		}
-		for _, r := range remove {
-			delete(updates, r)
-		}
-		return strings.Join(out, "|")
-	}
-	return ""
-}
+//func (r *roomUpdates) refresh(room, fp string, s int64) string {
+//	r.Lock()
+//	defer r.Unlock()
+//	remove := []string{}
+//	if updates, ok := r.m[room]; ok {
+//		out := make([]string, 0, len(updates))
+//		for u, t := range updates {
+//			if (time.Now().Unix() - t.timestamp) < s {
+//				if t.updater == fp {
+//					continue
+//				}
+//				if u == room {
+//					return room
+//				}
+//				out = append(out, u)
+//			} else {
+//				remove = append(remove, u)
+//			}
+//		}
+//		for _, r := range remove {
+//			delete(updates, r)
+//		}
+//		return strings.Join(out, "|")
+//	}
+//	return ""
+//}
 
 func init() {
 	http.HandleFunc("/", root)
@@ -83,12 +173,16 @@ func init() {
 var diceURLs = map[string]string{}
 var dieCounter int64
 var roomCounter int64
-var updates = roomUpdates{m: map[string]map[string]*update{}}
+//var updates = roomUpdates{m: map[string]map[string]*update{}}
+var refreshDelta = int64(10)
 
-type Room struct{}
+type Room struct{
+//	Updates []update
+	Updates []byte  // hooray having to use json
+	Timestamp int64
+}
 
 type Die struct {
-	//	sync.RWMutex
 	Size      string // for fate dice this won't be an integer
 	Result    int    // For fate dice make this one of three very large numbers?
 	ResultStr string
@@ -98,20 +192,16 @@ type Die struct {
 	Y         float64
 	Key       *datastore.Key
 	KeyStr    string
-	Timestamp time.Time
+	Timestamp int64
 	Image     string
 }
 
 func (d *Die) updatePosition(x, y float64) {
-	//	d.Lock()
-	//	defer d.Unlock()
 	d.X = x
 	d.Y = y
 }
 
 func (d *Die) getPosition() (float64, float64) {
-	//	d.RLock()
-	//	defer d.RUnlock()
 	return d.X, d.Y
 }
 
@@ -129,7 +219,11 @@ func dieKey(c appengine.Context, roomKey *datastore.Key) *datastore.Key {
 
 // TODO(shanel): Have a button to create a new room
 func newRoom(c appengine.Context) (string, error) {
-	k, err := datastore.Put(c, roomKey(c), &Room{})
+	up, err := json.Marshal([]Update{})
+	if err != nil {
+		return "", fmt.Errorf("ccould not marshal update: %v", err)
+	}
+	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix()})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
@@ -159,7 +253,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				ResultStr: rs,
 				Key:       dk,
 				KeyStr:    dk.Encode(),
-				Timestamp: time.Now(),
+				Timestamp: time.Now().Unix(),
 				Image:     diu,
 			}
 			dice = append(dice, &d)
@@ -170,12 +264,9 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	for _, k := range keys {
 		keyStrings = append(keyStrings, k.Encode())
 	}
-	rk, err := datastore.PutMulti(c, keys, dice)
+	_, err := datastore.PutMulti(c, keys, dice)
 	if err != nil {
 		return fmt.Errorf("could not create new dice: %v", err)
-	}
-	if len(rk) != len(keys) {
-		return fmt.Errorf("wrong number of keys returned: got %v, want %v", len(rk), len(keys))
 	}
 	return nil
 }
@@ -191,7 +282,7 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 		Result:    r,
 		ResultStr: rs,
 		Key:       dieKey(c, roomKey),
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Unix(),
 		Image:     diu,
 	}
 	// TODO(shanel): Refactor to use PutMulti instead
@@ -207,7 +298,7 @@ func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Order("Result").Limit(10)
+	q := datastore.NewQuery("Die").Ancestor(k).Order("Result")//.Limit(10)
 	dice := make([]Die, 0, 10)
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
@@ -230,7 +321,7 @@ func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
 		// TODO(shanel): Refactor to use DeleteMulti
 		err = datastore.Delete(c, d)
 		if err != nil {
-			return fmt.Errorf("problem deleting room dice: %v", err)
+			return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
 		}
 	}
 	return nil
@@ -271,7 +362,7 @@ func getDeleteImageURL(c appengine.Context) (string, error) {
 	return path, nil
 }
 
-func updateDieLocation(c appengine.Context, encodedDieKey string, x, y float64) error {
+func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float64) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -285,6 +376,7 @@ func updateDieLocation(c appengine.Context, encodedDieKey string, x, y float64) 
 	if err != nil {
 		return fmt.Errorf("could not update die %v with new position: %v", encodedDieKey, err)
 	}
+	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
 	return nil
 }
 
@@ -350,7 +442,8 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.RemoteAddr + r.UserAgent()
-	ref := updates.refresh(keyStr, fp, 3)
+//	ref := updates.refresh(keyStr, fp, 3)
+	ref := refreshRoom(c, keyStr, fp)
 	c.Infof("checking refresh for %v, (fp: %v): %v", keyStr, fp, ref)
 	fmt.Fprintf(w, "%v", ref)
 }
@@ -368,7 +461,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
 	}
-	err = updateDieLocation(c, keyStr, x, y)
+	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
 	}
@@ -376,10 +469,8 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 	}
-	updates.updated(roomCookie.Value, keyStr, fp)
 }
 
-// Unexpected token at start of html?
 
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
@@ -523,8 +614,8 @@ interact('.dropzone').dropzone({
 //		     console.log(items[i]);
 //		     $("#" + items[i]).load(window.location.href + " #" + items[i]);
 //	     };
-             var t = 'true';
-//             console.log(b);
+//             var t = 'true';
+             console.log(b);
 //             console.log(t);
              if (b != "") {
                  $("#refreshable").load(window.location.href + " #refreshable");
@@ -532,7 +623,7 @@ interact('.dropzone').dropzone({
          });
  }
  
-  setInterval('autoRefresh_div()', 2000); // refresh div after 2 second
+  setInterval('autoRefresh_div()', 5000); // refresh div after 2 second
   </script>
   </head>
   <body>
@@ -585,6 +676,7 @@ interact('.dropzone').dropzone({
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
+	// TODO(shanel): maybe better to get from referrer instead of cookie?
 	roomCookie, err := r.Cookie("dice_room")
 	if err != nil {
 		// If no cookie, then create a room, set cookie, and redirect
@@ -632,7 +724,8 @@ func roll(w http.ResponseWriter, r *http.Request) {
 //	if err != nil {
 //		c.Errorf("couldn't find fingerprint")
 //	}
-	updates.updated(roomKey.Encode(), roomKey.Encode(), r.RemoteAddr + r.UserAgent())
+//	updates.updated(roomKey.Encode(), roomKey.Encode(), r.RemoteAddr + r.UserAgent())  // remove soon
+	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
@@ -659,7 +752,8 @@ func clear(w http.ResponseWriter, r *http.Request) {
 //	if err != nil {
 //		c.Errorf("couldn't find fingerprint")
 //	}
-	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())
+//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
+	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
