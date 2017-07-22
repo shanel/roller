@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,31 +18,56 @@ import (
 	//"appengine/user"
 )
 
+type update struct {
+	timestamp int64
+	updater string
+}
+
 // TODO(shanel): Would it make sense to have room updates for #refreshable
 // and dice updates for individual dice? maybe just refresh the dice's divs
 // as they are updated?
 type roomUpdates struct {
 	sync.Mutex
-	m map[string]int64
+//	m map[string]int64
+	m map[string]map[string]*update
 }
 
-func (r *roomUpdates) updated(room string) {
+func (r *roomUpdates) updated(room, die, fp string) {
 	r.Lock()
 	defer r.Unlock()
-	r.m[room] = time.Now().Unix()
-}
-
-func (r *roomUpdates) refresh(room string) bool {
-	r.Lock()
-	defer r.Unlock()
-	if lastUpdate, ok := r.m[room]; ok {
-		// value should be 2 or 3 likely
-		if (time.Now().Unix() - lastUpdate) < 1 {
-			return true
-		}
-		r.m[room] = 0
+	if _, ok := r.m[room]; !ok {
+//		r.m[room] = map[string]int64{die: time.Now().Unix()}
+		r.m[room] = map[string]*update{die: &update{time.Now().Unix(), fp}}
+		return
 	}
-	return false
+	r.m[room][die] = &update{time.Now().Unix(), fp}
+}
+
+func (r *roomUpdates) refresh(room, fp string, s int64) string {
+	r.Lock()
+	defer r.Unlock()
+	remove := []string{}
+	if updates, ok := r.m[room]; ok {
+		out := make([]string, 0, len(updates))
+		for u, t := range updates {
+			if (time.Now().Unix() - t.timestamp) < s {
+				if t.updater == fp {
+					continue
+				}
+				if u == room {
+					return room
+				}
+				out = append(out, u)
+			} else {
+				remove = append(remove, u)
+			}
+		}
+		for _, r := range remove {
+			delete(updates, r)
+		}
+		return strings.Join(out, "|")
+	}
+	return ""
 }
 
 func init() {
@@ -57,7 +83,7 @@ func init() {
 var diceURLs = map[string]string{}
 var dieCounter int64
 var roomCounter int64
-var updates = roomUpdates{m: map[string]int64{}}
+var updates = roomUpdates{m: map[string]map[string]*update{}}
 
 type Room struct{}
 
@@ -318,12 +344,14 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TODO(shanel): Probably would make the most sense to try and push all updates here (ie not just rooms)
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	ref := updates.refresh(keyStr)
-	c.Infof("checking refresh for %v: %v", keyStr, ref)
+	fp := r.Form.Get("fp")
+	ref := updates.refresh(keyStr, fp, 1)
+	c.Infof("checking refresh for %v, (fp: %v): %v", keyStr, fp, ref)
 	fmt.Fprintf(w, "%v", ref)
 }
 
@@ -331,6 +359,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
+	fp := r.Form.Get("fp")
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -347,15 +376,17 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 	}
-	updates.updated(roomCookie.Value)
+	updates.updated(roomCookie.Value, keyStr, fp)
 }
 
+// Unexpected token at start of html?
 
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
   <head>
     <title>Dice Roller</title>
-  <link rel="stylesheet" type="text/css" src="drag.css" />
+  <link rel="stylesheet" type="text/css" src="css/drag.css" />
+  <!-- <script src="js/client.js"></script> -->
   <script src="http://code.interactjs.io/v1.2.9/interact.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script type="text/javascript" language="javascript">
@@ -406,7 +437,7 @@ interact('.draggable')
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
-    $.post('move', {'id': target.id, 'x': x, 'y': y});
+    $.post('move', {'id': target.id, 'x': x, 'y': y, 'fp': fingerprint});
 
   }
 
@@ -474,17 +505,32 @@ interact('.dropzone').dropzone({
   }
 });
 
+var client = new ClientJS();
+var fingerprint = client.getFingerprint();
+$.cookie("dice_roller_fp", fingerprint);
+
  function autoRefresh_div() {
      var room = (window.location.href).split("=")[1];
      $.post("/refresh", {
-             id: room
+             id: room,
+	     fp: fingerprint,
          })
          .done(function(data) {
+		 // need to cycle through the |-spearated list
              var b = data;
+//             var item_str = data;
+//	     var items = item_str.split("|");
+//	     for (i = 0; i < items.length; i++) {
+//		     if (items[0] == "") {
+//			     break
+//		     }
+//		     console.log(items[i]);
+//		     $("#" + items[i]).load(window.location.href + " #" + items[i]);
+//	     };
              var t = 'true';
-	     console.log(b);
-             console.log(t);
-             if (b == t) {
+//             console.log(b);
+//             console.log(t);
+             if (b != "") {
                  $("#refreshable").load(window.location.href + " #refreshable");
              };
          });
@@ -515,7 +561,6 @@ interact('.dropzone').dropzone({
         <img src="{{.Image}}">
       </div>
     {{end}}
-    </div>
     <br>
     <br>
 <div id="drag-1" class="draggable">
@@ -533,6 +578,7 @@ interact('.dropzone').dropzone({
   #outer-dropzone
   <div id="inner-dropzone" class="dropzone">#inner-dropzone</div>
  </div>
+    </div>
   </body>
 </html>
 `))
@@ -586,7 +632,11 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	//		}
 	//
 	//	}
-	updates.updated(roomKey.Encode())
+	fp, err := r.Cookie("dice_roller_fp")
+	if err != nil {
+		c.Errorf("couldn't find fingerprint")
+	}
+	updates.updated(roomKey.Encode(), roomKey.Encode(), fp.Value)
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
@@ -609,7 +659,11 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	updates.updated(roomCookie.Value)
+	fp, err := r.Cookie("dice_roller_fp")
+	if err != nil {
+		c.Errorf("couldn't find fingerprint")
+	}
+	updates.updated(roomCookie.Value, roomCookie.Value, fp.Value)
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 }
 
