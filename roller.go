@@ -535,7 +535,7 @@ interact('.draggable')
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
-    $.post('move', {'id': target.id, 'x': x, 'y': y});
+    $.post('/move', {'id': target.id, 'x': x, 'y': y});
 
   }
 
@@ -622,15 +622,16 @@ function deleteMarked() {
 		 $.post("/delete", { id: toDelete[i].id, }).done(function(data) {});
 	}
 	if (toDelete.length > 0) {
-		$("#refreshable").load(window.location.referrer + " #refreshable");
+		$("#refreshable").load(window.location.href + " #refreshable");
 	}
+		$("#refreshable").load(window.location.href + " #refreshable");
 }
 
 interact('.tap-target')
   .on('tap', function (event) {
 //    event.currentTarget.classList.toggle('switch-bg');
     event.currentTarget.classList.toggle('to-delete');
-    event.preventDefault();
+//    event.preventDefault();
 //  })
 //  .on('doubletap', function (event) {
 //    event.currentTarget.classList.toggle('large');
@@ -750,6 +751,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.RemoteAddr + r.UserAgent()
+	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
 	err := deleteDieHelper(c, keyStr, fp)
 	if err != nil {
