@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -39,7 +40,7 @@ func (r *refreshCounter) increment() int64 {
 func updateRoom(c appengine.Context, rk string, u Update) error {
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
-		return fmt.Errorf("could not decode room key %v: %v", rk, err)
+		return fmt.Errorf("updateRoom: could not decode room key %v: %v", rk, err)
 	}
 	var r Room
 	t := time.Now().Unix()
@@ -79,7 +80,7 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
-		c.Errorf("could not decode room key %v: %v", rk, err)
+		c.Errorf("refreshRoom: could not decode room key %v: %v", rk, err)
 		return out
 	}
 	var r Room
@@ -131,6 +132,8 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/room", room)
+	http.HandleFunc("/room/", room)
+	http.HandleFunc("/room/*", room)
 	http.HandleFunc("/roll", roll)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/move", move)
@@ -273,7 +276,7 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
+		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).Order("Result") //.Limit(10)
 	dice := []Die{}
@@ -286,7 +289,7 @@ func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
-		return fmt.Errorf("could not decode room key %v: %v", encodedRoomKey, err)
+		return fmt.Errorf("clearRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).KeysOnly()
 	out := q.Run(c)
@@ -391,6 +394,8 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
+// TODO(shanel): Get rid of cookie stuff and just do it all via referrer?
+
 // the root request should check for a cookie which tells what room the request should actually go to
 // (reminder: when setting the room explicitly, set the cookie) - if that cookie is not present or is
 // invalid, create a new random room, set the cookie and drop the user there, otherwise show user
@@ -400,7 +405,8 @@ func root(w http.ResponseWriter, r *http.Request) {
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
 	if err == nil {
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+//		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", roomCookie.Value), http.StatusFound)
 	}
 	// If no cookie, then create a room, set cookie, and redirect
 	room, err := newRoom(c)
@@ -409,14 +415,16 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+//	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 // TODO(shanel): We keep making unused rooms...
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// TODO(shanel): Fix this - likely will crash is passed in w/o an id
-	room := r.URL.Query()["id"][0] // is this going to break?
+//	room := r.URL.Query()["id"][0] // is this going to break?
+	room := path.Base(r.URL.Path)
 	dice, err := getRoomDice(c, room)
 	if err != nil {
 		newRoom, err := newRoom(c)
@@ -425,7 +433,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", newRoom), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
 	// now we need a template for the whole page, and in the short term just print out strings of dice
 
@@ -468,10 +476,8 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
 	}
-	roomCookie, err := r.Cookie("dice_room")
-	if err == nil {
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
-	}
+	room := path.Base(r.Referer())
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 var roomTemplate = template.Must(template.New("room").Parse(`
@@ -553,25 +559,6 @@ interact('.draggable')
 
   }
 
-var saved = "";
-
-  function changeImg(elem, src, save)
-{
-    if (src != elem.src)
-    {
-        save = elem.src;
-        elem.src = src;
-    }
-}
-
-  function changeImgWithSave(elem, src, save)
-{
-    if (src != elem.src)
-    {
-        save = elem.src;
-        elem.src = src;
-    }
-}
 
   // this is used later in the resizing and gesture demos
   window.dragMoveListener = dragMoveListener;
@@ -631,7 +618,7 @@ interact('.dropzone').dropzone({
 
 
  function autoRefresh_div() {
-	 var room = (window.location.href).split("=")[1];
+	 var room = (window.location.pathname).split("/")[2];
 	 $.post("/refresh", {
 		 id: room,
 	 })
@@ -682,14 +669,7 @@ interact('.dropzone').dropzone({
     <br>
     <br>
 <br>
-<div id="no-drop" class="draggable drag-drop"> #no-drop </div>
-
-<div id="yes-drop" class="draggable drag-drop"> #yes-drop </div>
-
-<div id="outer-dropzone" class="dropzone">
-  #outer-dropzone
   <div id="inner-dropzone" class="dropzone">#inner-dropzone</div>
- </div>
     </div>
   </body>
 </html>
@@ -702,20 +682,22 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
 	// TODO(shanel): maybe better to get from referrer instead of cookie?
-	roomCookie, err := r.Cookie("dice_room")
-	if err != nil {
-		// If no cookie, then create a room, set cookie, and redirect
-		room, err := newRoom(c)
-		if err != nil {
-			// TODO(shanel): This should probably say something more...
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		cookie := &http.Cookie{Name: "dice_room", Value: room}
-		http.SetCookie(w, cookie)
-		roomCookie = cookie
-	}
+//	roomCookie, err := r.Cookie("dice_room")
+//	if err != nil {
+//		// If no cookie, then create a room, set cookie, and redirect
+//		room, err := newRoom(c)
+//		if err != nil {
+//			// TODO(shanel): This should probably say something more...
+//			http.Error(w, err.Error(), http.StatusInternalServerError)
+//		}
+//		cookie := &http.Cookie{Name: "dice_room", Value: room}
+//		http.SetCookie(w, cookie)
+//		roomCookie = cookie
+//	}
 	// Eventually split these all into separate go routines
-	roomKey, err := datastore.DecodeKey(roomCookie.Value)
+//	roomKey, err := datastore.DecodeKey(roomCookie.Value)
+	room := path.Base(r.Referer())
+	roomKey, err := datastore.DecodeKey(room)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -733,7 +715,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func deleteDie(w http.ResponseWriter, r *http.Request) {
@@ -745,28 +727,30 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	err := deleteDieHelper(c, keyStr, fp)
 	if err != nil {
 		c.Errorf("%v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 //	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
-	roomCookie, err := r.Cookie("dice_room")
-	if err != nil {
-		// If no cookie, then create a room, set cookie, and redirect
-		room, err := newRoom(c)
-		if err != nil {
-			// TODO(shanel): This should probably say something more...
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
-	}
-	// Eventually split these all into separate go routines
-	err = clearRoomDice(c, roomCookie.Value)
+//	roomCookie, err := r.Cookie("dice_room")
+//	if err != nil {
+//		// If no cookie, then create a room, set cookie, and redirect
+//		room, err := newRoom(c)
+//		if err != nil {
+//			// TODO(shanel): This should probably say something more...
+//			http.Error(w, err.Error(), http.StatusInternalServerError)
+//		}
+//		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
+//		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+//	}
+//	// Eventually split these all into separate go routines
+//	err = clearRoomDice(c, roomCookie.Value)
+	room := path.Base(r.Referer())
+	err := clearRoomDice(c, room)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -775,8 +759,8 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	//		c.Errorf("couldn't find fingerprint")
 	//	}
 	//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
-	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 // get all the room's dice and return them as a slice
