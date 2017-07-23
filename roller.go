@@ -600,7 +600,7 @@ interact('.dropzone').dropzone({
   },
   // This should call the delete function
   ondrop: function (event) {
-    event.relatedTarget.textContent = 'Dropped';
+ //   event.relatedTarget.textContent = 'Dropped';
 	 $.post("/delete", {
 		 id: event.relatedTarget.id,
 	 })
@@ -615,6 +615,32 @@ interact('.dropzone').dropzone({
     event.target.classList.remove('drop-target');
   }
 });
+
+function deleteMarked() {
+	var toDelete = document.getElementsByClassName("to-delete");
+	for (var i = 0; i < toDelete.length; i++) {
+		 $.post("/delete", { id: toDelete[i].id, }).done(function(data) {});
+	}
+	if (toDelete.length > 0) {
+		$("#refreshable").load(window.location.referrer + " #refreshable");
+	}
+}
+
+interact('.tap-target')
+  .on('tap', function (event) {
+//    event.currentTarget.classList.toggle('switch-bg');
+    event.currentTarget.classList.toggle('to-delete');
+    event.preventDefault();
+//  })
+//  .on('doubletap', function (event) {
+//    event.currentTarget.classList.toggle('large');
+//    event.currentTarget.classList.remove('rotate');
+//    event.preventDefault();
+//  })
+//  .on('hold', function (event) {
+//    event.currentTarget.classList.toggle('rotate');
+//    event.currentTarget.classList.remove('large');
+  });
 
 
  function autoRefresh_div() {
@@ -658,11 +684,12 @@ interact('.dropzone').dropzone({
     <form action="/clear" method="post">
       <div><input type="submit" value="Clear"></div>
     </form>
+    <button onclick="deleteMarked()">Delete selected</button>
     <p><b>Results:</b></p>
     <hr>
     <div id="refreshable">
     {{range .Dice}}
-      <div id="{{.KeyStr}}" class="draggable drag-drop" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
+      <div id="{{.KeyStr}}" class="draggable drag-drop tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
         <img src="{{.Image}}">
       </div>
     {{end}}

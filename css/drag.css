@@ -67,3 +67,11 @@
   color: #000;
   background-color: #4e4;
 }
+
+.tap-target.switch-bg {
+  background-color: #f40;
+}
+
+.tap-target.to-delete {
+  background-color: #f40;
+}
