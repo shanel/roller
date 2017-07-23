@@ -165,6 +165,9 @@ type Die struct {
 	Label     string
 	X         float64
 	Y         float64
+	// use the to store old offsets and then add the new ones when they come in - constantly updating?
+	OldX      float64
+        OldY      float64
 	Key       *datastore.Key
 	KeyStr    string
 	Timestamp int64
@@ -172,6 +175,8 @@ type Die struct {
 }
 
 func (d *Die) updatePosition(x, y float64) {
+//	d.OldX = d.X
+//        d.OldY = d.Y
 	d.X = x
 	d.Y = y
 }
@@ -518,26 +523,52 @@ interact('.draggable')
 //                     event.dy * event.dy)|0) + 'px');
 //    }
   });
+
+function getOffset( el ) {
+    var _x = 0;
+    var _y = 0;
+    while( el && !isNaN( el.offsetLeft ) && !isNaN( el.offsetTop ) ) {
+        _x += el.offsetLeft - el.scrollLeft;
+        _y += el.offsetTop - el.scrollTop;
+        el = el.offsetParent;
+    }
+    return { top: _y, left: _x };
+}
+//var x = getOffset( document.getElementById('yourElId') ).left; 
+
   function dragMoveEnd (event) {
     var target = event.target,
         // keep the dragged position in the data-x/data-y attributes
         x = (parseFloat(target.getAttribute('data-x')) || 0),
         y = (parseFloat(target.getAttribute('data-y')) || 0);
+//        x = (parseFloat(target.getAttribute('data-dx')) || 0),
+//        y = (parseFloat(target.getAttribute('data-dy')) || 0);
 
+      var left = getOffset( document.getElementById('refreshable') ).left; 
+      var top = getOffset( document.getElementById('refreshable') ).top; 
+      console.log(left, top)
 
 
     // translate the element
-    target.style.webkittransform =
-    target.style.transform =
-      'translate(' + x + 'px, ' + y + 'px)';
+//    target.style = null;
+//    target.style.webkittransform =
+//    target.style.transform =
+//      'translate(' + x + 'px, ' + y + 'px)';
+      target.style = null;
+      target.style.position = 'absolute';
+      target.style.top = event.pageY + 'px';
+      target.style.left = event.pageX + 'px';
 
-    // update the posiion attributes
-    target.setAttribute('data-x', x);
-    target.setAttribute('data-y', y);
+    // update the position attributes
+//    target.setAttribute('data-x', x);
+//    target.setAttribute('data-y', y);
+//    console.log(event.pageX, event.pageY);
+//    console.log(event.type, event.x0, event.y0);
 
-    $.post('/move', {'id': target.id, 'x': x, 'y': y});
+    $.post('/move', {'id': target.id, 'x': event.pageX, 'y': event.pageY});
 
   }
+
 
   function dragMoveListener (event) {
     var target = event.target,
@@ -548,14 +579,21 @@ interact('.draggable')
 
 
     // translate the element
-    target.style.webkittransform =
-    target.style.transform =
-      'translate(' + x + 'px, ' + y + 'px)';
+//    target.style = null;
+//    target.style.webkittransform =
+//    target.style.transform =
+//      'translate(' + x + 'px, ' + y + 'px)';
+      target.style = null;
+      target.style.position = 'absolute';
+      target.style.top = event.pageY + 'px';
+      target.style.left = event.pageX + 'px';
+
 
     // update the posiion attributes
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
+    console.log(event.type, event.x0, event.y0);
 
   }
 
@@ -690,14 +728,14 @@ interact('.tap-target')
     <hr>
     <div id="refreshable">
     {{range .Dice}}
-      <div id="{{.KeyStr}}" class="draggable drag-drop tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
+    <!-- <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px;)"> -->
+    <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
         <img src="{{.Image}}">
       </div>
     {{end}}
     <br>
     <br>
 <br>
-  <div id="inner-dropzone" class="dropzone">#inner-dropzone</div>
     </div>
   </body>
 </html>
