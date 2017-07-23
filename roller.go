@@ -172,13 +172,13 @@ type Die struct {
 	KeyStr    string
 	Timestamp int64
 	Image     string
+	New       bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
-//	d.OldX = d.X
-//        d.OldY = d.Y
 	d.X = x
 	d.Y = y
+	d.New = false
 }
 
 func (d *Die) getPosition() (float64, float64) {
@@ -238,6 +238,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				KeyStr:    dk.Encode(),
 				Timestamp: time.Now().Unix(),
 				Image:     diu,
+				New:       true,
 			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
@@ -269,6 +270,7 @@ func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
 		KeyStr:    dk.Encode(),
 		Timestamp: time.Now().Unix(),
 		Image:     diu,
+		New:       true,
 	}
 	// TODO(shanel): Refactor to use PutMulti instead
 	_, err = datastore.Put(c, d.Key, &d)
@@ -546,7 +548,6 @@ function getOffset( el ) {
 
       var left = getOffset( document.getElementById('refreshable') ).left; 
       var top = getOffset( document.getElementById('refreshable') ).top; 
-      console.log(left, top)
 
 
     // translate the element
@@ -593,7 +594,6 @@ function getOffset( el ) {
     target.setAttribute('data-x', x);
     target.setAttribute('data-y', y);
 
-    console.log(event.type, event.x0, event.y0);
 
   }
 
@@ -728,10 +728,15 @@ interact('.tap-target')
     <hr>
     <div id="refreshable">
     {{range .Dice}}
-    <!-- <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px;)"> -->
-    <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+      {{if .New}}
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);"> 
         <img src="{{.Image}}">
       </div>
+      {{else}}
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+        <img src="{{.Image}}">
+      </div>
+      {{end}}
     {{end}}
     <br>
     <br>
