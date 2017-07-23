@@ -355,6 +355,23 @@ func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float
 	return nil
 }
 
+func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	err = datastore.Delete(c, k)
+	if err != nil {
+		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
+	}
+	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+	return nil
+}
+
 func getNewResult(kind string) (int, string) {
 	s, err := strconv.Atoi(kind)
 	if err != nil {
@@ -546,6 +563,26 @@ interact('.draggable')
 
   }
 
+var saved = "";
+
+  function changeImg(elem, src, save)
+{
+    if (src != elem.src)
+    {
+        save = elem.src;
+        elem.src = src;
+    }
+}
+
+  function changeImgWithSave(elem, src, save)
+{
+    if (src != elem.src)
+    {
+        save = elem.src;
+        elem.src = src;
+    }
+}
+
   // this is used later in the resizing and gesture demos
   window.dragMoveListener = dragMoveListener;
 
@@ -573,18 +610,28 @@ interact('.dropzone').dropzone({
     // feedback the possibility of a drop
     dropzoneElement.classList.add('drop-target');
     draggableElement.classList.add('can-drop');
-    draggableElement.textContent = 'Dragged in';
+//    draggableElement.textContent = 'Dragged in';
+    changeImgWithSave(event.target, {{.Del}}, saved);
   },
   // This should put the die back to what it was.
   ondragleave: function (event) {
     // remove the drop feedback style
     event.target.classList.remove('drop-target');
     event.relatedTarget.classList.remove('can-drop');
-    event.relatedTarget.textContent = 'Dragged out';
+//    event.relatedTarget.textContent = 'Dragged out';
+    changeImg(event.relatedTarget, saved);
+    
   },
   // This should call the delete function
   ondrop: function (event) {
-    event.relatedTarget.textContent = 'Dropped';
+//    event.relatedTarget.textContent = 'Dropped';
+	 $.post("/delete", {
+		 id: event.relatedTarget.id,
+	 })
+         .done(function(data) {
+					 $("#refreshable").load(window.location.href + " #refreshable");
+	 });
+  
   },
   ondropdeactivate: function (event) {
     // remove active dropzone feedback
@@ -639,7 +686,7 @@ interact('.dropzone').dropzone({
     <hr>
     <div id="refreshable">
     {{range .Dice}}
-      <div id="{{.KeyStr}}" class="draggable" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
+      <div id="{{.KeyStr}}" class="draggable drag-drop" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);">
         <img src="{{.Image}}">
       </div>
     {{end}}
@@ -702,32 +749,17 @@ func roll(w http.ResponseWriter, r *http.Request) {
 
 func deleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	roomCookie, err := r.Cookie("dice_room")
-	if err != nil {
-		// If no cookie, then create a room, set cookie, and redirect
-		room, err := newRoom(c)
-		if err != nil {
-			// TODO(shanel): This should probably say something more...
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
-	}
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	d, err := datastore.DecodeKey(keyStr)
-	if err != nil {
-		c.Errorf("couldn't decode die key %v", keyStr)
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
-	}
+	fp := r.RemoteAddr + r.UserAgent()
 	// Do we need to be worried dice will be deleted from other rooms?
-	err = datastore.Delete(c, d)
+	err := deleteDieHelper(c, keyStr, fp)
 	if err != nil {
-		c.Errorf("problem deleting room die %v from room %v: %v", keyStr, roomCookie.Value, err)
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+		c.Errorf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
 	}
-	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
+//	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
