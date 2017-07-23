@@ -126,6 +126,8 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	return out
 }
 
+// TODO(shanel): Maybe instead of passing ids (at least for rooms), just have it be after a slash
+// ie /room/asdfgergkka
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/room", room)
@@ -410,44 +412,32 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
 }
 
+// TODO(shanel): We keep making unused rooms...
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+	// TODO(shanel): Fix this - likely will crash is passed in w/o an id
 	room := r.URL.Query()["id"][0] // is this going to break?
-	// TODO(shanel): If the room doesn't exist we need to gracefully send them elsewhere
-	roomCookie, err := r.Cookie("dice_room")
-	if err == nil {
-		if roomCookie.Value != room {
-			http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-		}
-	}
 	dice, err := getRoomDice(c, room)
 	if err != nil {
-		// Can probably nuke this once done testing - it'll spam the logs
-		room, err := newRoom(c)
+		newRoom, err := newRoom(c)
 		if err != nil {
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
-		//	http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
+		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", newRoom), http.StatusFound)
 	}
 	// now we need a template for the whole page, and in the short term just print out strings of dice
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
-	del, err := getDeleteImageURL(c)
-	if err != nil {
-		c.Errorf("couldn't get delete image url: %v", err)
-	}
-	p := Passer{Del: del, Dice: dice}
+	p := Passer{Dice: dice}
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type Passer struct {
-	Del string
 	Dice []Die
 }
 
@@ -602,7 +592,8 @@ interact('.dropzone').dropzone({
     // add active dropzone feedback
     event.target.classList.add('drop-active');
   },
-  // This should change the die to the X
+  // Instead of changing image - just highlight the dropzone.
+  // That is enough warning.
   ondragenter: function (event) {
     var draggableElement = event.relatedTarget,
         dropzoneElement = event.target;
@@ -611,7 +602,6 @@ interact('.dropzone').dropzone({
     dropzoneElement.classList.add('drop-target');
     draggableElement.classList.add('can-drop');
 //    draggableElement.textContent = 'Dragged in';
-    changeImgWithSave(event.target, {{.Del}}, saved);
   },
   // This should put the die back to what it was.
   ondragleave: function (event) {
@@ -619,12 +609,11 @@ interact('.dropzone').dropzone({
     event.target.classList.remove('drop-target');
     event.relatedTarget.classList.remove('can-drop');
 //    event.relatedTarget.textContent = 'Dragged out';
-    changeImg(event.relatedTarget, saved);
     
   },
   // This should call the delete function
   ondrop: function (event) {
-//    event.relatedTarget.textContent = 'Dropped';
+    event.relatedTarget.textContent = 'Dropped';
 	 $.post("/delete", {
 		 id: event.relatedTarget.id,
 	 })
