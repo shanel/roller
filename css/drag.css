@@ -72,9 +72,9 @@
   background-color: #f40;
 }
 
-/*.tap-target {
-  display: block;
-}*/
+.tap-target {
+  display: inline-block;
+}
 
 .tap-target.to-delete {
   background-color: #f40;
