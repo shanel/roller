@@ -1,3 +1,5 @@
+// TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
+// Also should test out that highlighting for removal shows up for everyone, not just the one doing it? (if it matters)
 package roller
 
 import (
@@ -215,7 +217,7 @@ func newRoom(c appengine.Context) (string, error) {
 
 // TODO(shanel): After anything that changes the room, update the roomUpdates map so clients can check
 // in to see if they should refresh
-func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key) error {
+func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	for size, v := range sizes {
@@ -225,7 +227,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 		}
 		for i := 0; i < count; i++ {
 			r, rs := getNewResult(size)
-			diu, err := getDieImageURL(c, size, rs)
+			diu, err := getDieImageURL(c, size, rs, color)
 			if err != nil {
 				c.Errorf("could not get die image: %v", err)
 			}
@@ -255,9 +257,9 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	return nil
 }
 
-func newDie(c appengine.Context, size string, roomKey *datastore.Key) error {
+func newDie(c appengine.Context, size string, roomKey *datastore.Key, color string) error {
 	r, rs := getNewResult(size)
-	diu, err := getDieImageURL(c, size, rs)
+	diu, err := getDieImageURL(c, size, rs, color)
 	if err != nil {
 		return fmt.Errorf("could not get die image: %v", err)
 	}
@@ -314,13 +316,13 @@ func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
 	return nil
 }
 
-func getDieImageURL(c appengine.Context, size, result string) (string, error) {
+func getDieImageURL(c appengine.Context, size, result, color string) (string, error) {
 	// Fate dice silliness
 	ft := map[string]string{"-": "minus", "+": "plus", " ": "zero"}
 	if _, ok := ft[result]; ok {
 		result = ft[result]
 	}
-	d := fmt.Sprintf("d%s/%s.png", size, result)
+	d := fmt.Sprintf("%s-d%s/%s.png", color, size, result)
 	// Should this have a mutex?
 	if u, ok := diceURLs[d]; ok {
 		return u, nil
@@ -711,13 +713,24 @@ interact('.tap-target')
   </head>
   <body>
     <form action="/roll" method="post">
-      <div><textarea name="d4" rows="1" cols="2"></textarea>d4</div>
-      <div><textarea name="d6" rows="1" cols="2"></textarea>d6</div>
-      <div><textarea name="d8" rows="1" cols="2"></textarea>d8</div>
-      <div><textarea name="d10" rows="1" cols="2"></textarea>d10</div>
-      <div><textarea name="d12" rows="1" cols="2"></textarea>d12</div>
-      <div><textarea name="d20" rows="1" cols="2"></textarea>d20</div>
-      <div><textarea name="dF" rows="1" cols="2"></textarea>dF</div>
+      <div><input type="text" name="d4" style ="width: 25px"></input>d4</div>
+      <div><input type="text" name="d6" style ="width: 25px"></input>d6</div>
+      <div><input type="text" name="d8" style ="width: 25px"></input>d8</div>
+      <div><input type="text" name="d10" style ="width: 25px"></input>d10</div>
+      <div><input type="text" name="d12" style ="width: 25px"></input>d12</div>
+      <div><input type="text" name="d20" style ="width: 25px"></input>d20</div>
+      <div><input type="text" name="dF" style ="width: 25px"></input>dF</div>
+      <div>
+		<select id="selectColor" name="color">
+			<option value="blue" style="color: #1e90ff">Blue</option>
+			<option value="clear" style="color: #ffffff" >Clear</option>
+			<option value="green" style="color: #008b45">Green</option>
+			<option value="orange" style="color: #ff8c00">Orange</option>
+			<option value="red" style="color: #ff3333">Red</option>
+			<option value="purple" style="color: #8a2be2" >Purple</option>
+			<option value="yellow" style="color: #ffd700" >Yellow</option>
+		</select>
+      </div>
       <div><input type="submit" value="Roll"></div>
     </form>
     <form action="/clear" method="post">
@@ -781,7 +794,8 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"20": r.FormValue("d20"),
 		"F":  r.FormValue("dF"),
 	}
-	if err = newRoll(c, toRoll, roomKey); err != nil {
+	color := r.FormValue("color")
+	if err = newRoll(c, toRoll, roomKey, color); err != nil {
 		c.Errorf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
