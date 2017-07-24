@@ -1,6 +1,5 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Also should test out that highlighting for removal shows up for everyone, not just the one doing it? (if it matters)
-// The weirdness with moving out from under you when dragging is still a bit annoying...
 // The red bar for deletes is getting annoying.
 package roller
 
@@ -736,7 +735,7 @@ interact('.tap-target')
     <div id="refreshable">
     {{range .Dice}}
       {{if .New}}
-        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px);"> 
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}";> 
         <img src="{{.Image}}">
       </div>
       {{else}}
