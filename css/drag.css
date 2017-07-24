@@ -79,3 +79,11 @@
 .tap-target.to-delete {
   background-color: #f40;
 }
+
+.tap-target.hidden {
+  background-color: #c2c2d6;
+}
+
+.tap-target.to-hide {
+  background-color: #c2c2d6;
+}

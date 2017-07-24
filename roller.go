@@ -173,6 +173,7 @@ type Die struct {
 	Timestamp int64
 	Image     string
 	New       bool
+	HiddenFor string
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -437,7 +438,8 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	fp := r.RemoteAddr + r.UserAgent()
+	fp := r.Form.Get("fp")
+//	fp := r.RemoteAddr + r.UserAgent()
 	ref := refreshRoom(c, keyStr, fp)
 	fmt.Fprintf(w, "%v", ref)
 }
@@ -446,7 +448,8 @@ func move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	fp := r.RemoteAddr + r.UserAgent()
+	fp := r.Form.Get("fp")
+//	fp := r.RemoteAddr + r.UserAgent()
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -470,7 +473,15 @@ var roomTemplate = template.Must(template.New("room").Parse(`
   <link type="text/css" rel="stylesheet" href="/css/drag.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
 <script type="text/javascript" language="javascript">
+
+var fp = "";
+new Fingerprint2().get(function(result, components){
+  fp = result; //a hash, representing your device fingerprint
+  var x = document.getElementsByName("fp");
+  x[0].value = fp;
+});
 
 
 
@@ -560,7 +571,7 @@ function getOffset( el ) {
 //    console.log(event.type, event.x0, event.y0);
 
 //    $.post('/move', {'id': target.id, 'x': event.pageX, 'y': event.pageY});
-    $.post('/move', {'id': target.id, 'x': x, 'y': y});
+$.post('/move', {'id': target.id, 'x': x, 'y': y, 'fp': fp});
 
   }
 
@@ -657,11 +668,16 @@ interact('.dropzone').dropzone({
 function deleteMarked() {
 	var toDelete = document.getElementsByClassName("to-delete");
 	for (var i = 0; i < toDelete.length; i++) {
-		 $.post("/delete", { id: toDelete[i].id, }).done(function(data) {});
+		$.post("/delete", { id: toDelete[i].id, 'fp': fp }).done(function(data) {});
 	}
 	if (toDelete.length > 0) {
 		$("#refreshable").load(window.location.href + " #refreshable");
 	}
+		$("#refreshable").load(window.location.href + " #refreshable");
+}
+
+function clearAllDice() {
+		$.post("/clear", { 'fp': fp }).done(function(data) {});
 		$("#refreshable").load(window.location.href + " #refreshable");
 }
 
@@ -686,6 +702,7 @@ interact('.tap-target')
 	 var room = (window.location.pathname).split("/")[2];
 	 $.post("/refresh", {
 		 id: room,
+		 fp: fp,
 	 })
          .done(function(data) {
 		 var b = data;
@@ -727,12 +744,14 @@ interact('.tap-target')
 			<option value="yellow" style="color: #ffd700" >Yellow</option>
 		</select>
       
+      <input type="hidden" name="fp" value="">
       <p></p>
       <input type="submit" value="Roll">
     </form>
-    <form action="/clear" method="post">
+<!--    <form action="/clear" method="post">
       <input type="submit" value="Clear">
-    </form>
+    </form> -->
+    <button onclick="clearAllDice()">Clear</button>
     <button onclick="deleteMarked()">Delete selected</button>
     </center>
     <hr>
@@ -795,7 +814,9 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		c.Errorf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+	fp := r.FormValue("fp")
+	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+//	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -803,7 +824,8 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-	fp := r.RemoteAddr + r.UserAgent()
+//	fp := r.RemoteAddr + r.UserAgent()
+	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
 	err := deleteDieHelper(c, keyStr, fp)
@@ -841,7 +863,10 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	//		c.Errorf("couldn't find fingerprint")
 	//	}
 	//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
-	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+	fp := r.Form.Get("fp")
+	updateRoom(c, room, Update{Updater: fp, Timestamp: time.Now().Unix()})
+//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
