@@ -533,10 +533,10 @@ function getOffset( el ) {
 
     var transformer = target.style.transform;
     if (transformer.search("px") != -1) {
-//	    x += parseFloat(target.getAttribute('start-x'));  
-//	    y += parseFloat(target.getAttribute('start-y'));  
-	    x += left;
-	    y += top;
+	    x += parseFloat(target.getAttribute('start-x'));  
+	    y += parseFloat(target.getAttribute('start-y'));  
+//	    x += left;
+//	    y += top;
     }
 
 
