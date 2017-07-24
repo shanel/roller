@@ -736,6 +736,7 @@ interact('.tap-target')
     <button onclick="deleteMarked()">Delete selected</button>
     </center>
     <hr>
+    <center>
     <div id="refreshable">
     {{range .Dice}}
       {{if .New}}
@@ -748,10 +749,8 @@ interact('.tap-target')
       </div>
       {{end}}
     {{end}}
-    <br>
-    <br>
-<br>
     </div>
+    </center>
   </body>
 </html>
 `))
