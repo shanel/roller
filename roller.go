@@ -1,5 +1,7 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Also should test out that highlighting for removal shows up for everyone, not just the one doing it? (if it matters)
+// The weirdness with moving out from under you when dragging is still a bit annoying...
+// The red bar for deletes is getting annoying.
 package roller
 
 import (
@@ -336,21 +338,6 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	return path, nil
 }
 
-func getDeleteImageURL(c appengine.Context) (string, error) {
-	d := "delete.png"
-	// Should this have a mutex?
-	if u, ok := diceURLs[d]; ok {
-		return u, nil
-	}
-	bucket, err := file.DefaultBucketName(c)
-	if err != nil {
-		return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
-	}
-	path := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
-	diceURLs[d] = path
-	return path, nil
-}
-
 func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float64) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
@@ -382,7 +369,9 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	if err != nil {
 		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
 	}
-	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+	// Fake updater so Safari will work?
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari no worky", Timestamp: time.Now().Unix()})
+//	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
 	return nil
 }
 
@@ -528,6 +517,7 @@ interact('.draggable')
 //    }
   });
 
+
 function getOffset( el ) {
     var _x = 0;
     var _y = 0;
@@ -553,14 +543,16 @@ function getOffset( el ) {
 
 
     // translate the element
-//    target.style = null;
+    target.style = null;
 //    target.style.webkittransform =
 //    target.style.transform =
 //      'translate(' + x + 'px, ' + y + 'px)';
       target.style = null;
       target.style.position = 'absolute';
-      target.style.top = event.pageY + 'px';
-      target.style.left = event.pageX + 'px';
+//      target.style.top = event.pageY + 'px';
+      target.style.top = y + 'px';
+//      target.style.left = event.pageX + 'px';
+      target.style.left = x + 'px';
 
     // update the position attributes
 //    target.setAttribute('data-x', x);
@@ -568,7 +560,8 @@ function getOffset( el ) {
 //    console.log(event.pageX, event.pageY);
 //    console.log(event.type, event.x0, event.y0);
 
-    $.post('/move', {'id': target.id, 'x': event.pageX, 'y': event.pageY});
+//    $.post('/move', {'id': target.id, 'x': event.pageX, 'y': event.pageY});
+    $.post('/move', {'id': target.id, 'x': x, 'y': y});
 
   }
 
@@ -588,8 +581,10 @@ function getOffset( el ) {
 //      'translate(' + x + 'px, ' + y + 'px)';
       target.style = null;
       target.style.position = 'absolute';
-      target.style.top = event.pageY + 'px';
-      target.style.left = event.pageX + 'px';
+//      target.style.top = event.pageY + 'px';
+      target.style.top = y + 'px';
+//      target.style.left = event.pageX + 'px';
+      target.style.left = x + 'px';
 
 
     // update the posiion attributes
@@ -692,15 +687,12 @@ interact('.tap-target')
          .done(function(data) {
 		 var b = data;
 		 if (b != "") {
-			 console.log("b: " + b);
 			 if (sessionStorage.lastUpdateId) {
 				 if (b != sessionStorage.lastUpdateId) {
-					 console.log(b + " != " + sessionStorage.lastUpdateId);
 					 $("#refreshable").load(window.location.href + " #refreshable");
 					 sessionStorage.lastUpdateId = b;
 				 }
 			 } else {
-				 console.log("didn't find local storage, so setting it to " + b);
 				 $("#refreshable").load(window.location.href + " #refreshable");
 			         sessionStorage.lastUpdateId = b;
 			 }
@@ -712,15 +704,16 @@ interact('.tap-target')
   </script>
   </head>
   <body>
+    <center>
     <form action="/roll" method="post">
-      <div><input type="text" name="d4" style ="width: 25px"></input>d4</div>
-      <div><input type="text" name="d6" style ="width: 25px"></input>d6</div>
-      <div><input type="text" name="d8" style ="width: 25px"></input>d8</div>
-      <div><input type="text" name="d10" style ="width: 25px"></input>d10</div>
-      <div><input type="text" name="d12" style ="width: 25px"></input>d12</div>
-      <div><input type="text" name="d20" style ="width: 25px"></input>d20</div>
-      <div><input type="text" name="dF" style ="width: 25px"></input>dF</div>
-      <div>
+      <input type="text" name="d4" style ="width: 25px"></input>d4
+      <input type="text" name="d6" style ="width: 25px"></input>d6
+      <input type="text" name="d8" style ="width: 25px"></input>d8
+      <input type="text" name="d10" style ="width: 25px"></input>d10
+      <input type="text" name="d12" style ="width: 25px"></input>d12
+      <input type="text" name="d20" style ="width: 25px"></input>d20
+      <input type="text" name="dF" style ="width: 25px"></input>dF
+      
 		<select id="selectColor" name="color">
 			<option value="blue" style="color: #1e90ff">Blue</option>
 			<option value="clear" style="color: #ffffff" >Clear</option>
@@ -730,14 +723,15 @@ interact('.tap-target')
 			<option value="purple" style="color: #8a2be2" >Purple</option>
 			<option value="yellow" style="color: #ffd700" >Yellow</option>
 		</select>
-      </div>
-      <div><input type="submit" value="Roll"></div>
+      
+      <p></p>
+      <input type="submit" value="Roll">
     </form>
     <form action="/clear" method="post">
-      <div><input type="submit" value="Clear"></div>
+      <input type="submit" value="Clear">
     </form>
     <button onclick="deleteMarked()">Delete selected</button>
-    <p><b>Results:</b></p>
+    </center>
     <hr>
     <div id="refreshable">
     {{range .Dice}}
@@ -815,7 +809,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
-//	updateRoom(c, roomCookie.Value, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
+//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
