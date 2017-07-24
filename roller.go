@@ -1,6 +1,5 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Also should test out that highlighting for removal shows up for everyone, not just the one doing it? (if it matters)
-// The red bar for deletes is getting annoying.
 package roller
 
 import (
@@ -130,8 +129,6 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	return out
 }
 
-// TODO(shanel): Maybe instead of passing ids (at least for rooms), just have it be after a slash
-// ie /room/asdfgergkka
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/room", room)
@@ -190,15 +187,11 @@ func (d *Die) getPosition() (float64, float64) {
 
 // roomKey creates a new room entity key.
 func roomKey(c appengine.Context) *datastore.Key {
-	//	roomCounter++
-	//	return datastore.NewKey(c, "Room", "", roomCounter, nil)
 	return datastore.NewKey(c, "Room", "", time.Now().UnixNano(), nil)
 }
 
 // dieKey creates a new die entity key.
 func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key {
-	//	dieCounter++
-	//	return datastore.NewKey(c, "Die", "", dieCounter, roomKey)
 	res := datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
 	return res
 }
@@ -207,7 +200,7 @@ func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key
 func newRoom(c appengine.Context) (string, error) {
 	up, err := json.Marshal([]Update{})
 	if err != nil {
-		return "", fmt.Errorf("ccould not marshal update: %v", err)
+		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
 	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix()})
 	if err != nil {
@@ -370,7 +363,6 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	}
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari no worky", Timestamp: time.Now().Unix()})
-//	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
 	return nil
 }
 
@@ -391,12 +383,6 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
-// TODO(shanel): Get rid of cookie stuff and just do it all via referrer?
-
-// the root request should check for a cookie which tells what room the request should actually go to
-// (reminder: when setting the room explicitly, set the cookie) - if that cookie is not present or is
-// invalid, create a new random room, set the cookie and drop the user there, otherwise show user
-// correct room.
 func root(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
@@ -502,6 +488,11 @@ interact('.draggable')
     // enable autoScroll
     autoScroll: true,
 
+    onstart: function (event) {
+//    // update the posiion attributes
+    event.target.setAttribute('start-x', event.x0);
+    event.target.setAttribute('start-y', event.y0);
+    },
     // call this function on every dragmove event
     onmove: dragMoveListener,
     onend: dragMoveEnd,
@@ -534,28 +525,38 @@ function getOffset( el ) {
         // keep the dragged position in the data-x/data-y attributes
         x = (parseFloat(target.getAttribute('data-x')) || 0),
         y = (parseFloat(target.getAttribute('data-y')) || 0);
-//        x = (parseFloat(target.getAttribute('data-dx')) || 0),
-//        y = (parseFloat(target.getAttribute('data-dy')) || 0);
 
       var left = getOffset( document.getElementById('refreshable') ).left; 
       var top = getOffset( document.getElementById('refreshable') ).top; 
+      console.log(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);
+
+
+    var transformer = target.style.transform;
+    if (transformer.search("px") != -1) {
+//	    x += parseFloat(target.getAttribute('start-x'));  
+//	    y += parseFloat(target.getAttribute('start-y'));  
+	    x += left;
+	    y += top;
+    }
 
 
     // translate the element
-    target.style = null;
+//    target.style = null;
 //    target.style.webkittransform =
 //    target.style.transform =
 //      'translate(' + x + 'px, ' + y + 'px)';
       target.style = null;
       target.style.position = 'absolute';
 //      target.style.top = event.pageY + 'px';
+//      target.style.top = event.clientY + 'px';
       target.style.top = y + 'px';
 //      target.style.left = event.pageX + 'px';
+//      target.style.left = event.clientX + 'px';
       target.style.left = x + 'px';
 
     // update the position attributes
-//    target.setAttribute('data-x', x);
-//    target.setAttribute('data-y', y);
+    target.setAttribute('data-x', x);
+    target.setAttribute('data-y', y);
 //    console.log(event.pageX, event.pageY);
 //    console.log(event.type, event.x0, event.y0);
 
@@ -575,15 +576,19 @@ function getOffset( el ) {
 
     // translate the element
 //    target.style = null;
-//    target.style.webkittransform =
-//    target.style.transform =
-//      'translate(' + x + 'px, ' + y + 'px)';
+    var transformer = target.style.transform;
+    if (transformer.search("px") != -1) {
+    target.style.webkittransform =
+    target.style.transform =
+      'translate(' + x + 'px, ' + y + 'px)';
+      } else {
       target.style = null;
       target.style.position = 'absolute';
 //      target.style.top = event.pageY + 'px';
       target.style.top = y + 'px';
 //      target.style.left = event.pageX + 'px';
       target.style.left = x + 'px';
+      }
 
 
     // update the posiion attributes
@@ -735,7 +740,7 @@ interact('.tap-target')
     <div id="refreshable">
     {{range .Dice}}
       {{if .New}}
-        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}";> 
+      <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px)";> 
         <img src="{{.Image}}">
       </div>
       {{else}}
