@@ -528,7 +528,6 @@ function getOffset( el ) {
 
       var left = getOffset( document.getElementById('refreshable') ).left; 
       var top = getOffset( document.getElementById('refreshable') ).top; 
-      console.log(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);(left, top);
 
 
     var transformer = target.style.transform;
