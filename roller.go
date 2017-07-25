@@ -561,7 +561,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
 
             // translate the element
-            target.style = null;
+	    target.removeAttribute("style");
             target.style.position = 'absolute';
             target.style.top = y + 'px';
             target.style.left = x + 'px';
@@ -579,6 +579,15 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
         }
 
+        var delete_cookie = function(name) {
+           document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        };
+
+        var getNewRoom = function() {
+           delete_cookie('dice_room');
+           window.location.href = '/';
+        };
+
 
         function dragMoveListener(event) {
             var target = event.target,
@@ -591,6 +600,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
             // translate the element
             var transformer = target.style.transform;
             if (transformer.search("px") != -1) {
+                target.style.mstransform =
                 target.style.webkittransform =
                     target.style.transform =
                     'translate(' + x + 'px, ' + y + 'px)';
@@ -693,6 +703,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
         </form>
         <button onclick="clearAllDice()">Clear</button>
         <button onclick="deleteMarked()">Delete selected</button>
+<!--        <button onclick="getNewRoom()">Get a (new) room!</button> -->
     </center>
     <hr>
     <center>
