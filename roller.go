@@ -522,7 +522,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
 
 <head>
-    <title>Dice Roller</title>
+    <title>Roll Dice Or Say Yes</title>
     <link type="text/css" rel="stylesheet" href="/css/drag.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
@@ -698,6 +698,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
 <body>
     <center>
+        <h1><a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a></h1>
         <form action="/roll" method="post">
             <input type="text" name="d4" style="width: 25px"></input>d4
             <input type="text" name="d6" style="width: 25px"></input>d6
