@@ -1,5 +1,7 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
+// Probably would be good to factor out duplicate code.
+// Should also make a little "about" page noting where everything comes from.
 package roller
 
 import (
@@ -22,6 +24,13 @@ import (
 	//"appengine/user"
 )
 
+// As we create urls for the die images, store them here so we don't keep making them
+var diceURLs = map[string]string{}
+var dieCounter int64
+var roomCounter int64
+var refreshDelta = int64(2)
+var refresher = refreshCounter{}
+
 type Update struct {
 	Timestamp int64
 	Updater   string
@@ -37,6 +46,39 @@ func (r *refreshCounter) increment() int64 {
 	defer r.Unlock()
 	r.c++
 	return r.c
+}
+
+type Room struct {
+	Updates   []byte // hooray having to use json
+	Timestamp int64
+	ShortURL  string
+}
+
+type Die struct {
+	Size      string // for fate dice this won't be an integer
+	Result    int    // For fate dice make this one of three very large numbers?
+	ResultStr string
+	X         float64
+	Y         float64
+	Key       *datastore.Key
+	KeyStr    string
+	Timestamp int64
+	Image     string
+	New       bool
+}
+
+func (d *Die) updatePosition(x, y float64) {
+	d.X = x
+	d.Y = y
+	d.New = false
+}
+
+func (d *Die) getPosition() (float64, float64) {
+	return d.X, d.Y
+}
+
+type Passer struct {
+	Dice []Die
 }
 
 func updateRoom(c appengine.Context, rk string, u Update) error {
@@ -77,7 +119,6 @@ func updateRoom(c appengine.Context, rk string, u Update) error {
 	return nil
 }
 
-// TODO(shanel): This proabably can just go back to being a true/false thing
 func refreshRoom(c appengine.Context, rk, fp string) string {
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
@@ -129,59 +170,6 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	return out
 }
 
-func init() {
-	http.HandleFunc("/", root)
-	http.HandleFunc("/room", room)
-	http.HandleFunc("/room/", room)
-	http.HandleFunc("/room/*", room)
-	http.HandleFunc("/roll", roll)
-	http.HandleFunc("/clear", clear)
-	http.HandleFunc("/move", move)
-	http.HandleFunc("/refresh", refresh)
-	http.HandleFunc("/delete", deleteDie)
-	rand.Seed(int64(time.Now().Unix()))
-}
-
-// As we create urls for the die images, store them here so we don't keep making them
-var diceURLs = map[string]string{}
-var dieCounter int64
-var roomCounter int64
-
-//var updates = roomUpdates{m: map[string]map[string]*update{}}
-var refreshDelta = int64(2)
-var refresher = refreshCounter{}
-
-type Room struct {
-	Updates   []byte // hooray having to use json
-	Timestamp int64
-	ShortURL  string
-}
-
-type Die struct {
-	Size      string // for fate dice this won't be an integer
-	Result    int    // For fate dice make this one of three very large numbers?
-	ResultStr string
-	Color     string
-	Label     string
-	X         float64
-	Y         float64
-	Key       *datastore.Key
-	KeyStr    string
-	Timestamp int64
-	Image     string
-	New       bool
-}
-
-func (d *Die) updatePosition(x, y float64) {
-	d.X = x
-	d.Y = y
-	d.New = false
-}
-
-func (d *Die) getPosition() (float64, float64) {
-	return d.X, d.Y
-}
-
 // roomKey creates a new room entity key.
 func roomKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, "Room", "", time.Now().UnixNano(), nil)
@@ -189,8 +177,7 @@ func roomKey(c appengine.Context) *datastore.Key {
 
 // dieKey creates a new die entity key.
 func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key {
-	res := datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
-	return res
+	return datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
 }
 
 // TODO(shanel): Have a button to create a new room
@@ -378,6 +365,19 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
+func init() {
+	http.HandleFunc("/", root)
+	http.HandleFunc("/room", room)
+	http.HandleFunc("/room/", room)
+	http.HandleFunc("/room/*", room)
+	http.HandleFunc("/roll", roll)
+	http.HandleFunc("/clear", clear)
+	http.HandleFunc("/move", move)
+	http.HandleFunc("/refresh", refresh)
+	http.HandleFunc("/delete", deleteDie)
+	rand.Seed(int64(time.Now().Unix()))
+}
+
 func root(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
@@ -393,33 +393,6 @@ func root(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-}
-
-// TODO(shanel): We keep making unused rooms...
-func room(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	room := path.Base(r.URL.Path)
-	dice, err := getRoomDice(c, room)
-	if err != nil {
-		newRoom, err := newRoom(c)
-		if err != nil {
-			// TODO(shanel): This should probably say something more...
-			http.NotFound(w, r)
-		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
-	}
-
-	cookie := &http.Cookie{Name: "dice_room", Value: room}
-	http.SetCookie(w, cookie)
-	p := Passer{Dice: dice}
-	if err := roomTemplate.Execute(w, p); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-type Passer struct {
-	Dice []Die
 }
 
 // TODO(shanel): Updates should probably ids instead of "true" - so clients can keep track of whether they need to reload or not
@@ -453,6 +426,81 @@ func move(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
+func roll(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	roomKey, err := datastore.DecodeKey(room)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	toRoll := map[string]string{
+		"4":  r.FormValue("d4"),
+		"6":  r.FormValue("d6"),
+		"8":  r.FormValue("d8"),
+		"10": r.FormValue("d10"),
+		"12": r.FormValue("d12"),
+		"20": r.FormValue("d20"),
+		"F":  r.FormValue("dF"),
+	}
+	color := r.FormValue("color")
+	if err = newRoll(c, toRoll, roomKey, color); err != nil {
+		c.Errorf("%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	fp := r.FormValue("fp")
+	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func deleteDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	fp := r.Form.Get("fp")
+	room := path.Base(r.Referer())
+	// Do we need to be worried dice will be deleted from other rooms?
+	err := deleteDieHelper(c, keyStr, fp)
+	if err != nil {
+		c.Errorf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func clear(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	err := clearRoomDice(c, room)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	fp := r.Form.Get("fp")
+	updateRoom(c, room, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func room(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.URL.Path)
+	dice, err := getRoomDice(c, room)
+	if err != nil {
+		newRoom, err := newRoom(c)
+		if err != nil {
+			// TODO(shanel): This should probably say something more...
+			http.NotFound(w, r)
+		}
+		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
+	}
+
+	cookie := &http.Cookie{Name: "dice_room", Value: room}
+	http.SetCookie(w, cookie)
+	p := Passer{Dice: dice}
+	if err := roomTemplate.Execute(w, p); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
 
@@ -463,14 +511,13 @@ var roomTemplate = template.Must(template.New("room").Parse(`
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
     <script type="text/javascript" language="javascript">
+
         var fp = "";
         new Fingerprint2().get(function(result, components) {
             fp = result; //a hash, representing your device fingerprint
             var x = document.getElementsByName("fp");
             x[0].value = fp;
         });
-
-
 
         // target elements with the "draggable" class
         interact('.draggable')
@@ -498,30 +545,14 @@ var roomTemplate = template.Must(template.New("room").Parse(`
             });
 
 
-        function getOffset(el) {
-            var _x = 0;
-            var _y = 0;
-            while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
-                _x += el.offsetLeft - el.scrollLeft;
-                _y += el.offsetTop - el.scrollTop;
-                el = el.offsetParent;
-            }
-            return {
-                top: _y,
-                left: _x
-            };
-        }
-
         function dragMoveEnd(event) {
             var target = event.target,
                 // keep the dragged position in the data-x/data-y attributes
                 x = (parseFloat(target.getAttribute('data-x')) || 0),
                 y = (parseFloat(target.getAttribute('data-y')) || 0);
 
-            var left = getOffset(document.getElementById('refreshable')).left;
-            var top = getOffset(document.getElementById('refreshable')).top;
 
-
+	    // TODO(shanel): This is janky and annoying...
             var transformer = target.style.transform;
             if (transformer.search("px") != -1) {
                 x += parseFloat(target.getAttribute('start-x'));
@@ -681,56 +712,3 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
 </html>
 `))
-
-func roll(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	room := path.Base(r.Referer())
-	roomKey, err := datastore.DecodeKey(room)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	toRoll := map[string]string{
-		"4":  r.FormValue("d4"),
-		"6":  r.FormValue("d6"),
-		"8":  r.FormValue("d8"),
-		"10": r.FormValue("d10"),
-		"12": r.FormValue("d12"),
-		"20": r.FormValue("d20"),
-		"F":  r.FormValue("dF"),
-	}
-	color := r.FormValue("color")
-	if err = newRoll(c, toRoll, roomKey, color); err != nil {
-		c.Errorf("%v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	fp := r.FormValue("fp")
-	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-}
-
-func deleteDie(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	r.ParseForm()
-	keyStr := r.Form.Get("id")
-	fp := r.Form.Get("fp")
-	room := path.Base(r.Referer())
-	// Do we need to be worried dice will be deleted from other rooms?
-	err := deleteDieHelper(c, keyStr, fp)
-	if err != nil {
-		c.Errorf("%v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-	}
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-}
-
-func clear(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	room := path.Base(r.Referer())
-	err := clearRoomDice(c, room)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	fp := r.Form.Get("fp")
-	updateRoom(c, room, Update{Updater: fp, Timestamp: time.Now().Unix()})
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-}
