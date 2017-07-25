@@ -1,5 +1,5 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
-// Also should test out that highlighting for removal shows up for everyone, not just the one doing it? (if it matters)
+// Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
 package roller
 
 import (
@@ -152,9 +152,9 @@ var refreshDelta = int64(2)
 var refresher = refreshCounter{}
 
 type Room struct {
-	//	Updates []update
 	Updates   []byte // hooray having to use json
 	Timestamp int64
+	ShortURL  string
 }
 
 type Die struct {
@@ -165,15 +165,11 @@ type Die struct {
 	Label     string
 	X         float64
 	Y         float64
-	// use the to store old offsets and then add the new ones when they come in - constantly updating?
-	OldX      float64
-        OldY      float64
 	Key       *datastore.Key
 	KeyStr    string
 	Timestamp int64
 	Image     string
 	New       bool
-	HiddenFor string
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -210,8 +206,6 @@ func newRoom(c appengine.Context) (string, error) {
 	return k.Encode(), nil
 }
 
-// TODO(shanel): After anything that changes the room, update the roomUpdates map so clients can check
-// in to see if they should refresh
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
@@ -363,7 +357,7 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari no worky", Timestamp: time.Now().Unix()})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix()})
 	return nil
 }
 
@@ -389,7 +383,6 @@ func root(w http.ResponseWriter, r *http.Request) {
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
 	if err == nil {
-//		http.Redirect(w, r, fmt.Sprintf("/room?id=%v", roomCookie.Value), http.StatusFound)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", roomCookie.Value), http.StatusFound)
 	}
 	// If no cookie, then create a room, set cookie, and redirect
@@ -399,15 +392,12 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-//	http.Redirect(w, r, fmt.Sprintf("/room?id=%v", room), http.StatusFound)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 // TODO(shanel): We keep making unused rooms...
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	// TODO(shanel): Fix this - likely will crash is passed in w/o an id
-//	room := r.URL.Query()["id"][0] // is this going to break?
 	room := path.Base(r.URL.Path)
 	dice, err := getRoomDice(c, room)
 	if err != nil {
@@ -419,7 +409,6 @@ func room(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
-	// now we need a template for the whole page, and in the short term just print out strings of dice
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
@@ -439,7 +428,6 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
-//	fp := r.RemoteAddr + r.UserAgent()
 	ref := refreshRoom(c, keyStr, fp)
 	fmt.Fprintf(w, "%v", ref)
 }
@@ -449,7 +437,6 @@ func move(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
-//	fp := r.RemoteAddr + r.UserAgent()
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -774,27 +761,8 @@ interact('.tap-target')
 </html>
 `))
 
-// the roll request should either have an explicit room in the passed args or be in the cookie, it
-// should then generate all the dice (results) and make sure they line up properly (and don't overlap
-// already existing dice).
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	// Check for cookie based room
-	// TODO(shanel): maybe better to get from referrer instead of cookie?
-//	roomCookie, err := r.Cookie("dice_room")
-//	if err != nil {
-//		// If no cookie, then create a room, set cookie, and redirect
-//		room, err := newRoom(c)
-//		if err != nil {
-//			// TODO(shanel): This should probably say something more...
-//			http.Error(w, err.Error(), http.StatusInternalServerError)
-//		}
-//		cookie := &http.Cookie{Name: "dice_room", Value: room}
-//		http.SetCookie(w, cookie)
-//		roomCookie = cookie
-//	}
-	// Eventually split these all into separate go routines
-//	roomKey, err := datastore.DecodeKey(roomCookie.Value)
 	room := path.Base(r.Referer())
 	roomKey, err := datastore.DecodeKey(room)
 	if err != nil {
@@ -816,7 +784,6 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.FormValue("fp")
 	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
-//	updateRoom(c, roomKey.Encode(), Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -824,7 +791,6 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
-//	fp := r.RemoteAddr + r.UserAgent()
 	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
@@ -833,56 +799,17 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
-//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	// Check for cookie based room
-//	roomCookie, err := r.Cookie("dice_room")
-//	if err != nil {
-//		// If no cookie, then create a room, set cookie, and redirect
-//		room, err := newRoom(c)
-//		if err != nil {
-//			// TODO(shanel): This should probably say something more...
-//			http.Error(w, err.Error(), http.StatusInternalServerError)
-//		}
-//		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-//		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
-//	}
-//	// Eventually split these all into separate go routines
-//	err = clearRoomDice(c, roomCookie.Value)
 	room := path.Base(r.Referer())
 	err := clearRoomDice(c, room)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	//	fp, err := r.Cookie("dice_roller_fp")
-	//	if err != nil {
-	//		c.Errorf("couldn't find fingerprint")
-	//	}
-	//	updates.updated(roomCookie.Value, roomCookie.Value, r.RemoteAddr + r.UserAgent())  // remove soon
-//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	fp := r.Form.Get("fp")
 	updateRoom(c, room, Update{Updater: fp, Timestamp: time.Now().Unix()})
-//	updateRoom(c, room, Update{Updater: r.RemoteAddr + r.UserAgent(), Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
-
-// get all the room's dice and return them as a slice
-// if the room name is unknown return a new room
-
-// take the form's entries and return a slice of dice
-
-// delete a die from the room
-
-// delete all dice in the room
-
-// create a new room, returning it's name
-
-// update a die's position
-
-// create die images(?)
-
-// TODO(shanel): make use of url shortener?
