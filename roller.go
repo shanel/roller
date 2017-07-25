@@ -455,309 +455,230 @@ func move(w http.ResponseWriter, r *http.Request) {
 
 var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
-  <head>
+
+<head>
     <title>Dice Roller</title>
-  <link type="text/css" rel="stylesheet" href="/css/drag.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
-<script type="text/javascript" language="javascript">
-
-var fp = "";
-new Fingerprint2().get(function(result, components){
-  fp = result; //a hash, representing your device fingerprint
-  var x = document.getElementsByName("fp");
-  x[0].value = fp;
-});
-
-
-
-// target elements with the "draggable" class
-interact('.draggable')
-  .draggable({
-    // enable inertial throwing
-    inertia: true,
-    // keep the element within the area of it's parent
-//    restrict: {
-//      restriction: "parent",
-//      endOnly: true,
-//      elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
-//    },
-    // enable autoScroll
-    autoScroll: true,
-
-    onstart: function (event) {
-//    // update the posiion attributes
-    event.target.setAttribute('start-x', event.x0);
-    event.target.setAttribute('start-y', event.y0);
-    },
-    // call this function on every dragmove event
-    onmove: dragMoveListener,
-    onend: dragMoveEnd,
-    // call this function on every dragend event
-//    onend: function (event) {
-//      var textEl = event.target.querySelector('p');
-//
-//      textEl && (textEl.textContent =
-//        'moved a distance of '
-//        + (Math.sqrt(event.dx * event.dx +
-//                     event.dy * event.dy)|0) + 'px');
-//    }
-  });
-
-
-function getOffset( el ) {
-    var _x = 0;
-    var _y = 0;
-    while( el && !isNaN( el.offsetLeft ) && !isNaN( el.offsetTop ) ) {
-        _x += el.offsetLeft - el.scrollLeft;
-        _y += el.offsetTop - el.scrollTop;
-        el = el.offsetParent;
-    }
-    return { top: _y, left: _x };
-}
-//var x = getOffset( document.getElementById('yourElId') ).left; 
-
-  function dragMoveEnd (event) {
-    var target = event.target,
-        // keep the dragged position in the data-x/data-y attributes
-        x = (parseFloat(target.getAttribute('data-x')) || 0),
-        y = (parseFloat(target.getAttribute('data-y')) || 0);
-
-      var left = getOffset( document.getElementById('refreshable') ).left; 
-      var top = getOffset( document.getElementById('refreshable') ).top; 
-
-
-    var transformer = target.style.transform;
-    if (transformer.search("px") != -1) {
-	    x += parseFloat(target.getAttribute('start-x'));  
-	    y += parseFloat(target.getAttribute('start-y'));  
-//	    x += left;
-//	    y += top;
-    }
-
-
-    // translate the element
-//    target.style = null;
-//    target.style.webkittransform =
-//    target.style.transform =
-//      'translate(' + x + 'px, ' + y + 'px)';
-      target.style = null;
-      target.style.position = 'absolute';
-//      target.style.top = event.pageY + 'px';
-//      target.style.top = event.clientY + 'px';
-      target.style.top = y + 'px';
-//      target.style.left = event.pageX + 'px';
-//      target.style.left = event.clientX + 'px';
-      target.style.left = x + 'px';
-
-    // update the position attributes
-    target.setAttribute('data-x', x);
-    target.setAttribute('data-y', y);
-//    console.log(event.pageX, event.pageY);
-//    console.log(event.type, event.x0, event.y0);
-
-//    $.post('/move', {'id': target.id, 'x': event.pageX, 'y': event.pageY});
-$.post('/move', {'id': target.id, 'x': x, 'y': y, 'fp': fp});
-
-  }
-
-
-  function dragMoveListener (event) {
-    var target = event.target,
-        // keep the dragged position in the data-x/data-y attributes
-        x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx,
-        y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+    <link type="text/css" rel="stylesheet" href="/css/drag.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
+    <script type="text/javascript" language="javascript">
+        var fp = "";
+        new Fingerprint2().get(function(result, components) {
+            fp = result; //a hash, representing your device fingerprint
+            var x = document.getElementsByName("fp");
+            x[0].value = fp;
+        });
 
 
 
-    // translate the element
-//    target.style = null;
-    var transformer = target.style.transform;
-    if (transformer.search("px") != -1) {
-    target.style.webkittransform =
-    target.style.transform =
-      'translate(' + x + 'px, ' + y + 'px)';
-      } else {
-      target.style = null;
-      target.style.position = 'absolute';
-//      target.style.top = event.pageY + 'px';
-      target.style.top = y + 'px';
-//      target.style.left = event.pageX + 'px';
-      target.style.left = x + 'px';
-      }
+        // target elements with the "draggable" class
+        interact('.draggable')
+            .draggable({
+                // enable inertial throwing
+                inertia: true,
+                // keep the element within the area of it's parent
+                //    restrict: {
+                //      restriction: "parent",
+                //      endOnly: true,
+                //      elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
+                //    },
+                // enable autoScroll
+                autoScroll: true,
+
+                onstart: function(event) {
+                    // update the posiion attributes
+                    event.target.setAttribute('start-x', event.x0);
+                    event.target.setAttribute('start-y', event.y0);
+                },
+                // call this function on every dragmove event
+                onmove: dragMoveListener,
+                onend: dragMoveEnd,
+                // call this function on every dragend event
+            });
 
 
-    // update the posiion attributes
-    target.setAttribute('data-x', x);
-    target.setAttribute('data-y', y);
+        function getOffset(el) {
+            var _x = 0;
+            var _y = 0;
+            while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
+                _x += el.offsetLeft - el.scrollLeft;
+                _y += el.offsetTop - el.scrollTop;
+                el = el.offsetParent;
+            }
+            return {
+                top: _y,
+                left: _x
+            };
+        }
+
+        function dragMoveEnd(event) {
+            var target = event.target,
+                // keep the dragged position in the data-x/data-y attributes
+                x = (parseFloat(target.getAttribute('data-x')) || 0),
+                y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+            var left = getOffset(document.getElementById('refreshable')).left;
+            var top = getOffset(document.getElementById('refreshable')).top;
 
 
-  }
+            var transformer = target.style.transform;
+            if (transformer.search("px") != -1) {
+                x += parseFloat(target.getAttribute('start-x'));
+                y += parseFloat(target.getAttribute('start-y'));
+            }
 
 
-  // this is used later in the resizing and gesture demos
-  window.dragMoveListener = dragMoveListener;
+            // translate the element
+            target.style = null;
+            target.style.position = 'absolute';
+            target.style.top = y + 'px';
+            target.style.left = x + 'px';
 
-/* The dragging code for '.draggable' from the demo above
- * applies to this demo as well so it doesn't have to be repeated. */
+            // update the position attributes
+            target.setAttribute('data-x', x);
+            target.setAttribute('data-y', y);
 
-// enable draggables to be dropped into this
-interact('.dropzone').dropzone({
-  // only accept elements matching this CSS selector
-//  accept: '#yes-drop',
-  // Require a 75% element overlap for a drop to be possible
-  overlap: 0.75,
+            $.post('/move', {
+                'id': target.id,
+                'x': x,
+                'y': y,
+                'fp': fp
+            });
 
-  // listen for drop related events:
-
-  ondropactivate: function (event) {
-    // add active dropzone feedback
-    event.target.classList.add('drop-active');
-  },
-  // Instead of changing image - just highlight the dropzone.
-  // That is enough warning.
-  ondragenter: function (event) {
-    var draggableElement = event.relatedTarget,
-        dropzoneElement = event.target;
-
-    // feedback the possibility of a drop
-    dropzoneElement.classList.add('drop-target');
-    draggableElement.classList.add('can-drop');
-//    draggableElement.textContent = 'Dragged in';
-  },
-  // This should put the die back to what it was.
-  ondragleave: function (event) {
-    // remove the drop feedback style
-    event.target.classList.remove('drop-target');
-    event.relatedTarget.classList.remove('can-drop');
-//    event.relatedTarget.textContent = 'Dragged out';
-    
-  },
-  // This should call the delete function
-  ondrop: function (event) {
- //   event.relatedTarget.textContent = 'Dropped';
-	 $.post("/delete", {
-		 id: event.relatedTarget.id,
-	 })
-         .done(function(data) {
-					 $("#refreshable").load(window.location.href + " #refreshable");
-	 });
-  
-  },
-  ondropdeactivate: function (event) {
-    // remove active dropzone feedback
-    event.target.classList.remove('drop-active');
-    event.target.classList.remove('drop-target');
-  }
-});
-
-function deleteMarked() {
-	var toDelete = document.getElementsByClassName("to-delete");
-	for (var i = 0; i < toDelete.length; i++) {
-		$.post("/delete", { id: toDelete[i].id, 'fp': fp }).done(function(data) {});
-	}
-	if (toDelete.length > 0) {
-		$("#refreshable").load(window.location.href + " #refreshable");
-	}
-		$("#refreshable").load(window.location.href + " #refreshable");
-}
-
-function clearAllDice() {
-		$.post("/clear", { 'fp': fp }).done(function(data) {});
-		$("#refreshable").load(window.location.href + " #refreshable");
-}
-
-interact('.tap-target')
-  .on('tap', function (event) {
-//    event.currentTarget.classList.toggle('switch-bg');
-    event.currentTarget.classList.toggle('to-delete');
-//    event.preventDefault();
-//  })
-//  .on('doubletap', function (event) {
-//    event.currentTarget.classList.toggle('large');
-//    event.currentTarget.classList.remove('rotate');
-//    event.preventDefault();
-//  })
-//  .on('hold', function (event) {
-//    event.currentTarget.classList.toggle('rotate');
-//    event.currentTarget.classList.remove('large');
-  });
+        }
 
 
- function autoRefresh_div() {
-	 var room = (window.location.pathname).split("/")[2];
-	 $.post("/refresh", {
-		 id: room,
-		 fp: fp,
-	 })
-         .done(function(data) {
-		 var b = data;
-		 if (b != "") {
-			 if (sessionStorage.lastUpdateId) {
-				 if (b != sessionStorage.lastUpdateId) {
-					 $("#refreshable").load(window.location.href + " #refreshable");
-					 sessionStorage.lastUpdateId = b;
-				 }
-			 } else {
-				 $("#refreshable").load(window.location.href + " #refreshable");
-			         sessionStorage.lastUpdateId = b;
-			 }
-		 }
-	 });
- }
- 
-  setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
-  </script>
-  </head>
-  <body>
+        function dragMoveListener(event) {
+            var target = event.target,
+                // keep the dragged position in the data-x/data-y attributes
+                x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx,
+                y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+
+
+            // translate the element
+            var transformer = target.style.transform;
+            if (transformer.search("px") != -1) {
+                target.style.webkittransform =
+                    target.style.transform =
+                    'translate(' + x + 'px, ' + y + 'px)';
+            } else {
+                target.style = null;
+                target.style.position = 'absolute';
+                target.style.top = y + 'px';
+                target.style.left = x + 'px';
+            }
+
+
+            // update the posiion attributes
+            target.setAttribute('data-x', x);
+            target.setAttribute('data-y', y);
+        }
+
+
+        // this is used later in the resizing and gesture demos
+        window.dragMoveListener = dragMoveListener;
+
+
+        function deleteMarked() {
+            var toDelete = document.getElementsByClassName("to-delete");
+            for (var i = 0; i < toDelete.length; i++) {
+                $.post("/delete", {
+                    id: toDelete[i].id,
+                    'fp': fp
+                }).done(function(data) {});
+            }
+            if (toDelete.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function clearAllDice() {
+            $.post("/clear", {
+                'fp': fp
+            }).done(function(data) {});
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        interact('.tap-target')
+            .on('tap', function(event) {
+                event.currentTarget.classList.toggle('to-delete');
+                //    event.preventDefault();
+            });
+
+
+        function autoRefresh_div() {
+            var room = (window.location.pathname).split("/")[2];
+            $.post("/refresh", {
+                    id: room,
+                    fp: fp,
+                })
+                .done(function(data) {
+                    var b = data;
+                    if (b != "") {
+                        if (sessionStorage.lastUpdateId) {
+                            if (b != sessionStorage.lastUpdateId) {
+                                $("#refreshable").load(window.location.href + " #refreshable");
+                                sessionStorage.lastUpdateId = b;
+                            }
+                        } else {
+                            $("#refreshable").load(window.location.href + " #refreshable");
+                            sessionStorage.lastUpdateId = b;
+                        }
+                    }
+                });
+        }
+
+        setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
+    </script>
+</head>
+
+<body>
     <center>
-    <form action="/roll" method="post">
-      <input type="text" name="d4" style ="width: 25px"></input>d4
-      <input type="text" name="d6" style ="width: 25px"></input>d6
-      <input type="text" name="d8" style ="width: 25px"></input>d8
-      <input type="text" name="d10" style ="width: 25px"></input>d10
-      <input type="text" name="d12" style ="width: 25px"></input>d12
-      <input type="text" name="d20" style ="width: 25px"></input>d20
-      <input type="text" name="dF" style ="width: 25px"></input>dF
-      
-		<select id="selectColor" name="color">
+        <form action="/roll" method="post">
+            <input type="text" name="d4" style="width: 25px"></input>d4
+            <input type="text" name="d6" style="width: 25px"></input>d6
+            <input type="text" name="d8" style="width: 25px"></input>d8
+            <input type="text" name="d10" style="width: 25px"></input>d10
+            <input type="text" name="d12" style="width: 25px"></input>d12
+            <input type="text" name="d20" style="width: 25px"></input>d20
+            <input type="text" name="dF" style="width: 25px"></input>dF
+
+            <select id="selectColor" name="color">
 			<option value="blue" style="color: #1e90ff">Blue</option>
 			<option value="clear" style="color: #ffffff" >Clear</option>
 			<option value="green" style="color: #008b45">Green</option>
 			<option value="orange" style="color: #ff8c00">Orange</option>
 			<option value="red" style="color: #ff3333">Red</option>
-			<option value="purple" style="color: #8a2be2" >Purple</option>
-			<option value="yellow" style="color: #ffd700" >Yellow</option>
+			<option value="violet" style="color: #8a2be2" >Purple</option>
+			<option value="gold" style="color: #ffd700" >Yellow</option>
 		</select>
-      
-      <input type="hidden" name="fp" value="">
-      <p></p>
-      <input type="submit" value="Roll">
-    </form>
-<!--    <form action="/clear" method="post">
-      <input type="submit" value="Clear">
-    </form> -->
-    <button onclick="clearAllDice()">Clear</button>
-    <button onclick="deleteMarked()">Delete selected</button>
+
+            <input type="hidden" name="fp" value="">
+            <p></p>
+            <input type="submit" value="Roll">
+        </form>
+        <button onclick="clearAllDice()">Clear</button>
+        <button onclick="deleteMarked()">Delete selected</button>
     </center>
     <hr>
     <center>
-    <div id="refreshable">
-    {{range .Dice}}
-      {{if .New}}
-      <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px)";> 
-        <img src="{{.Image}}">
-      </div>
-      {{else}}
-        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-        <img src="{{.Image}}">
-      </div>
-      {{end}}
-    {{end}}
-    </div>
+        <div id="refreshable">
+            {{range .Dice}} {{if .New}}
+            <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px)" ;>
+                <img src="{{.Image}}">
+            </div>
+            {{else}}
+            <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+                <img src="{{.Image}}">
+            </div>
+            {{end}} {{end}}
+        </div>
     </center>
-  </body>
+</body>
+
 </html>
 `))
 
