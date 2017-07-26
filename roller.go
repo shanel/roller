@@ -237,9 +237,9 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				if size == "tokens" {
 					r = 0
 					rs = "token"
-			} else {
-				r, rs = getNewResult(size)
-			}
+				} else {
+					r, rs = getNewResult(size)
+				}
 				diu, err := getDieImageURL(c, size, rs, color)
 				if err != nil {
 					c.Errorf("could not get die image: %v", err)
@@ -467,14 +467,14 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	toRoll := map[string]string{
-		"4":     r.FormValue("d4"),
-		"6":     r.FormValue("d6"),
-		"8":     r.FormValue("d8"),
-		"10":    r.FormValue("d10"),
-		"12":    r.FormValue("d12"),
-		"20":    r.FormValue("d20"),
-		"F":     r.FormValue("dF"),
-		"label": r.FormValue("label"),
+		"4":      r.FormValue("d4"),
+		"6":      r.FormValue("d6"),
+		"8":      r.FormValue("d8"),
+		"10":     r.FormValue("d10"),
+		"12":     r.FormValue("d12"),
+		"20":     r.FormValue("d20"),
+		"F":      r.FormValue("dF"),
+		"label":  r.FormValue("label"),
 		"tokens": r.FormValue("tokens"),
 	}
 	color := r.FormValue("color")
