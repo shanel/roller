@@ -231,9 +231,15 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 			if err != nil {
 				continue
 			}
-
+			var r int
+			var rs string
 			for i := 0; i < count; i++ {
-				r, rs := getNewResult(size)
+				if size == "tokens" {
+					r = 0
+					rs = "token"
+			} else {
+				r, rs = getNewResult(size)
+			}
 				diu, err := getDieImageURL(c, size, rs, color)
 				if err != nil {
 					c.Errorf("could not get die image: %v", err)
@@ -319,7 +325,11 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	if _, ok := ft[result]; ok {
 		result = ft[result]
 	}
+	c.Errorf("size: %v; result: %v; color: %v", size, result, color)
 	d := fmt.Sprintf("%s-d%s/%s.png", color, size, result)
+	if size == "0" || result == "token" {
+		d = fmt.Sprintf("tokens/%s_token.png", color)
+	}
 	// Should this have a mutex?
 	if u, ok := diceURLs[d]; ok {
 		return u, nil
@@ -388,6 +398,7 @@ func getNewResult(kind string) (int, string) {
 
 func init() {
 	http.HandleFunc("/", root)
+	http.HandleFunc("/about", about)
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/room/", room)
 	http.HandleFunc("/room/*", room)
@@ -464,6 +475,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"20":    r.FormValue("d20"),
 		"F":     r.FormValue("dF"),
 		"label": r.FormValue("label"),
+		"tokens": r.FormValue("tokens"),
 	}
 	color := r.FormValue("color")
 	if err = newRoll(c, toRoll, roomKey, color); err != nil {
@@ -522,6 +534,23 @@ func room(w http.ResponseWriter, r *http.Request) {
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func about(w http.ResponseWriter, r *http.Request) {
+	out := (`<html>
+	  <body>
+	    <center>
+	      <p>This is a dice roller.</p>
+	      <p>Give the URL for the room to others and they can see and do everything you can see and do.</p>
+	      <p>It was inspired by (and uses the dice images from) <a href="https://catchyourhare.com/diceroller/">this dice roller.</a></p>
+	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
+	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
+	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
+	      <p>If you make use of this, please think of donating some money to ...</p>
+	    </center>
+	  </body>
+	</html>`)
+	fmt.Fprintf(w, "%s", out)
 }
 
 func Convert(h string) color.RGBA {
@@ -789,6 +818,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
             <input type="text" name="d12" style="width: 25px"></input>d12
             <input type="text" name="d20" style="width: 25px"></input>d20
             <input type="text" name="dF" style="width: 25px"></input>dF
+            <input type="text" name="tokens" style="width: 25px"></input>tokens
             <input type="text" name="label" style="width: 100"></input>label
 
             <select id="selectColor" name="color">
@@ -803,11 +833,14 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
             <input type="hidden" name="fp" value="">
             <p></p>
-            <input type="submit" value="Roll">
+            <input type="submit" value="Submit">
         </form>
         <button onclick="clearAllDice()">Clear</button>
         <button onclick="deleteMarked()">Delete selected</button>
 <!--        <button onclick="getNewRoom()">Get a (new) room!</button> -->
+    <br>
+    <br>
+    <a href="/about">about</a>
     </center>
     <hr>
     <center>
