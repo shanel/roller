@@ -14,7 +14,6 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
 // Probably would be good to factor out duplicate code.
@@ -23,16 +22,29 @@ package roller
 
 import (
 	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"io/ioutil"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
+
+	"github.com/golang/freetype"
+	"golang.org/x/image/font"
 
 	"appengine"
 	"appengine/datastore"
@@ -214,30 +226,47 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	for size, v := range sizes {
-		count, err := strconv.Atoi(v)
-		if err != nil {
-			continue
-		}
-		for i := 0; i < count; i++ {
-			r, rs := getNewResult(size)
-			diu, err := getDieImageURL(c, size, rs, color)
+		if size != "label" {
+			count, err := strconv.Atoi(v)
 			if err != nil {
-				c.Errorf("could not get die image: %v", err)
+				continue
 			}
-			dk := dieKey(c, roomKey, int64(i))
-			d := Die{
-				Size:      size,
-				Result:    r,
-				ResultStr: rs,
-				Key:       dk,
-				KeyStr:    dk.Encode(),
-				Timestamp: time.Now().Unix(),
-				Image:     diu,
-				New:       true,
+
+			for i := 0; i < count; i++ {
+				r, rs := getNewResult(size)
+				diu, err := getDieImageURL(c, size, rs, color)
+				if err != nil {
+					c.Errorf("could not get die image: %v", err)
+				}
+				dk := dieKey(c, roomKey, int64(i))
+				d := Die{
+					Size:      size,
+					Result:    r,
+					ResultStr: rs,
+					Key:       dk,
+					KeyStr:    dk.Encode(),
+					Timestamp: time.Now().Unix(),
+					Image:     diu,
+					New:       true,
+				}
+				dice = append(dice, &d)
+				keys = append(keys, dk)
 			}
-			dice = append(dice, &d)
-			keys = append(keys, dk)
 		}
+	}
+
+	if sizes["label"] != "" {
+		lk := dieKey(c, roomKey, int64(len(dice)))
+		l := Die{
+			ResultStr: sizes["label"],
+			Key:       lk,
+			KeyStr:    lk.Encode(),
+			Timestamp: time.Now().Unix(),
+			Image:     fmt.Sprintf("/label?text=%s&color=%s", sizes["label"], color),
+			New:       true,
+		}
+		dice = append(dice, &l)
+		keys = append(keys, lk)
 	}
 	keyStrings := []string{}
 	for _, k := range keys {
@@ -246,31 +275,6 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	_, err := datastore.PutMulti(c, keys, dice)
 	if err != nil {
 		return fmt.Errorf("could not create new dice: %v", err)
-	}
-	return nil
-}
-
-func newDie(c appengine.Context, size string, roomKey *datastore.Key, color string) error {
-	r, rs := getNewResult(size)
-	diu, err := getDieImageURL(c, size, rs, color)
-	if err != nil {
-		return fmt.Errorf("could not get die image: %v", err)
-	}
-	dk := dieKey(c, roomKey, int64(0))
-	d := Die{
-		Size:      size,
-		Result:    r,
-		ResultStr: rs,
-		Key:       dk,
-		KeyStr:    dk.Encode(),
-		Timestamp: time.Now().Unix(),
-		Image:     diu,
-		New:       true,
-	}
-	// TODO(shanel): Refactor to use PutMulti instead
-	_, err = datastore.Put(c, d.Key, &d)
-	if err != nil {
-		return fmt.Errorf("could not create new die: %v", err)
 	}
 	return nil
 }
@@ -389,6 +393,7 @@ func init() {
 	http.HandleFunc("/room/*", room)
 	http.HandleFunc("/roll", roll)
 	http.HandleFunc("/clear", clear)
+	http.HandleFunc("/label", label)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
 	http.HandleFunc("/delete", deleteDie)
@@ -451,13 +456,14 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	toRoll := map[string]string{
-		"4":  r.FormValue("d4"),
-		"6":  r.FormValue("d6"),
-		"8":  r.FormValue("d8"),
-		"10": r.FormValue("d10"),
-		"12": r.FormValue("d12"),
-		"20": r.FormValue("d20"),
-		"F":  r.FormValue("dF"),
+		"4":     r.FormValue("d4"),
+		"6":     r.FormValue("d6"),
+		"8":     r.FormValue("d8"),
+		"10":    r.FormValue("d10"),
+		"12":    r.FormValue("d12"),
+		"20":    r.FormValue("d20"),
+		"F":     r.FormValue("dF"),
+		"label": r.FormValue("label"),
 	}
 	color := r.FormValue("color")
 	if err = newRoll(c, toRoll, roomKey, color); err != nil {
@@ -516,6 +522,82 @@ func room(w http.ResponseWriter, r *http.Request) {
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func Convert(h string) color.RGBA {
+
+	if strings.HasPrefix(h, "#") {
+		h = strings.Replace(h, "#", "", 1)
+	}
+
+	if len(h) == 3 {
+		h = fmt.Sprintf("%c%c%c%c%c%c", h[0], h[0], h[1], h[1], h[2], h[2])
+	}
+
+	d, _ := hex.DecodeString(h)
+
+	return color.RGBA{uint8(d[0]), uint8(d[1]), uint8(d[2]), uint8(1)}
+}
+
+func label(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	text, err := url.QueryUnescape(r.URL.Query()["text"][0])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	col := r.URL.Query()["color"][0]
+
+	// Read the font data.
+	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	f, err := freetype.ParseFont(fontBytes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	cols := map[string]string{
+		"blue":   "1e90ff",
+		"clear":  "ffffff",
+		"green":  "008b45",
+		"orange": "ff8c00",
+		"red":    "ff3333",
+		"violet": "8a2be2",
+		"gold":   "ffd700",
+	}
+	if _, ok := cols[col]; !ok {
+		c.Errorf("couldn't find color %s", col)
+		http.Error(w, fmt.Sprintf("couldn't find color %s", col), http.StatusInternalServerError)
+	}
+	// Initialize the context.
+	fg, bg := image.NewUniform(Convert(cols[col])), image.Black
+	width := (((utf8.RuneCountInString(text) * int(18)) / 72) * 58) + 30
+	rgba := image.NewRGBA(image.Rect(0, 0, width, 48))
+	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
+	fc := freetype.NewContext()
+	fc.SetDPI(96)
+	fc.SetFont(f)
+	fc.SetFontSize(18)
+	fc.SetClip(rgba.Bounds())
+	fc.SetDst(rgba)
+	fc.SetSrc(fg)
+	fc.SetHinting(font.HintingNone)
+
+	// Draw the text.
+	pt := freetype.Pt(10, 10+int(fc.PointToFixed(18)>>6))
+	_, err = fc.DrawString(text, pt)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	pt.Y += fc.PointToFixed(18 * 1.5)
+
+	err = png.Encode(w, rgba)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	c.Infof("Wrote out png OK.")
 }
 
 var roomTemplate = template.Must(template.New("room").Parse(`
@@ -707,6 +789,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
             <input type="text" name="d12" style="width: 25px"></input>d12
             <input type="text" name="d20" style="width: 25px"></input>d20
             <input type="text" name="dF" style="width: 25px"></input>dF
+            <input type="text" name="label" style="width: 100"></input>label
 
             <select id="selectColor" name="color">
 			<option value="blue" style="color: #1e90ff">Blue</option>

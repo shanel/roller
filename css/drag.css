@@ -20,4 +20,6 @@
 
 .tap-target.to-delete {
   background-color: #f40;
+  border-style: solid;
+  border-color: red;
 }
