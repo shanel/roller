@@ -545,6 +545,7 @@ func about(w http.ResponseWriter, r *http.Request) {
 	      <p>It was inspired by (and uses the dice images from) <a href="https://catchyourhare.com/diceroller/">this dice roller.</a></p>
 	      <p>The title comes from an idea who's authorship is discussed <a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">here</a>.</p>
 	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
+	      <p>Hex conversion code borrowed form <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
 	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
 	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
 	      <p>If you make use of this, please think of donating some money to ...</p>
