@@ -41,10 +41,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
+	"github.com/dustinkirkland/golang-petname"
 
 	"appengine"
 	"appengine/datastore"
@@ -80,7 +82,7 @@ func (r *refreshCounter) increment() int64 {
 type Room struct {
 	Updates   []byte // hooray having to use json
 	Timestamp int64
-	ShortURL  string
+	Slug  string
 }
 
 type Die struct {
@@ -110,6 +112,33 @@ type Passer struct {
 	Dice []Die
 }
 
+func noSpaces(str string) string {
+    return strings.Map(func(r rune) rune {
+        if unicode.IsSpace(r) {
+            return -1
+        }
+        return r
+    }, str)
+}
+
+func generateRoomName() string {
+	name := petname.Generate(3, " ")
+	name = strings.Title(name)
+	return noSpaces(name)
+}
+
+func getEncodedRoomKeyFromName(c appengine.Context, name string) (string, error) {
+	q := datastore.NewQuery("Room").Filter("Slug =", name).Limit(1).KeysOnly()
+	k, err := q.GetAll(c, nil)
+	if err != nil {
+		return name, fmt.Errorf("problem executing room (by Slug) query: %v", err)
+	}
+	if len(k) > 0 {
+		return k[0].Encode(), nil
+	}
+	return name, fmt.Errorf("couldn't find a room key for %v", name)
+}
+
 func updateRoom(c appengine.Context, rk string, u Update) error {
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
@@ -124,7 +153,7 @@ func updateRoom(c appengine.Context, rk string, u Update) error {
 		if err != nil {
 			return fmt.Errorf("could not marshal update: %v", err)
 		}
-		r = Room{Updates: up, Timestamp: t}
+		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName()}
 		_, err = datastore.Put(c, roomKey, &r)
 		if err != nil {
 			return fmt.Errorf("could not create updated room %v: %v", rk, err)
@@ -215,11 +244,22 @@ func newRoom(c appengine.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
-	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix()})
+	roomName := generateRoomName()
+	var k *datastore.Key
+	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
+//	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
-	return k.Encode(), nil
+//	return k.Encode(), nil
+	var testRoom Room
+	if err = datastore.Get(c, k, &testRoom); err != nil {
+		return "", fmt.Errorf("couldn't find the new entry: %v", err)
+	}
+	// TODO(shanel): why does it seem I need the above three lines? Race condition?
+//	c.Errorf("put in and got out room with slug %s", testRoom.Slug)
+
+	return roomName, nil
 }
 
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
@@ -422,6 +462,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	room, err := newRoom(c)
 	if err != nil {
 		// TODO(shanel): This should probably say something more...
+		c.Errorf("no room from root: %v", err)
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
@@ -432,7 +473,10 @@ func root(w http.ResponseWriter, r *http.Request) {
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr := r.Form.Get("id")
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Errorf("roomname wonkiness in refresh: %v", err)
+	}
 	fp := r.Form.Get("fp")
 	ref := refreshRoom(c, keyStr, fp)
 	fmt.Fprintf(w, "%v", ref)
@@ -441,7 +485,10 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 func move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr := r.Form.Get("id")
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Errorf("roomname wonkiness in move: %v", err)
+	}
 	fp := r.Form.Get("fp")
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
@@ -462,7 +509,11 @@ func move(w http.ResponseWriter, r *http.Request) {
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
-	roomKey, err := datastore.DecodeKey(room)
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		c.Errorf("roomname wonkiness in roll: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -490,11 +541,14 @@ func roll(w http.ResponseWriter, r *http.Request) {
 func deleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr := r.Form.Get("id")
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Errorf("roomname wonkiness in deleteDie: %v", err)
+	}
 	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
-	err := deleteDieHelper(c, keyStr, fp)
+	err = deleteDieHelper(c, keyStr, fp)
 	if err != nil {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -505,22 +559,31 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 func clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
-	err := clearRoomDice(c, room)
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		c.Errorf("roomname wonkiness in clear: %v", err)
+	}
+	err = clearRoomDice(c, keyStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
-	updateRoom(c, room, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.URL.Path)
-	dice, err := getRoomDice(c, room)
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		c.Errorf("room wonkiness in room: %v", err)
+	}
+	dice, err := getRoomDice(c, keyStr)
 	if err != nil {
 		newRoom, err := newRoom(c)
 		if err != nil {
+			c.Errorf("no room because: %v", err)
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}

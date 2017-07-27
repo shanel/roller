@@ -14,3 +14,7 @@ indexes:
   ancestor: yes
   properties:
   - name: Result
+
+- kind: Room
+  properties:
+  - name: Slug
