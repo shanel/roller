@@ -590,6 +590,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
+		time.Sleep(100 * time.Nanosecond)  // Getting into a race I think...
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
 
