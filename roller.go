@@ -247,17 +247,14 @@ func newRoom(c appengine.Context) (string, error) {
 	roomName := generateRoomName()
 	var k *datastore.Key
 	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
-//	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
-//	return k.Encode(), nil
 	var testRoom Room
 	if err = datastore.Get(c, k, &testRoom); err != nil {
 		return "", fmt.Errorf("couldn't find the new entry: %v", err)
 	}
 	// TODO(shanel): why does it seem I need the above three lines? Race condition?
-//	c.Errorf("put in and got out room with slug %s", testRoom.Slug)
 
 	return roomName, nil
 }
@@ -469,7 +466,6 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-// TODO(shanel): Updates should probably ids instead of "true" - so clients can keep track of whether they need to reload or not
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
