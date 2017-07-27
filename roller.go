@@ -122,6 +122,8 @@ func noSpaces(str string) string {
 }
 
 func generateRoomName() string {
+	// 3 part words will allow for 91922432 unique names
+	// 4 part words will allow for 41181249536 unique names
 	name := petname.Generate(3, " ")
 	name = strings.Title(name)
 	return noSpaces(name)
