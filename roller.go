@@ -57,8 +57,6 @@ import (
 
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
-var dieCounter int64
-var roomCounter int64
 var refreshDelta = int64(2)
 var refresher = refreshCounter{}
 
