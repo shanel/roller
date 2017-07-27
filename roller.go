@@ -477,7 +477,7 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Errorf("roomname wonkiness in refresh: %v", err)
+		c.Infof("roomname wonkiness in refresh: %v", err)
 	}
 	fp := r.Form.Get("fp")
 	ref := refreshRoom(c, keyStr, fp)
@@ -489,7 +489,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Errorf("roomname wonkiness in move: %v", err)
+		c.Infof("roomname wonkiness in move: %v", err)
 	}
 	fp := r.Form.Get("fp")
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
@@ -513,7 +513,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Errorf("roomname wonkiness in roll: %v", err)
+		c.Infof("roomname wonkiness in roll: %v", err)
 	}
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
@@ -545,7 +545,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Errorf("roomname wonkiness in deleteDie: %v", err)
+		c.Infof("roomname wonkiness in deleteDie: %v", err)
 	}
 	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
@@ -563,7 +563,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Errorf("roomname wonkiness in clear: %v", err)
+		c.Infof("roomname wonkiness in clear: %v", err)
 	}
 	err = clearRoomDice(c, keyStr)
 	if err != nil {
@@ -579,7 +579,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.URL.Path)
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Errorf("room wonkiness in room: %v", err)
+		c.Infof("room wonkiness in room: %v", err)
 	}
 	dice, err := getRoomDice(c, keyStr)
 	if err != nil {
