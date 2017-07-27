@@ -482,14 +482,7 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", ref)
 }
 
-func move(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	r.ParseForm()
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		c.Infof("roomname wonkiness in move: %v", err)
-	}
-	fp := r.Form.Get("fp")
+func getXY(c appengine.Context, r *http.Request) (float64, float64) {
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -498,6 +491,18 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
 	}
+  return x, y
+}
+
+func move(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Infof("roomname wonkiness in move: %v", err)
+	}
+	fp := r.Form.Get("fp")
+  x, y := getXY(c, r)
 	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
