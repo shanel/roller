@@ -635,6 +635,9 @@ func Convert(h string) color.RGBA {
 	return color.RGBA{uint8(d[0]), uint8(d[1]), uint8(d[2]), uint8(1)}
 }
 
+func pngtest (w http.ResponseWriter, r *http.Request) {
+}
+
 func label(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	text, err := url.QueryUnescape(r.URL.Query()["text"][0])
@@ -668,7 +671,8 @@ func label(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("couldn't find color %s", col), http.StatusInternalServerError)
 	}
 	// Initialize the context.
-	fg, bg := image.NewUniform(Convert(cols[col])), image.Black
+	//fg, bg := image.NewUniform(Convert(cols[col])), image.Black
+	fg, bg := image.Black, image.Opaque
 	rc := utf8.RuneCountInString(text)
 	if (rc % 2) == 0 {
 		rc += 1
