@@ -478,7 +478,7 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", ref)
 }
 
-func getXY(c appengine.Context, r *http.Request) (float64, float64) {
+func getXY(c appengine.Context, keyStr string, r *http.Request) (float64, float64) {
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -498,7 +498,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 		c.Infof("roomname wonkiness in move: %v", err)
 	}
 	fp := r.Form.Get("fp")
-  x, y := getXY(c, r)
+  x, y := getXY(c, keyStr, r)
 	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
@@ -644,7 +644,8 @@ func label(w http.ResponseWriter, r *http.Request) {
 	col := r.URL.Query()["color"][0]
 
 	// Read the font data.
-	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+//	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+	fontBytes, err := ioutil.ReadFile("Roboto-Regular.ttf")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
