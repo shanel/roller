@@ -986,11 +986,11 @@ button {
         <div id="refreshable">
             {{range .Dice}} {{if .New}}
             <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px)" ;>
-                <img src="{{.Image}}">
+                <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             </div>
             {{else}}
             <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-                <img src="{{.Image}}">
+                <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             </div>
             {{end}} {{end}}
         </div>
