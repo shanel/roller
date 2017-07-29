@@ -605,15 +605,14 @@ func about(w http.ResponseWriter, r *http.Request) {
 	out := (`<html>
 	  <body>
 	    <center>
-	      <p>This is a dice roller.</p>
-	      <p>Give the URL for the room to others and they can see and do everything you can see and do.</p>
-	      <p>It was inspired by (and uses the dice images from) <a href="https://catchyourhare.com/diceroller/">this dice roller.</a></p>
-	      <p>The title comes from an idea who's authorship is discussed <a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">here</a>.</p>
+	      <p>This is a dice roller. Give the URL for the room to others and they can see and do everything you can see and do.</p>
+        <p>Site based on (and dice images borrowed from) <a href="https://plus.google.com/+GrahamWalmsley">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
+	      <p<a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a>.</p>
 	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
-	      <p>Hex conversion code borrowed form <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
+	      <p>Hex conversion code borrowed from <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
 	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
 	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
-	      <p>If you make use of this, please think of donating some money to ...</p>
+        <p>If you make use of this, please think of donating some money to <a href="http://www.shantibhavanchildren.org/">Shanti Bhavan</a>.</p>
 	    </center>
 	  </body>
 	</html>`)
@@ -714,7 +713,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
 
-<!--    <a href="https://your-url" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#151513; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style> -->
+<!--    <a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#151513; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style> -->
 
     <a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
 
@@ -788,12 +787,13 @@ var roomTemplate = template.Must(template.New("room").Parse(`
         }
 
         var delete_cookie = function(name) {
-           document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+           document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/';
+           document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/room';
         };
 
         var getNewRoom = function() {
-           delete_cookie('dice_room');
-           window.location.href = '/';
+           delete_cookie("dice_room");
+           window.location.replace("/");
         };
 
 
@@ -899,40 +899,85 @@ body {
   border-style: solid;
   border-color: red;
 }
+
+
+html {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  padding-bottom: 6rem;
+  min-height: 100%;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1rem;
+  background-color: #efefef;
+  text-align: center;
+}
+
+button {
+  background-color: #e7e7e7;
+  color: black;
+  padding: 5px 5px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.button2 { background-color: #f44336; color: white; }
+
 </style>
 
 <body>
     <center>
-        <h1>Roll Dice Or Say Yes</h1>
-        <form action="/roll" method="post">
-            <input type="text" name="d4" style="width: 25px"></input> d4
-            <input type="text" name="d6" style="width: 25px"></input> d6
-            <input type="text" name="d8" style="width: 25px"></input> d8
-            <input type="text" name="d10" style="width: 25px"></input> d10
-            <input type="text" name="d12" style="width: 25px"></input> d12
-            <input type="text" name="d20" style="width: 25px"></input> d20
-            <input type="text" name="dF" style="width: 25px"></input> dF
-            <input type="text" name="tokens" style="width: 25px"></input> tokens
+        <h3>Roll Dice Or Say Yes</h3>
+        <p>A multi-user dice roller based on <a href="https://plus.google.com/+GrahamWalmsley">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
+        <form id="rollem" action="/roll" method="post">
+            <input type="text" name="d4" style="width: 19px"></input> d4
+            <input type="text" name="d6" style="width: 19px"></input> d6
+            <input type="text" name="d8" style="width: 19px"></input> d8
+            <input type="text" name="d10" style="width: 19px"></input> d10
+            <input type="text" name="d12" style="width: 19px"></input> d12
+            <input type="text" name="d20" style="width: 19px"></input> d20
+            <input type="text" name="dF" style="width: 19px"></input> dF
+            <input type="text" name="tokens" style="width: 19px"></input> tokens
             <input type="text" name="label" style="width: 100"></input> label
 
             <select id="selectColor" name="color">
-			<option value="blue" style="color: #1e90ff">Blue</option>
-			<option value="clear" style="color: #ffffff" >Clear</option>
-			<option value="green" style="color: #008b45">Green</option>
-			<option value="orange" style="color: #ff8c00">Orange</option>
-			<option value="red" style="color: #ff3333">Red</option>
-			<option value="violet" style="color: #8a2be2" >Purple</option>
-			<option value="gold" style="color: #ffd700" >Yellow</option>
-		</select>
+		            <option value="blue" style="color: #1e90ff">Blue</option>
+          			<option value="clear" style="color: #ffffff" >Clear</option>
+          			<option value="green" style="color: #008b45">Green</option>
+          			<option value="orange" style="color: #ff8c00">Orange</option>
+          			<option value="red" style="color: #ff3333">Red</option>
+          			<option value="violet" style="color: #8a2be2" >Purple</option>
+          			<option value="gold" style="color: #ffd700" >Yellow</option>
+         		</select>
 
             <input type="hidden" name="fp" value="">
             <p></p>
-            <input type="submit" value="Submit">
         </form>
-        <button onclick="clearAllDice()">Clear</button>
-        <button onclick="deleteMarked()">Delete selected</button>
-<!--        <button onclick="getNewRoom()">Get a (new) room!</button> -->
-    <br>
+        <button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit      </button>
+        <button class="button" onclick="clearAllDice()">Clear</button>
+        <button class="button" onclick="deleteMarked()">Delete selected</button>
+        <button class="button" onclick="getNewRoom()">New room</button> 
     <br>
     <a href="/about">about</a>
     </center>
@@ -950,6 +995,9 @@ body {
             {{end}} {{end}}
         </div>
     </center>
+<div class="footer">
+    If you get use out of this site, please consider donating to <a href="http://www.shantibhavanchildren.org/">Shanti Bhavan</a>.
+</div>
 </body>
 
 </html>
