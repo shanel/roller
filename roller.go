@@ -605,14 +605,13 @@ func about(w http.ResponseWriter, r *http.Request) {
 	out := (`<html>
 	  <body>
 	    <center>
-	      <p>This is a dice roller. Give the URL for the room to others and they can see and do everything you can see and do.</p>
-        <p>Site based on (and dice images borrowed from) <a href="https://plus.google.com/+GrahamWalmsley">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
+	      <p>This is a dice roller. Give the URL of the room to others and they can see and do everything you can see and do.</p>
+        <p>Site based on (and dice images borrowed from) <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
 	      <p<a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a>.</p>
 	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
 	      <p>Hex conversion code borrowed from <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
 	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
 	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
-        <p>If you make use of this, please think of donating some money to <a href="http://www.shantibhavanchildren.org/">Shanti Bhavan</a>.</p>
 	    </center>
 	  </body>
 	</html>`)
@@ -930,6 +929,10 @@ body {
   text-align: center;
 }
 
+.attribution {
+	font-size: x-small;
+}
+
 button {
   background-color: #e7e7e7;
   color: black;
@@ -948,8 +951,8 @@ button {
 
 <body>
     <center>
-        <h3>Roll Dice Or Say Yes</h3>
-        <p>A multi-user dice roller based on <a href="https://plus.google.com/+GrahamWalmsley">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
+        <h3>Roll For Your Party: A multi-user dice roller.</h3>
+        <p>Send the URL to your friends and roll away!</p>
         <form id="rollem" action="/roll" method="post">
             <input type="text" name="d4" style="width: 19px"></input> d4
             <input type="text" name="d6" style="width: 19px"></input> d6
@@ -997,6 +1000,10 @@ button {
     </center>
 <div class="footer">
     If you get use out of this site, please consider donating to <a href="http://www.shantibhavanchildren.org/">Shanti Bhavan</a>.
+		<br>
+		<div class="attribution">
+		Design and functionality based on <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.
+		</div>
 </div>
 </body>
 
