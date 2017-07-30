@@ -273,6 +273,9 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 			if err != nil {
 				continue
 			}
+      if count > 500 {
+        continue
+      }
 			var r int
 			var rs string
 			for i := 0; i < count; i++ {
