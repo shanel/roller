@@ -262,8 +262,13 @@ func newRoom(c appengine.Context) (string, error) {
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
+  var old_size string
 	for size, v := range sizes {
 		if size != "label" {
+      if size == "6p" {
+        old_size = "6p"
+        size = "6"
+      }
 			count, err := strconv.Atoi(v)
 			if err != nil {
 				continue
@@ -277,7 +282,12 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				} else {
 					r, rs = getNewResult(size)
 				}
-				diu, err := getDieImageURL(c, size, rs, color)
+        var diu string
+        if old_size == "6p" {
+				  diu, err = getDieImageURL(c, old_size, rs, color)
+        } else {
+          diu, err = getDieImageURL(c, size, rs, color)
+        }
 				if err != nil {
 					c.Errorf("could not get die image: %v", err)
 				}
@@ -362,7 +372,6 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	if _, ok := ft[result]; ok {
 		result = ft[result]
 	}
-	c.Errorf("size: %v; result: %v; color: %v", size, result, color)
 	d := fmt.Sprintf("%s-d%s/%s.png", color, size, result)
 	if size == "0" || result == "token" {
 		d = fmt.Sprintf("tokens/%s_token.png", color)
@@ -521,6 +530,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	toRoll := map[string]string{
 		"4":      r.FormValue("d4"),
 		"6":      r.FormValue("d6"),
+		"6p":      r.FormValue("d6p"),
 		"8":      r.FormValue("d8"),
 		"10":     r.FormValue("d10"),
 		"12":     r.FormValue("d12"),
@@ -956,6 +966,7 @@ button {
         <form id="rollem" action="/roll" method="post">
             <input type="text" name="d4" style="width: 19px"></input> d4
             <input type="text" name="d6" style="width: 19px"></input> d6
+            <input type="text" name="d6p" style="width: 19px"></input> d6(P)
             <input type="text" name="d8" style="width: 19px"></input> d8
             <input type="text" name="d10" style="width: 19px"></input> d10
             <input type="text" name="d12" style="width: 19px"></input> d12
