@@ -430,6 +430,27 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	return nil
 }
 
+func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+  oldResultStr := d.ResultStr
+  d.Result, d.ResultStr = getNewResult(d.Size)
+  d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", d.ResultStr), 1)
+  _, err = datastore.Put(c, k, &d)
+	if err != nil {
+		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
+	}
+	// Fake updater so Safari will work?
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix()})
+	return nil
+}
+
 func getNewResult(kind string) (int, string) {
 	s, err := strconv.Atoi(kind)
 	if err != nil {
@@ -459,6 +480,7 @@ func init() {
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
 	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/reroll", rerollDie)
 	rand.Seed(int64(time.Now().Unix()))
 }
 
@@ -565,6 +587,24 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
 	err = deleteDieHelper(c, keyStr, fp)
+	if err != nil {
+		c.Errorf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func rerollDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Infof("roomname wonkiness in rerollDie: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	room := path.Base(r.Referer())
+	// Do we need to be worried dice will be rerolld from other rooms?
+	err = rerollDieHelper(c, keyStr, fp)
 	if err != nil {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -845,7 +885,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
 
         function deleteMarked() {
-            var toDelete = document.getElementsByClassName("to-delete");
+            var toDelete = document.getElementsByClassName("selected");
             for (var i = 0; i < toDelete.length; i++) {
                 $.post("/delete", {
                     id: toDelete[i].id,
@@ -853,6 +893,20 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                 }).done(function(data) {});
             }
             if (toDelete.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function rerollMarked() {
+            var toReroll = document.getElementsByClassName("selected");
+            for (var i = 0; i < toReroll.length; i++) {
+                $.post("/reroll", {
+                    id: toReroll[i].id,
+                    'fp': fp
+                }).done(function(data) {});
+            }
+            if (toReroll.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
             }
             $("#refreshable").load(window.location.href + " #refreshable");
@@ -867,7 +921,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
         interact('.tap-target')
             .on('tap', function(event) {
-                event.currentTarget.classList.toggle('to-delete');
+                event.currentTarget.classList.toggle('selected');
                 //    event.preventDefault();
             });
 
@@ -908,7 +962,7 @@ body {
   display: inline-block;
 }
 
-.tap-target.to-delete {
+.tap-target.selected {
   background-color: #f40;
   border-style: solid;
   border-color: red;
@@ -996,6 +1050,7 @@ button {
         <button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit      </button>
         <button class="button" onclick="clearAllDice()">Clear</button>
         <button class="button" onclick="deleteMarked()">Delete selected</button>
+        <button class="button" onclick="rerollMarked()">Reroll selected</button>
         <button class="button" onclick="getNewRoom()">New room</button> 
     <br>
     <a href="/about">about</a>
