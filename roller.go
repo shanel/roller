@@ -711,8 +711,8 @@ func label(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cols := map[string]string{
-		"blue":   "1e90ff",
 		"clear":  "ffffff",
+		"blue":   "1e90ff",
 		"green":  "008b45",
 		"orange": "ff8c00",
 		"red":    "ff3333",
@@ -1035,8 +1035,8 @@ button {
             <input type="text" name="label" style="width: 100"></input> label
 
             <select id="selectColor" name="color">
-		            <option value="blue" style="color: #1e90ff">Blue</option>
           			<option value="clear" style="color: #ffffff" >Clear</option>
+		            <option value="blue" style="color: #1e90ff">Blue</option>
           			<option value="green" style="color: #008b45">Green</option>
           			<option value="orange" style="color: #ff8c00">Orange</option>
           			<option value="red" style="color: #ff3333">Red</option>
