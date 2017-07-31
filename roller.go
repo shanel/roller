@@ -722,7 +722,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
 
 <head>
-    <title>Roll Dice Or Say Yes</title>
+    <title>Roll For Your Party</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
