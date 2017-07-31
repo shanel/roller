@@ -262,6 +262,7 @@ func newRoom(c appengine.Context) (string, error) {
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
+  var totalCount int
   var old_size string
 	for size, v := range sizes {
 		if size != "label" {
@@ -273,7 +274,8 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 			if err != nil {
 				continue
 			}
-      if count > 500 {
+      totalCount += count
+      if totalCount > 500 {
         continue
       }
 			var r int
