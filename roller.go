@@ -44,9 +44,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/dustinkirkland/golang-petname"
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
-	"github.com/dustinkirkland/golang-petname"
 
 	"appengine"
 	"appengine/datastore"
@@ -80,7 +80,7 @@ func (r *refreshCounter) increment() int64 {
 type Room struct {
 	Updates   []byte // hooray having to use json
 	Timestamp int64
-	Slug  string
+	Slug      string
 }
 
 type Die struct {
@@ -111,12 +111,12 @@ type Passer struct {
 }
 
 func noSpaces(str string) string {
-    return strings.Map(func(r rune) rune {
-        if unicode.IsSpace(r) {
-            return -1
-        }
-        return r
-    }, str)
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, str)
 }
 
 func generateRoomName() string {
@@ -262,22 +262,22 @@ func newRoom(c appengine.Context) (string, error) {
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
-  var totalCount int
-  var old_size string
+	var totalCount int
 	for size, v := range sizes {
+		var oldSize string
 		if size != "label" {
-      if size == "6p" {
-        old_size = "6p"
-        size = "6"
-      }
+			if size == "6p" {
+				oldSize = "6p"
+				size = "6"
+			}
 			count, err := strconv.Atoi(v)
 			if err != nil {
 				continue
 			}
-      totalCount += count
-      if totalCount > 500 {
-        continue
-      }
+			totalCount += count
+			if totalCount > 500 {
+				continue
+			}
 			var r int
 			var rs string
 			for i := 0; i < count; i++ {
@@ -287,12 +287,12 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				} else {
 					r, rs = getNewResult(size)
 				}
-        var diu string
-        if old_size == "6p" {
-				  diu, err = getDieImageURL(c, old_size, rs, color)
-        } else {
-          diu, err = getDieImageURL(c, size, rs, color)
-        }
+				var diu string
+				if oldSize == "6p" {
+					diu, err = getDieImageURL(c, oldSize, rs, color)
+				} else {
+					diu, err = getDieImageURL(c, size, rs, color)
+				}
 				if err != nil {
 					c.Errorf("could not get die image: %v", err)
 				}
@@ -439,10 +439,10 @@ func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-  oldResultStr := d.ResultStr
-  d.Result, d.ResultStr = getNewResult(d.Size)
-  d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", d.ResultStr), 1)
-  _, err = datastore.Put(c, k, &d)
+	oldResultStr := d.ResultStr
+	d.Result, d.ResultStr = getNewResult(d.Size)
+	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", d.ResultStr), 1)
+	_, err = datastore.Put(c, k, &d)
 	if err != nil {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 	}
@@ -523,7 +523,7 @@ func getXY(c appengine.Context, keyStr string, r *http.Request) (float64, float6
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
 	}
-  return x, y
+	return x, y
 }
 
 func move(w http.ResponseWriter, r *http.Request) {
@@ -534,7 +534,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 		c.Infof("roomname wonkiness in move: %v", err)
 	}
 	fp := r.Form.Get("fp")
-  x, y := getXY(c, keyStr, r)
+	x, y := getXY(c, keyStr, r)
 	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
@@ -557,7 +557,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	toRoll := map[string]string{
 		"4":      r.FormValue("d4"),
 		"6":      r.FormValue("d6"),
-		"6p":      r.FormValue("d6p"),
+		"6p":     r.FormValue("d6p"),
 		"8":      r.FormValue("d8"),
 		"10":     r.FormValue("d10"),
 		"12":     r.FormValue("d12"),
@@ -644,7 +644,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
-		time.Sleep(100 * time.Nanosecond)  // Getting into a race I think...
+		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
 
@@ -688,7 +688,7 @@ func Convert(h string) color.RGBA {
 	return color.RGBA{uint8(d[0]), uint8(d[1]), uint8(d[2]), uint8(1)}
 }
 
-func pngtest (w http.ResponseWriter, r *http.Request) {
+func pngtest(w http.ResponseWriter, r *http.Request) {
 }
 
 func label(w http.ResponseWriter, r *http.Request) {
@@ -700,7 +700,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 	col := r.URL.Query()["color"][0]
 
 	// Read the font data.
-//	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+	//	fontBytes, err := ioutil.ReadFile("luximr.ttf")
 	fontBytes, err := ioutil.ReadFile("Roboto-Regular.ttf")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -730,7 +730,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 	if (rc % 2) == 0 {
 		rc += 1
 	}
-	width := (int(math.Ceil((float64(rc) * float64(18)) / float64(72))) * 52)// + 10
+	width := (int(math.Ceil((float64(rc)*float64(18))/float64(72))) * 52) // + 10
 	rgba := image.NewRGBA(image.Rect(0, 0, width, 48))
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
 	fc := freetype.NewContext()
