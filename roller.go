@@ -430,6 +430,14 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	return nil
 }
 
+func fateReplace(in string) string {
+	ft := map[string]string{"-": "minus", "+": "plus", " ": "zero"}
+	if r, ok := ft[in]; ok {
+		return r
+	}
+	return in
+}
+
 func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
@@ -439,9 +447,9 @@ func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	oldResultStr := d.ResultStr
+	oldResultStr := fateReplace(d.ResultStr)
 	d.Result, d.ResultStr = getNewResult(d.Size)
-	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", d.ResultStr), 1)
+	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	_, err = datastore.Put(c, k, &d)
 	if err != nil {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
