@@ -44,9 +44,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/dustinkirkland/golang-petname"
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
-	"github.com/dustinkirkland/golang-petname"
 
 	"appengine"
 	"appengine/datastore"
@@ -57,8 +57,6 @@ import (
 
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
-var dieCounter int64
-var roomCounter int64
 var refreshDelta = int64(2)
 var refresher = refreshCounter{}
 
@@ -82,7 +80,7 @@ func (r *refreshCounter) increment() int64 {
 type Room struct {
 	Updates   []byte // hooray having to use json
 	Timestamp int64
-	Slug  string
+	Slug      string
 }
 
 type Die struct {
@@ -113,12 +111,12 @@ type Passer struct {
 }
 
 func noSpaces(str string) string {
-    return strings.Map(func(r rune) rune {
-        if unicode.IsSpace(r) {
-            return -1
-        }
-        return r
-    }, str)
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, str)
 }
 
 func generateRoomName() string {
@@ -249,17 +247,14 @@ func newRoom(c appengine.Context) (string, error) {
 	roomName := generateRoomName()
 	var k *datastore.Key
 	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
-//	k, err := datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
-//	return k.Encode(), nil
 	var testRoom Room
 	if err = datastore.Get(c, k, &testRoom); err != nil {
 		return "", fmt.Errorf("couldn't find the new entry: %v", err)
 	}
 	// TODO(shanel): why does it seem I need the above three lines? Race condition?
-//	c.Errorf("put in and got out room with slug %s", testRoom.Slug)
 
 	return roomName, nil
 }
@@ -267,10 +262,20 @@ func newRoom(c appengine.Context) (string, error) {
 func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
+	var totalCount int
 	for size, v := range sizes {
+		var oldSize string
 		if size != "label" {
+			if size == "6p" {
+				oldSize = "6p"
+				size = "6"
+			}
 			count, err := strconv.Atoi(v)
 			if err != nil {
+				continue
+			}
+			totalCount += count
+			if totalCount > 500 {
 				continue
 			}
 			var r int
@@ -282,7 +287,12 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 				} else {
 					r, rs = getNewResult(size)
 				}
-				diu, err := getDieImageURL(c, size, rs, color)
+				var diu string
+				if oldSize == "6p" {
+					diu, err = getDieImageURL(c, oldSize, rs, color)
+				} else {
+					diu, err = getDieImageURL(c, size, rs, color)
+				}
 				if err != nil {
 					c.Errorf("could not get die image: %v", err)
 				}
@@ -367,7 +377,6 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	if _, ok := ft[result]; ok {
 		result = ft[result]
 	}
-	c.Errorf("size: %v; result: %v; color: %v", size, result, color)
 	d := fmt.Sprintf("%s-d%s/%s.png", color, size, result)
 	if size == "0" || result == "token" {
 		d = fmt.Sprintf("tokens/%s_token.png", color)
@@ -421,6 +430,27 @@ func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	return nil
 }
 
+func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	oldResultStr := d.ResultStr
+	d.Result, d.ResultStr = getNewResult(d.Size)
+	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", d.ResultStr), 1)
+	_, err = datastore.Put(c, k, &d)
+	if err != nil {
+		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
+	}
+	// Fake updater so Safari will work?
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix()})
+	return nil
+}
+
 func getNewResult(kind string) (int, string) {
 	s, err := strconv.Atoi(kind)
 	if err != nil {
@@ -450,6 +480,7 @@ func init() {
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
 	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/reroll", rerollDie)
 	rand.Seed(int64(time.Now().Unix()))
 }
 
@@ -471,7 +502,6 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-// TODO(shanel): Updates should probably ids instead of "true" - so clients can keep track of whether they need to reload or not
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
@@ -484,14 +514,7 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", ref)
 }
 
-func move(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	r.ParseForm()
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		c.Infof("roomname wonkiness in move: %v", err)
-	}
-	fp := r.Form.Get("fp")
+func getXY(c appengine.Context, keyStr string, r *http.Request) (float64, float64) {
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
@@ -500,6 +523,18 @@ func move(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
 	}
+	return x, y
+}
+
+func move(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Infof("roomname wonkiness in move: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	x, y := getXY(c, keyStr, r)
 	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
@@ -522,6 +557,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	toRoll := map[string]string{
 		"4":      r.FormValue("d4"),
 		"6":      r.FormValue("d6"),
+		"6p":     r.FormValue("d6p"),
 		"8":      r.FormValue("d8"),
 		"10":     r.FormValue("d10"),
 		"12":     r.FormValue("d12"),
@@ -551,6 +587,24 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
 	err = deleteDieHelper(c, keyStr, fp)
+	if err != nil {
+		c.Errorf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func rerollDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		c.Infof("roomname wonkiness in rerollDie: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	room := path.Base(r.Referer())
+	// Do we need to be worried dice will be rerolld from other rooms?
+	err = rerollDieHelper(c, keyStr, fp)
 	if err != nil {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -590,7 +644,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
-		time.Sleep(100 * time.Nanosecond)  // Getting into a race I think...
+		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
 
@@ -606,15 +660,13 @@ func about(w http.ResponseWriter, r *http.Request) {
 	out := (`<html>
 	  <body>
 	    <center>
-	      <p>This is a dice roller.</p>
-	      <p>Give the URL for the room to others and they can see and do everything you can see and do.</p>
-	      <p>It was inspired by (and uses the dice images from) <a href="https://catchyourhare.com/diceroller/">this dice roller.</a></p>
-	      <p>The title comes from an idea who's authorship is discussed <a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">here</a>.</p>
+	      <p>This is a dice roller. Give the URL of the room to others and they can see and do everything you can see and do.</p>
+        <p>Site based on (and dice images borrowed from) <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
+	      <p<a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a>.</p>
 	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
-	      <p>Hex conversion code borrowed form <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
+	      <p>Hex conversion code borrowed from <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
 	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
 	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
-	      <p>If you make use of this, please think of donating some money to ...</p>
 	    </center>
 	  </body>
 	</html>`)
@@ -636,6 +688,9 @@ func Convert(h string) color.RGBA {
 	return color.RGBA{uint8(d[0]), uint8(d[1]), uint8(d[2]), uint8(1)}
 }
 
+func pngtest(w http.ResponseWriter, r *http.Request) {
+}
+
 func label(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	text, err := url.QueryUnescape(r.URL.Query()["text"][0])
@@ -645,7 +700,8 @@ func label(w http.ResponseWriter, r *http.Request) {
 	col := r.URL.Query()["color"][0]
 
 	// Read the font data.
-	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+	//	fontBytes, err := ioutil.ReadFile("luximr.ttf")
+	fontBytes, err := ioutil.ReadFile("Roboto-Regular.ttf")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -655,8 +711,8 @@ func label(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cols := map[string]string{
-		"blue":   "1e90ff",
 		"clear":  "ffffff",
+		"blue":   "1e90ff",
 		"green":  "008b45",
 		"orange": "ff8c00",
 		"red":    "ff3333",
@@ -668,12 +724,13 @@ func label(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("couldn't find color %s", col), http.StatusInternalServerError)
 	}
 	// Initialize the context.
-	fg, bg := image.NewUniform(Convert(cols[col])), image.Black
+	//fg, bg := image.NewUniform(Convert(cols[col])), image.Black
+	fg, bg := image.Black, image.Opaque
 	rc := utf8.RuneCountInString(text)
 	if (rc % 2) == 0 {
 		rc += 1
 	}
-	width := (int(math.Ceil((float64(rc) * float64(18)) / float64(72))) * 52)// + 10
+	width := (int(math.Ceil((float64(rc)*float64(18))/float64(72))) * 52) // + 10
 	rgba := image.NewRGBA(image.Rect(0, 0, width, 48))
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
 	fc := freetype.NewContext()
@@ -705,12 +762,12 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
 
 <head>
-    <title>Roll Dice Or Say Yes</title>
+    <title>Roll For Your Party</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
 
-<!--    <a href="https://your-url" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#151513; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style> -->
+<!--    <a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#151513; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style> -->
 
     <a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style>
 
@@ -784,12 +841,13 @@ var roomTemplate = template.Must(template.New("room").Parse(`
         }
 
         var delete_cookie = function(name) {
-           document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+           document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/';
+           document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/room';
         };
 
         var getNewRoom = function() {
-           delete_cookie('dice_room');
-           window.location.href = '/';
+           delete_cookie("dice_room");
+           window.location.replace("/");
         };
 
 
@@ -827,7 +885,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
 
         function deleteMarked() {
-            var toDelete = document.getElementsByClassName("to-delete");
+            var toDelete = document.getElementsByClassName("selected");
             for (var i = 0; i < toDelete.length; i++) {
                 $.post("/delete", {
                     id: toDelete[i].id,
@@ -835,6 +893,20 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                 }).done(function(data) {});
             }
             if (toDelete.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function rerollMarked() {
+            var toReroll = document.getElementsByClassName("selected");
+            for (var i = 0; i < toReroll.length; i++) {
+                $.post("/reroll", {
+                    id: toReroll[i].id,
+                    'fp': fp
+                }).done(function(data) {});
+            }
+            if (toReroll.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
             }
             $("#refreshable").load(window.location.href + " #refreshable");
@@ -849,7 +921,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
 
         interact('.tap-target')
             .on('tap', function(event) {
-                event.currentTarget.classList.toggle('to-delete');
+                event.currentTarget.classList.toggle('selected');
                 //    event.preventDefault();
             });
 
@@ -890,45 +962,96 @@ body {
   display: inline-block;
 }
 
-.tap-target.to-delete {
+.tap-target.selected {
   background-color: #f40;
   border-style: solid;
   border-color: red;
 }
+
+
+html {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  padding-bottom: 6rem;
+  min-height: 100%;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1rem;
+  background-color: #efefef;
+  text-align: center;
+}
+
+.attribution {
+	font-size: x-small;
+}
+
+button {
+  background-color: #e7e7e7;
+  color: black;
+  padding: 5px 5px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.button2 { background-color: #f44336; color: white; }
+
 </style>
 
 <body>
     <center>
-        <h1>Roll Dice Or Say Yes</h1>
-        <form action="/roll" method="post">
-            <input type="text" name="d4" style="width: 25px"></input> d4
-            <input type="text" name="d6" style="width: 25px"></input> d6
-            <input type="text" name="d8" style="width: 25px"></input> d8
-            <input type="text" name="d10" style="width: 25px"></input> d10
-            <input type="text" name="d12" style="width: 25px"></input> d12
-            <input type="text" name="d20" style="width: 25px"></input> d20
-            <input type="text" name="dF" style="width: 25px"></input> dF
-            <input type="text" name="tokens" style="width: 25px"></input> tokens
+        <h3>Roll For Your Party: A multi-user dice roller.</h3>
+        <p>Send the URL to your friends and roll away!</p>
+        <form id="rollem" action="/roll" method="post">
+            <input type="text" name="d4" style="width: 19px"></input> d4
+            <input type="text" name="d6" style="width: 19px"></input> d6
+            <input type="text" name="d6p" style="width: 19px"></input> d6(P)
+            <input type="text" name="d8" style="width: 19px"></input> d8
+            <input type="text" name="d10" style="width: 19px"></input> d10
+            <input type="text" name="d12" style="width: 19px"></input> d12
+            <input type="text" name="d20" style="width: 19px"></input> d20
+            <input type="text" name="dF" style="width: 19px"></input> dF
+            <input type="text" name="tokens" style="width: 19px"></input> tokens
             <input type="text" name="label" style="width: 100"></input> label
 
             <select id="selectColor" name="color">
-			<option value="blue" style="color: #1e90ff">Blue</option>
-			<option value="clear" style="color: #ffffff" >Clear</option>
-			<option value="green" style="color: #008b45">Green</option>
-			<option value="orange" style="color: #ff8c00">Orange</option>
-			<option value="red" style="color: #ff3333">Red</option>
-			<option value="violet" style="color: #8a2be2" >Purple</option>
-			<option value="gold" style="color: #ffd700" >Yellow</option>
-		</select>
+          			<option value="clear" style="color: #ffffff" >Clear</option>
+		            <option value="blue" style="color: #1e90ff">Blue</option>
+          			<option value="green" style="color: #008b45">Green</option>
+          			<option value="orange" style="color: #ff8c00">Orange</option>
+          			<option value="red" style="color: #ff3333">Red</option>
+          			<option value="violet" style="color: #8a2be2" >Purple</option>
+          			<option value="gold" style="color: #ffd700" >Yellow</option>
+         		</select>
 
             <input type="hidden" name="fp" value="">
             <p></p>
-            <input type="submit" value="Submit">
         </form>
-        <button onclick="clearAllDice()">Clear</button>
-        <button onclick="deleteMarked()">Delete selected</button>
-<!--        <button onclick="getNewRoom()">Get a (new) room!</button> -->
-    <br>
+        <button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit      </button>
+        <button class="button" onclick="clearAllDice()">Clear</button>
+        <button class="button" onclick="deleteMarked()">Delete selected</button>
+        <button class="button" onclick="rerollMarked()">Reroll selected</button>
+        <button class="button" onclick="getNewRoom()">New room</button> 
     <br>
     <a href="/about">about</a>
     </center>
@@ -937,15 +1060,22 @@ body {
         <div id="refreshable">
             {{range .Dice}} {{if .New}}
             <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="transform: translate({{.X}}px, {{.Y}}px)" ;>
-                <img src="{{.Image}}">
+                <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             </div>
             {{else}}
             <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}" style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-                <img src="{{.Image}}">
+                <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             </div>
             {{end}} {{end}}
         </div>
     </center>
+<div class="footer">
+    If you get use out of this site, please consider donating to <a href="http://www.shantibhavanchildren.org/">Shanti Bhavan</a>.
+		<br>
+		<div class="attribution">
+		Design and functionality based on <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.
+		</div>
+</div>
 </body>
 
 </html>
