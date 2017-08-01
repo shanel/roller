@@ -447,6 +447,9 @@ func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
+	if d.Size == "token" {
+		return nil
+	}
 	oldResultStr := fateReplace(d.ResultStr)
 	d.Result, d.ResultStr = getNewResult(d.Size)
 	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
