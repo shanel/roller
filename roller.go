@@ -1059,7 +1059,7 @@ button {
 <body>
     <center>
         <h3>Roll For Your Party: A multi-user dice roller.</h3>
-        <p>Send the URL to your friends! Drag the dice around! Click on dice to select/unselect them!</p>
+        <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect them!</p>
         <form id="rollem" action="/roll" method="post">
             d4: <input type="text" name="d4" style="width: 19px"></input>
              d6: <input type="text" name="d6" style="width: 19px"></input>
