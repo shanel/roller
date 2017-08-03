@@ -719,7 +719,6 @@ func label(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log.Printf("Wrote out png OK.")
 }
 
 var roomTemplate = template.Must(template.New("room").Parse(`
