@@ -523,13 +523,10 @@ func getXY(keyStr string, r *http.Request) (float64, float64) {
 func move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		log.Printf("roomname wonkiness in move: %v", err)
-	}
+	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
 	x, y := getXY(keyStr, r)
-	err = updateDieLocation(c, keyStr, fp, x, y)
+	err := updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
 		log.Printf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
 	}
@@ -573,13 +570,10 @@ func roll(w http.ResponseWriter, r *http.Request) {
 func deleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		log.Printf("roomname wonkiness in deleteDie: %v", err)
-	}
+	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
-	err = deleteDieHelper(c, keyStr)
+	err := deleteDieHelper(c, keyStr)
 	if err != nil {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -590,13 +584,10 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 func rerollDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		log.Printf("roomname wonkiness in rerollDie: %v", err)
-	}
+	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be rerolled from other rooms?
-	err = rerollDieHelper(c, keyStr)
+	err := rerollDieHelper(c, keyStr)
 	if err != nil {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
