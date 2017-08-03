@@ -20,7 +20,6 @@
 package roller
 
 import (
-	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -43,6 +42,7 @@ import (
 
 	"github.com/dustinkirkland/golang-petname"
 	"github.com/golang/freetype"
+	"golang.org/x/net/context"
 	"golang.org/x/image/font"
 
 	"google.golang.org/appengine"
