@@ -17,7 +17,6 @@
 // TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
 // Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
 // Probably would be good to factor out duplicate code.
-// Should also make a little "about" page noting where everything comes from.
 package roller
 
 import (
@@ -58,23 +57,10 @@ import (
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
 var refreshDelta = int64(2)
-var refresher = refreshCounter{}
 
 type Update struct {
 	Timestamp int64
 	Updater   string
-}
-
-type refreshCounter struct {
-	sync.Mutex
-	c int64
-}
-
-func (r *refreshCounter) increment() int64 {
-	r.Lock()
-	defer r.Unlock()
-	r.c++
-	return r.c
 }
 
 type Room struct {
@@ -199,7 +185,7 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 		return ""
 	}
 	for _, u := range umUpdates {
-		q := (now - u.Timestamp)
+		q := now - u.Timestamp
 		if q > refreshDelta {
 			continue
 		}
@@ -238,7 +224,6 @@ func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key
 	return datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
 }
 
-// TODO(shanel): Have a button to create a new room
 func newRoom(c appengine.Context) (string, error) {
 	up, err := json.Marshal([]Update{})
 	if err != nil {
@@ -389,9 +374,9 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
 	}
-	path := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
-	diceURLs[d] = path
-	return path, nil
+	p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	diceURLs[d] = p
+	return p, nil
 }
 
 func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float64) error {
@@ -412,7 +397,7 @@ func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float
 	return nil
 }
 
-func deleteDieHelper(c appengine.Context, encodedDieKey, fp string) error {
+func deleteDieHelper(c appengine.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -438,7 +423,7 @@ func fateReplace(in string) string {
 	return in
 }
 
-func rerollDieHelper(c appengine.Context, encodedDieKey, fp string) error {
+func rerollDieHelper(c appengine.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -577,8 +562,8 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"label":  r.FormValue("label"),
 		"tokens": r.FormValue("tokens"),
 	}
-	color := r.FormValue("color")
-	if err = newRoll(c, toRoll, roomKey, color); err != nil {
+	col := r.FormValue("color")
+	if err = newRoll(c, toRoll, roomKey, col); err != nil {
 		c.Errorf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -594,10 +579,9 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Infof("roomname wonkiness in deleteDie: %v", err)
 	}
-	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
-	err = deleteDieHelper(c, keyStr, fp)
+	err = deleteDieHelper(c, keyStr)
 	if err != nil {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -612,10 +596,9 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.Infof("roomname wonkiness in rerollDie: %v", err)
 	}
-	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
-	// Do we need to be worried dice will be rerolld from other rooms?
-	err = rerollDieHelper(c, keyStr, fp)
+	// Do we need to be worried dice will be rerolled from other rooms?
+	err = rerollDieHelper(c, keyStr)
 	if err != nil {
 		c.Errorf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -667,39 +650,22 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func about(w http.ResponseWriter, r *http.Request) {
-	out := (`<html>
+func about(w http.ResponseWriter, _ *http.Request) {
+	out := `<html>
 	  <body>
 	    <center>
 	      <p>This is a dice roller. Give the URL of the room to others and they can see and do everything you can see and do.</p>
         <p>Site based on (and dice images borrowed from) <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
 	      <p<a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a>.</p>
 	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
+	      <p>The pipped die image is "Black dice by Darrin Loeliger from the Noun Project."</p>
 	      <p>Hex conversion code borrowed from <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
 	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
 	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
 	    </center>
 	  </body>
-	</html>`)
+	</html>`
 	fmt.Fprintf(w, "%s", out)
-}
-
-func Convert(h string) color.RGBA {
-
-	if strings.HasPrefix(h, "#") {
-		h = strings.Replace(h, "#", "", 1)
-	}
-
-	if len(h) == 3 {
-		h = fmt.Sprintf("%c%c%c%c%c%c", h[0], h[0], h[1], h[1], h[2], h[2])
-	}
-
-	d, _ := hex.DecodeString(h)
-
-	return color.RGBA{uint8(d[0]), uint8(d[1]), uint8(d[2]), uint8(1)}
-}
-
-func pngtest(w http.ResponseWriter, r *http.Request) {
 }
 
 func label(w http.ResponseWriter, r *http.Request) {
@@ -711,7 +677,6 @@ func label(w http.ResponseWriter, r *http.Request) {
 	col := r.URL.Query()["color"][0]
 
 	// Read the font data.
-	//	fontBytes, err := ioutil.ReadFile("luximr.ttf")
 	fontBytes, err := ioutil.ReadFile("Roboto-Regular.ttf")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -741,7 +706,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 	if (rc % 2) == 0 {
 		rc += 1
 	}
-	width := (int(math.Ceil((float64(rc)*float64(18))/float64(72))) * 52) // + 10
+	width := int(math.Ceil((float64(rc)*float64(18))/float64(72))) * 52
 	rgba := image.NewRGBA(image.Rect(0, 0, width, 48))
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
 	fc := freetype.NewContext()
