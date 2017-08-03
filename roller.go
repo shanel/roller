@@ -20,13 +20,12 @@
 package roller
 
 import (
+	"context"
 	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"image"
-	"image/color"
 	"image/draw"
 	"image/png"
 	"io/ioutil"
@@ -38,7 +37,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -47,9 +45,9 @@ import (
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
 
-	"appengine"
-	"appengine/datastore"
-	"appengine/file"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/file"
 	// Maybe use this later?
 	//"appengine/user"
 )
@@ -113,7 +111,7 @@ func generateRoomName() string {
 	return noSpaces(name)
 }
 
-func getEncodedRoomKeyFromName(c appengine.Context, name string) (string, error) {
+func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 	q := datastore.NewQuery("Room").Filter("Slug =", name).Limit(1).KeysOnly()
 	k, err := q.GetAll(c, nil)
 	if err != nil {
@@ -125,7 +123,7 @@ func getEncodedRoomKeyFromName(c appengine.Context, name string) (string, error)
 	return name, fmt.Errorf("couldn't find a room key for %v", name)
 }
 
-func updateRoom(c appengine.Context, rk string, u Update) error {
+func updateRoom(c context.Context, rk string, u Update) error {
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
 		return fmt.Errorf("updateRoom: could not decode room key %v: %v", rk, err)
@@ -134,7 +132,7 @@ func updateRoom(c appengine.Context, rk string, u Update) error {
 	t := time.Now().Unix()
 	if err = datastore.Get(c, roomKey, &r); err != nil {
 		// Couldn't find it, so create it
-		c.Errorf("couldn't find room %v, so going to create it", rk)
+		log.Printf("couldn't find room %v, so going to create it", rk)
 		up, err := json.Marshal([]Update{})
 		if err != nil {
 			return fmt.Errorf("could not marshal update: %v", err)
@@ -163,16 +161,16 @@ func updateRoom(c appengine.Context, rk string, u Update) error {
 	return nil
 }
 
-func refreshRoom(c appengine.Context, rk, fp string) string {
+func refreshRoom(c context.Context, rk, fp string) string {
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
-		c.Errorf("refreshRoom: could not decode room key %v: %v", rk, err)
+		log.Printf("refreshRoom: could not decode room key %v: %v", rk, err)
 		return out
 	}
 	var r Room
 	if err = datastore.Get(c, roomKey, &r); err != nil {
-		c.Errorf("could not find room %v for refresh: %v", rk, err)
+		log.Printf("could not find room %v for refresh: %v", rk, err)
 		return out
 	}
 	keep := []Update{}
@@ -181,7 +179,7 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	var send []Update
 	err = json.Unmarshal(r.Updates, &umUpdates)
 	if err != nil {
-		c.Errorf("could not unmarshal updates in refreshRoom: %v", err)
+		log.Printf("could not unmarshal updates in refreshRoom: %v", err)
 		return ""
 	}
 	for _, u := range umUpdates {
@@ -196,17 +194,17 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 	}
 	r.Updates, err = json.Marshal(keep)
 	if err != nil {
-		c.Errorf("could not marshal updates in refreshRoom: %v", err)
+		log.Printf("could not marshal updates in refreshRoom: %v", err)
 		return ""
 	}
 	_, err = datastore.Put(c, roomKey, &r)
 	if err != nil {
-		c.Errorf("could not create updated room %v: %v", rk, err)
+		log.Printf("could not create updated room %v: %v", rk, err)
 	}
 	if len(send) > 0 {
 		toHash, err := json.Marshal(send)
 		if err != nil {
-			c.Errorf("could not marshal updates to send in refreshRoom: %v", err)
+			log.Printf("could not marshal updates to send in refreshRoom: %v", err)
 			return ""
 		}
 		out = fmt.Sprintf("%x", md5.Sum(toHash))
@@ -215,16 +213,16 @@ func refreshRoom(c appengine.Context, rk, fp string) string {
 }
 
 // roomKey creates a new room entity key.
-func roomKey(c appengine.Context) *datastore.Key {
+func roomKey(c context.Context) *datastore.Key {
 	return datastore.NewKey(c, "Room", "", time.Now().UnixNano(), nil)
 }
 
 // dieKey creates a new die entity key.
-func dieKey(c appengine.Context, roomKey *datastore.Key, i int64) *datastore.Key {
+func dieKey(c context.Context, roomKey *datastore.Key, i int64) *datastore.Key {
 	return datastore.NewKey(c, "Die", "", time.Now().UnixNano()+i, roomKey)
 }
 
-func newRoom(c appengine.Context) (string, error) {
+func newRoom(c context.Context) (string, error) {
 	up, err := json.Marshal([]Update{})
 	if err != nil {
 		return "", fmt.Errorf("could not marshal update: %v", err)
@@ -244,7 +242,7 @@ func newRoom(c appengine.Context) (string, error) {
 	return roomName, nil
 }
 
-func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
+func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var totalCount int
@@ -279,7 +277,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 					diu, err = getDieImageURL(c, size, rs, color)
 				}
 				if err != nil {
-					c.Errorf("could not get die image: %v", err)
+					log.Printf("could not get die image: %v", err)
 				}
 				dk := dieKey(c, roomKey, int64(i))
 				d := Die{
@@ -322,7 +320,7 @@ func newRoll(c appengine.Context, sizes map[string]string, roomKey *datastore.Ke
 	return nil
 }
 
-func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
+func getRoomDice(c context.Context, encodedRoomKey string) ([]Die, error) {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
@@ -335,7 +333,7 @@ func getRoomDice(c appengine.Context, encodedRoomKey string) ([]Die, error) {
 	return dice, nil
 }
 
-func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
+func clearRoomDice(c context.Context, encodedRoomKey string) error {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return fmt.Errorf("clearRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
@@ -356,7 +354,7 @@ func clearRoomDice(c appengine.Context, encodedRoomKey string) error {
 	return nil
 }
 
-func getDieImageURL(c appengine.Context, size, result, color string) (string, error) {
+func getDieImageURL(c context.Context, size, result, color string) (string, error) {
 	// Fate dice silliness
 	ft := map[string]string{"-": "minus", "+": "plus", " ": "zero"}
 	if _, ok := ft[result]; ok {
@@ -379,7 +377,7 @@ func getDieImageURL(c appengine.Context, size, result, color string) (string, er
 	return p, nil
 }
 
-func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float64) error {
+func updateDieLocation(c context.Context, encodedDieKey, fp string, x, y float64) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -397,7 +395,7 @@ func updateDieLocation(c appengine.Context, encodedDieKey, fp string, x, y float
 	return nil
 }
 
-func deleteDieHelper(c appengine.Context, encodedDieKey string) error {
+func deleteDieHelper(c context.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -423,7 +421,7 @@ func fateReplace(in string) string {
 	return in
 }
 
-func rerollDieHelper(c appengine.Context, encodedDieKey string) error {
+func rerollDieHelper(c context.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -491,7 +489,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	room, err := newRoom(c)
 	if err != nil {
 		// TODO(shanel): This should probably say something more...
-		c.Errorf("no room from root: %v", err)
+		log.Printf("no room from root: %v", err)
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
@@ -503,21 +501,21 @@ func refresh(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Infof("roomname wonkiness in refresh: %v", err)
+		log.Printf("roomname wonkiness in refresh: %v", err)
 	}
 	fp := r.Form.Get("fp")
 	ref := refreshRoom(c, keyStr, fp)
 	fmt.Fprintf(w, "%v", ref)
 }
 
-func getXY(c appengine.Context, keyStr string, r *http.Request) (float64, float64) {
+func getXY(keyStr string, r *http.Request) (float64, float64) {
 	x, err := strconv.ParseFloat(r.Form.Get("x"), 64)
 	if err != nil {
-		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
+		log.Printf("quietly not updating position of %v: %v", keyStr, err)
 	}
 	y, err := strconv.ParseFloat(r.Form.Get("y"), 64)
 	if err != nil {
-		c.Errorf("quietly not updating position of %v: %v", keyStr, err)
+		log.Printf("quietly not updating position of %v: %v", keyStr, err)
 	}
 	return x, y
 }
@@ -527,13 +525,13 @@ func move(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Infof("roomname wonkiness in move: %v", err)
+		log.Printf("roomname wonkiness in move: %v", err)
 	}
 	fp := r.Form.Get("fp")
-	x, y := getXY(c, keyStr, r)
+	x, y := getXY(keyStr, r)
 	err = updateDieLocation(c, keyStr, fp, x, y)
 	if err != nil {
-		c.Errorf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
+		log.Printf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
 	}
 	room := path.Base(r.Referer())
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -544,7 +542,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Infof("roomname wonkiness in roll: %v", err)
+		log.Printf("roomname wonkiness in roll: %v", err)
 	}
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
@@ -564,7 +562,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	}
 	col := r.FormValue("color")
 	if err = newRoll(c, toRoll, roomKey, col); err != nil {
-		c.Errorf("%v", err)
+		log.Printf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.FormValue("fp")
@@ -577,13 +575,13 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Infof("roomname wonkiness in deleteDie: %v", err)
+		log.Printf("roomname wonkiness in deleteDie: %v", err)
 	}
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
 	err = deleteDieHelper(c, keyStr)
 	if err != nil {
-		c.Errorf("%v", err)
+		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -594,13 +592,13 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
-		c.Infof("roomname wonkiness in rerollDie: %v", err)
+		log.Printf("roomname wonkiness in rerollDie: %v", err)
 	}
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be rerolled from other rooms?
 	err = rerollDieHelper(c, keyStr)
 	if err != nil {
-		c.Errorf("%v", err)
+		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -611,7 +609,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Infof("roomname wonkiness in clear: %v", err)
+		log.Printf("roomname wonkiness in clear: %v", err)
 	}
 	err = clearRoomDice(c, keyStr)
 	if err != nil {
@@ -627,13 +625,13 @@ func room(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.URL.Path)
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		c.Infof("room wonkiness in room: %v", err)
+		log.Printf("room wonkiness in room: %v", err)
 	}
 	dice, err := getRoomDice(c, keyStr)
 	if err != nil {
 		newRoom, err := newRoom(c)
 		if err != nil {
-			c.Errorf("no room because: %v", err)
+			log.Printf("no room because: %v", err)
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}
@@ -669,7 +667,6 @@ func about(w http.ResponseWriter, _ *http.Request) {
 }
 
 func label(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
 	text, err := url.QueryUnescape(r.URL.Query()["text"][0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -696,7 +693,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 		"gold":   "ffd700",
 	}
 	if _, ok := cols[col]; !ok {
-		c.Errorf("couldn't find color %s", col)
+		log.Printf("couldn't find color %s", col)
 		http.Error(w, fmt.Sprintf("couldn't find color %s", col), http.StatusInternalServerError)
 	}
 	// Initialize the context.
@@ -731,7 +728,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	c.Infof("Wrote out png OK.")
+	log.Printf("Wrote out png OK.")
 }
 
 var roomTemplate = template.Must(template.New("room").Parse(`
