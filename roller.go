@@ -497,7 +497,9 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-// TODO(shanel): Maybe the room/die culling code should happen here?
+// TODO(shanel): Maybe the room/die culling code should happen here? Also, I wonder if it should
+// instead of go to a separate page, just have a butter bar saying it is only updating every hour
+// or something and update the JS accordingly.
 func paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
@@ -1032,14 +1034,14 @@ button {
         <h3>Roll For Your Party: A multi-user dice roller.</h3>
         <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect them!</p>
         <form id="rollem" action="/roll" method="post">
-            d4: <input type="text" name="d4" style="width: 19px"></input>
-             d6: <input type="text" name="d6" style="width: 19px"></input>
-             <div class="tooltip">d6(P): <span class="tooltiptext">d6 with pips</span></div> <input type="text" name="d6p" style="width: 19px"></input>
-             d8: <input type="text" name="d8" style="width: 19px"></input>
-             d10: <input type="text" name="d10" style="width: 19px"></input>
-             d12: <input type="text" name="d12" style="width: 19px"></input>
-             d20: <input type="text" name="d20" style="width: 19px"></input>
-             dF: <input type="text" name="dF" style="width: 19px"></input>
+             <input type="text" name="d4" style="width: 19px"></input>d4
+             <input type="text" name="d6" style="width: 19px"></input> d6
+             <input type="text" name="d6p" style="width: 19px"></input><div class="tooltip">d6(P) <span class="tooltiptext">d6 with pips</span></div>
+             <input type="text" name="d8" style="width: 19px"></input> d8
+             <input type="text" name="d10" style="width: 19px"></input> d10
+             <input type="text" name="d12" style="width: 19px"></input> d12
+             <input type="text" name="d20" style="width: 19px"></input> d20
+             <input type="text" name="dF" style="width: 19px"></input> dF
              tokens: <input type="text" name="tokens" style="width: 19px"></input>
              label: <input type="text" name="label" style="width: 100"></input>
 
