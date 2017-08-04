@@ -917,7 +917,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                             sessionStorage.lastUpdateId = b;
                         }
                     }
-                    console.log((unix - Number(sessionStorage.lastUpdateId)));
+                    console.log(sessionStorage.lastUpdateId);
                     if ((unix - Number(sessionStorage.lastUpdateId)) > 300) {  // Just testing with 5m. Will set to 60m.
                     	var base = window.location.hostname;
                     	window.location.replace(base + "/paused?id=" + room);
