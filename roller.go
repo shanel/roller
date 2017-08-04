@@ -497,6 +497,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
+// TODO(shanel): Maybe the room/die culling code should happen here?
 func paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
@@ -916,6 +917,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                             sessionStorage.lastUpdateId = b;
                         }
                     }
+                    console.log((unix - Number(sessionStorage.lastUpdateId)));
                     if ((unix - Number(sessionStorage.lastUpdateId)) > 300) {  // Just testing with 5m. Will set to 60m.
                     	var base = window.location.hostname;
                     	window.location.replace(base + "/paused?id=" + room);
