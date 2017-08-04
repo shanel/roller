@@ -923,8 +923,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                     	var delta = unix - lastRealUpdate;
                     	console.log(delta);
                     	if (delta > 65) {  // Just testing with 1m. Will set to 60m.
-                    		var base = window.location.hostname;
-                    		window.location.replace(base + "/paused?id=" + room);
+                    		window.location.replace("/paused?id=" + room);
                     	}
                     }
                 });
