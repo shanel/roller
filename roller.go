@@ -473,6 +473,7 @@ func init() {
 	http.HandleFunc("/label", label)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/refresh", refresh)
+	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/delete", deleteDie)
 	http.HandleFunc("/reroll", rerollDie)
 	rand.Seed(int64(time.Now().Unix()))
@@ -494,6 +495,12 @@ func root(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func paused(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
+	fmt.Fprintf(w, out, r.Form.Get("id"))
 }
 
 func refresh(w http.ResponseWriter, r *http.Request) {
@@ -897,6 +904,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                 })
                 .done(function(data) {
                     var b = data;
+                    var unix = Math.round(+new Date()/1000);
                     if (b != "") {
                         if (sessionStorage.lastUpdateId) {
                             if (b != sessionStorage.lastUpdateId) {
@@ -907,6 +915,10 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                             $("#refreshable").load(window.location.href + " #refreshable");
                             sessionStorage.lastUpdateId = b;
                         }
+                    }
+                    if ((unix - Number(sessionStorage.lastUpdateId) > 300) {  // Just testing with 5m. Will set to 60m.
+                    	var base = window.location.hostname;
+                    	window.location.replace(base + "/paused?id=" + room);
                     }
                 });
         }
