@@ -896,6 +896,7 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                 //    event.preventDefault();
             });
 
+		var lastRealUpdate = 0;
 
         function autoRefresh_div() {
             var room = (window.location.pathname).split("/")[2];
@@ -911,16 +912,20 @@ var roomTemplate = template.Must(template.New("room").Parse(`
                             if (b != sessionStorage.lastUpdateId) {
                                 $("#refreshable").load(window.location.href + " #refreshable");
                                 sessionStorage.lastUpdateId = b;
+                                lastRealUpdate = unix;
                             }
                         } else {
                             $("#refreshable").load(window.location.href + " #refreshable");
                             sessionStorage.lastUpdateId = b;
+                            lastRealUpdate = unix;
                         }
-                    }
-                    console.log(sessionStorage.lastUpdateId);
-                    if ((unix - Number(sessionStorage.lastUpdateId)) > 300) {  // Just testing with 5m. Will set to 60m.
-                    	var base = window.location.hostname;
-                    	window.location.replace(base + "/paused?id=" + room);
+                    } else {
+                    	var delta = unix - lastRealUpdate;
+                    	console.log(delta);
+                    	if (delta > 65) {  // Just testing with 1m. Will set to 60m.
+                    		var base = window.location.hostname;
+                    		window.location.replace(base + "/paused?id=" + room);
+                    	}
                     }
                 });
         }
