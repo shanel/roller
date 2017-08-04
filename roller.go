@@ -1035,13 +1035,13 @@ button {
         <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect them!</p>
         <form id="rollem" action="/roll" method="post">
              <input type="text" name="d4" style="width: 19px"></input>d4
-             <input type="text" name="d6" style="width: 19px"></input> d6
-             <input type="text" name="d6p" style="width: 19px"></input><div class="tooltip">d6(P) <span class="tooltiptext">d6 with pips</span></div>
-             <input type="text" name="d8" style="width: 19px"></input> d8
-             <input type="text" name="d10" style="width: 19px"></input> d10
-             <input type="text" name="d12" style="width: 19px"></input> d12
-             <input type="text" name="d20" style="width: 19px"></input> d20
-             <input type="text" name="dF" style="width: 19px"></input> dF
+             <input type="text" name="d6" style="width: 19px"></input>d6
+             <input type="text" name="d6p" style="width: 19px"></input><div class="tooltip">d6(P)<span class="tooltiptext">d6 with pips</span></div>
+             <input type="text" name="d8" style="width: 19px"></input>d8
+             <input type="text" name="d10" style="width: 19px"></input>d10
+             <input type="text" name="d12" style="width: 19px"></input>d12
+             <input type="text" name="d20" style="width: 19px"></input>d20
+             <input type="text" name="dF" style="width: 19px"></input>dF
              tokens: <input type="text" name="tokens" style="width: 19px"></input>
              label: <input type="text" name="label" style="width: 100"></input>
 
