@@ -55,6 +55,8 @@ import (
 // As we create urls for the die images, store them here so we don't keep making them
 var diceURLs = map[string]string{}
 var refreshDelta = int64(2)
+var lastRoll = map[string]int{}
+var lastAction = map[string]string{}
 
 type Update struct {
 	Timestamp int64
@@ -97,6 +99,7 @@ type Passer struct {
 	RoomAvg float64
 	RollTotal int
 	RollAvg float64
+	LastAction string
 }
 
 func noSpaces(str string) string {
@@ -247,10 +250,11 @@ func newRoom(c context.Context) (string, error) {
 	return roomName, nil
 }
 
-func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) error {
+func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var totalCount int
+	var total int
 	ts := time.Now().Unix()
 	for size, v := range sizes {
 		var oldSize string
@@ -276,6 +280,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				} else {
 					r, rs = getNewResult(size)
 				}
+				total += r
 				var diu string
 				if oldSize == "6p" {
 					diu, err = getDieImageURL(c, oldSize, rs, color)
@@ -321,9 +326,9 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	}
 	_, err := datastore.PutMulti(c, keys, dice)
 	if err != nil {
-		return fmt.Errorf("could not create new dice: %v", err)
+		return total, fmt.Errorf("could not create new dice: %v", err)
 	}
-	return nil
+	return total, nil
 }
 
 func getRoomDice(c context.Context, encodedRoomKey, order string) ([]Die, error) {
@@ -512,7 +517,9 @@ func root(w http.ResponseWriter, r *http.Request) {
 func paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
-	fmt.Fprintf(w, out, r.Form.Get("id"))
+	room := r.Form.Get("id")
+	lastAction[room] = "paused"
+	fmt.Fprintf(w, out, room)
 }
 
 func refresh(w http.ResponseWriter, r *http.Request) {
@@ -550,6 +557,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 		log.Printf("quietly not updating position of %v to (%v, %v): %v", keyStr, x, y, err)
 	}
 	room := path.Base(r.Referer())
+	lastAction[room] = "move"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -577,11 +585,14 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"tokens": r.FormValue("tokens"),
 	}
 	col := r.FormValue("color")
-	if err = newRoll(c, toRoll, roomKey, col); err != nil {
+	total, err := newRoll(c, toRoll, roomKey, col)
+	if err != nil {
 		log.Printf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	lastRoll[room] = total
 	fp := r.FormValue("fp")
+	lastAction[room] = "roll"
 	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -597,6 +608,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
+	lastAction[room] = "delete"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -611,6 +623,7 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
+	lastAction[room] = "reroll"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -626,6 +639,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
+	lastAction[room] = "clear"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -688,6 +702,14 @@ func room(w http.ResponseWriter, r *http.Request) {
 		RoomAvg: roomAvg,
 		RollTotal: rollTotal,
 		RollAvg: rollAvg,
+	}
+	if la, ok := lastAction[room]; ok {
+		if la == "delete" {
+			var lr int
+			if lr, ok = lastRoll[room]; ok {
+				p.RollTotal = lr
+			}
+		}
 	}
 	content, err := ioutil.ReadFile("room.tmpl.html")
 	if err != nil {
