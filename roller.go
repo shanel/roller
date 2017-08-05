@@ -14,7 +14,7 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// TODO(shanel): Need to clean up the order fo this file, move the js into its own file, nuke useless comments, write tests...
+// TODO(shanel): Need to clean up the order of this file, move the js into its own file, nuke useless comments, write tests...
 // Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
 // Probably would be good to factor out duplicate code.
 package roller
