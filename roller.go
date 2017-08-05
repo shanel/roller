@@ -465,17 +465,19 @@ func getNewResult(kind string) (int, string) {
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
+	http.HandleFunc("/clear", clear)
+	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/label", label)
+	http.HandleFunc("/move", move)
+	http.HandleFunc("/paused", paused)
+	http.HandleFunc("/refresh", refresh)
+	http.HandleFunc("/reroll", rerollDie)
+	http.HandleFunc("/roll", roll)
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/room/", room)
 	http.HandleFunc("/room/*", room)
-	http.HandleFunc("/roll", roll)
-	http.HandleFunc("/clear", clear)
-	http.HandleFunc("/label", label)
-	http.HandleFunc("/move", move)
-	http.HandleFunc("/refresh", refresh)
-	http.HandleFunc("/paused", paused)
-	http.HandleFunc("/delete", deleteDie)
-	http.HandleFunc("/reroll", rerollDie)
+
+	// Seed random number generator.
 	rand.Seed(int64(time.Now().Unix()))
 }
 
