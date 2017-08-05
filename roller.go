@@ -280,7 +280,9 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				} else {
 					r, rs = getNewResult(size)
 				}
-				total += r
+				if size != "F" {
+					total += r
+				}
 				var diu string
 				if oldSize == "6p" {
 					diu, err = getDieImageURL(c, oldSize, rs, color)
