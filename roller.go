@@ -228,15 +228,16 @@ func newRoom(c context.Context) (string, error) {
 		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
 	roomName := generateRoomName()
-	var k *datastore.Key
-	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
+//	var k *datastore.Key
+//	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
+	_, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
-	var testRoom Room
+/*	var testRoom Room
 	if err = datastore.Get(c, k, &testRoom); err != nil {
 		return "", fmt.Errorf("couldn't find the new entry: %v", err)
-	}
+	}*/
 	// TODO(shanel): why does it seem I need the above three lines? Race condition?
 
 	return roomName, nil
