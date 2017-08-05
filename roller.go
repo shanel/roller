@@ -92,6 +92,10 @@ func (d *Die) getPosition() (float64, float64) {
 
 type Passer struct {
 	Dice []Die
+	RoomTotal int
+	RoomAvg float64
+	RollTotal int
+	RollAvg float64
 }
 
 func noSpaces(str string) string {
@@ -246,6 +250,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var totalCount int
+	ts := time.Now().Unix()
 	for size, v := range sizes {
 		var oldSize string
 		if size != "label" {
@@ -286,7 +291,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					ResultStr: rs,
 					Key:       dk,
 					KeyStr:    dk.Encode(),
-					Timestamp: time.Now().Unix(),
+					Timestamp: ts,
 					Image:     diu,
 					New:       true,
 				}
@@ -302,7 +307,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 			ResultStr: sizes["label"],
 			Key:       lk,
 			KeyStr:    lk.Encode(),
-			Timestamp: time.Now().Unix(),
+			Timestamp: ts,
 			Image:     fmt.Sprintf("/label?text=%s&color=%s", sizes["label"], color),
 			New:       true,
 		}
@@ -320,12 +325,12 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	return nil
 }
 
-func getRoomDice(c context.Context, encodedRoomKey string) ([]Die, error) {
+func getRoomDice(c context.Context, encodedRoomKey, order string) ([]Die, error) {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Order("Result") //.Limit(10)
+	q := datastore.NewQuery("Die").Ancestor(k).Order(order) //.Limit(10)
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
@@ -630,7 +635,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("room wonkiness in room: %v", err)
 	}
-	dice, err := getRoomDice(c, keyStr)
+	dice, err := getRoomDice(c, keyStr, "Result")
 	if err != nil {
 		newRoom, err := newRoom(c)
 		if err != nil {
@@ -643,9 +648,45 @@ func room(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 	}
 
+	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp")
+	if err != nil {
+		log.Printf("could not get dice for totals: %v", err)
+	}
+	var (
+		rollTotal int
+		rollCount int
+		rollAvg float64
+		roomTotal int
+		roomCount int
+		roomAvg float64
+		newestTimestamp int64
+	)
+	for i, d := range diceForTotals {
+		if i == 0 {
+			newestTimestamp = d.Timestamp
+		}
+		if _, err := strconv.Atoi(d.Size); err == nil {
+			roomTotal += d.Result
+			roomCount++
+			if newestTimestamp == d.Timestamp {
+				rollTotal += d.Result
+				rollCount++
+			}
+		}
+	}
+
+	rollAvg = float64(rollTotal)/float64(rollCount)
+	roomAvg = float64(roomTotal)/float64(roomCount)
+
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
-	p := Passer{Dice: dice}
+	p := Passer{
+		Dice: dice,
+		RoomTotal: roomTotal,
+		RoomAvg: roomAvg,
+		RollTotal: rollTotal,
+		RollAvg: rollAvg,
+	}
 	content, err := ioutil.ReadFile("room.tmpl.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -727,4 +768,3 @@ func label(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
-
