@@ -644,27 +644,22 @@ func room(w http.ResponseWriter, r *http.Request) {
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
 	p := Passer{Dice: dice}
+	content, err := ioutil.ReadFile("room.tmpl.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	roomTemplate := template.Must(template.New("room").Parse(string(content[:])))
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func about(w http.ResponseWriter, _ *http.Request) {
-	out := `<html>
-	  <body>
-	    <center>
-	      <p>This is a dice roller. Give the URL of the room to others and they can see and do everything you can see and do.</p>
-        <p>Site based on (and dice images borrowed from) <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a href="//https://catchyourhare.com/diceroller/">dice roller</a>.</p>
-	      <p<a href="http://story-games.com/forums/discussion/comment/276305/#Comment_276305">Roll Dice Or Say Yes</a>.</p>
-	      <p>The token image is "coin by Arthur Shlain from the Noun Project."</p>
-	      <p>The pipped die image is "Black dice by Darrin Loeliger from the Noun Project."</p>
-	      <p>Hex conversion code borrowed from <a href="https://github.com/dlion/hex2rgb">here</a>.</p>
-	      <p>The code is available <a href="https://github.com/shanel/roller">here</a>.</p>
-	      <p>Bugs or feature requests should go <a href="https://github.com/shanel/roller/issues">here</a>.</p>
-	    </center>
-	  </body>
-	</html>`
-	fmt.Fprintf(w, "%s", out)
+	if out, err := ioutil.ReadFile("about.html"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		fmt.Fprintf(w, "%s", out)
+	}
 }
 
 func label(w http.ResponseWriter, r *http.Request) {
@@ -731,7 +726,7 @@ func label(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var roomTemplate = template.Must(template.New("room").Parse(`
+/*var roomTemplate = template.Must(template.New("room").Parse(`
 <html>
 
 <head>
@@ -1000,14 +995,14 @@ button {
 
 .button2 { background-color: #f44336; color: white; }
 
-/* Tooltip container */
+*//* Tooltip container *//*
 .tooltip {
     position: relative;
     display: inline-block;
-    border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+    border-bottom: 1px dotted black; *//* If you want dots under the hoverable text *//*
 }
 
-/* Tooltip text */
+*//* Tooltip text *//*
 .tooltip .tooltiptext {
     visibility: hidden;
     width: 120px;
@@ -1017,12 +1012,12 @@ button {
     padding: 5px 0;
     border-radius: 6px;
  
-    /* Position the tooltip text - see examples below! */
+    *//* Position the tooltip text - see examples below! *//*
     position: absolute;
     z-index: 1;
 }
 
-/* Show the tooltip text when you mouse over the tooltip container */
+*//* Show the tooltip text when you mouse over the tooltip container *//*
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
@@ -1090,4 +1085,4 @@ button {
 </body>
 
 </html>
-`))
+`))*/
