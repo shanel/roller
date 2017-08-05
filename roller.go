@@ -42,8 +42,8 @@ import (
 
 	"github.com/dustinkirkland/golang-petname"
 	"github.com/golang/freetype"
-	"golang.org/x/net/context"
 	"golang.org/x/image/font"
+	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -94,11 +94,11 @@ func (d *Die) getPosition() (float64, float64) {
 }
 
 type Passer struct {
-	Dice []Die
-	RoomTotal int
-	RoomAvg float64
-	RollTotal int
-	RollAvg float64
+	Dice       []Die
+	RoomTotal  int
+	RoomAvg    float64
+	RollTotal  int
+	RollAvg    float64
 	LastAction string
 }
 
@@ -677,12 +677,12 @@ func room(w http.ResponseWriter, r *http.Request) {
 		log.Printf("could not get dice for totals: %v", err)
 	}
 	var (
-		rollTotal int
-		rollCount int
-		rollAvg float64
-		roomTotal int
-		roomCount int
-		roomAvg float64
+		rollTotal       int
+		rollCount       int
+		rollAvg         float64
+		roomTotal       int
+		roomCount       int
+		roomAvg         float64
 		newestTimestamp int64
 	)
 	for i, d := range diceForTotals {
@@ -699,17 +699,17 @@ func room(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rollAvg = float64(rollTotal)/float64(rollCount)
-	roomAvg = float64(roomTotal)/float64(roomCount)
+	rollAvg = float64(rollTotal) / float64(rollCount)
+	roomAvg = float64(roomTotal) / float64(roomCount)
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
 	p := Passer{
-		Dice: dice,
+		Dice:      dice,
 		RoomTotal: roomTotal,
-		RoomAvg: roomAvg,
+		RoomAvg:   roomAvg,
 		RollTotal: rollTotal,
-		RollAvg: rollAvg,
+		RollAvg:   rollAvg,
 	}
 	if la, ok := lastAction[room]; ok {
 		if la == "delete" {
