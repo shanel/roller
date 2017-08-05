@@ -434,7 +434,7 @@ func fateReplace(in string) string {
 	return in
 }
 
-func rerollDieHelper(c context.Context, encodedDieKey string) error {
+func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -453,6 +453,11 @@ func rerollDieHelper(c context.Context, encodedDieKey string) error {
 	_, err = datastore.Put(c, k, &d)
 	if err != nil {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
+	}
+	if lastRoll[room] == 0 || lastAction[room] == "reroll" {
+		if d.Size != "F" {
+			lastRoll[room] += d.Result
+		}
 	}
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
@@ -619,8 +624,9 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
+	lastRoll[room] = 0
 	// Do we need to be worried dice will be rerolled from other rooms?
-	err := rerollDieHelper(c, keyStr)
+	err := rerollDieHelper(c, keyStr, room)
 	if err != nil {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
