@@ -59,6 +59,7 @@ var refreshDelta = int64(2)
 type Update struct {
 	Timestamp int64
 	Updater   string
+	UpdateAll bool
 }
 
 type Room struct {
@@ -192,7 +193,7 @@ func refreshRoom(c context.Context, rk, fp string) string {
 			continue
 		}
 		keep = append(keep, u)
-		if u.Updater != fp {
+		if u.Updater != fp || u.UpdateAll {
 			send = append(send, u)
 		}
 	}
@@ -414,7 +415,7 @@ func deleteDieHelper(c context.Context, encodedDieKey string) error {
 		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix()})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	return nil
 }
 
@@ -446,7 +447,7 @@ func rerollDieHelper(c context.Context, encodedDieKey string) error {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix()})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	return nil
 }
 
