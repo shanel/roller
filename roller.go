@@ -441,6 +441,7 @@ func rerollDieHelper(c context.Context, encodedDieKey string) error {
 	}
 	oldResultStr := fateReplace(d.ResultStr)
 	d.Result, d.ResultStr = getNewResult(d.Size)
+	d.Timestamp = time.Now().Unix()
 	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	_, err = datastore.Put(c, k, &d)
 	if err != nil {
