@@ -68,3 +68,19 @@ func TestUpdateRoom(t *testing.T) {
 		t.Fatal("room did not have any updates, should have one")
 	}
 }
+
+func TestNewRoom(t *testing.T) {
+	ctx, done, err := aetest.NewContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+	rn, err := newRoom(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = getEncodedRoomKeyFromName(ctx, rn)
+	if err != nil {
+		t.Fatalf("getEncodedRoomFromName(ctx, %s) == _, %v; want _, nil", rn, err)
+	}
+}
