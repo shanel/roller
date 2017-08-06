@@ -158,14 +158,10 @@
                 event.currentTarget.classList.toggle('selected');
             });
 
-        var dr = new Selectables({
-            zone:'refreshable',
-            elements: '.tap-target',
-            selectedClass: 'selected',
-            onSelect:function(element){
-                console.log(element);
-            }
-        });
+
+
+
+
 
         var lastRealUpdate = 0;
 
@@ -421,4 +417,14 @@
 </div>
 
 </body>
+<script type="text/javascript" language="javascript">
+    var dr = new Selectables({
+        elements: '.tap-target',
+        selectedClass: 'selected',
+        zone: '#refreshable',
+        onSelect: function (element) {
+            console.log(element);
+        }
+    });
+</script>
 </html>
