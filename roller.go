@@ -44,7 +44,6 @@ import (
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
 	"golang.org/x/net/context"
-
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/file"
@@ -111,10 +110,10 @@ func noSpaces(str string) string {
 	}, str)
 }
 
-func generateRoomName() string {
+func generateRoomName(wc int) string {
 	// 3 part words will allow for 91922432 unique names
 	// 4 part words will allow for 41181249536 unique names
-	name := petname.Generate(3, " ")
+	name := petname.Generate(wc, " ")
 	name = strings.Title(name)
 	return noSpaces(name)
 }
@@ -145,7 +144,7 @@ func updateRoom(c context.Context, rk string, u Update) error {
 		if err != nil {
 			return fmt.Errorf("could not marshal update: %v", err)
 		}
-		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName()}
+		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3)}
 		_, err = datastore.Put(c, roomKey, &r)
 		if err != nil {
 			return fmt.Errorf("could not create updated room %v: %v", rk, err)
@@ -235,7 +234,7 @@ func newRoom(c context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
-	roomName := generateRoomName()
+	roomName := generateRoomName(3)
 	var k *datastore.Key
 	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
 	if err != nil {
