@@ -6,6 +6,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
+    <script src="/js/selectables.js"></script>
 
 
     <script type="text/javascript" language="javascript">
@@ -157,6 +158,15 @@
                 event.currentTarget.classList.toggle('selected');
             });
 
+        dr = new Selectables({
+            zone:'#refreshable',
+            elements: '.tap-target',
+            selectedClass: 'selected',
+            onSelect:function(element){
+                console.log(element);
+            }
+        });
+
         var lastRealUpdate = 0;
 
         function autoRefresh_div() {
@@ -198,6 +208,17 @@
 
 <!--TODO(shanel): This should probably be in its own file eventually.-->
 <style type="text/css">
+
+    .s-noselect {
+        -webkit-touch-callout: none;-webkit-user-select: none;-khtml-user-select: none;-moz-user-select: none;-ms-user-select: none;user-select: none;
+    }
+
+    #s-rectBox {
+        position: absolute;
+        z-index: 1090;
+        border:2px dashed #cbd3e3;
+    }
+
     body {
         color: #000000;
         background-color: #ffffff;
