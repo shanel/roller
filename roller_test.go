@@ -31,3 +31,11 @@ func TestGetEncodedRoomKeyFromName(t *testing.T) {
 		t.Fatalf("getEncodedRoomFromName(ctx, 'HappyFunBall') == %v, %v; want %v, nil", got, err, key.Encode())
 	}
 }
+
+func TestNoSpaces(t *testing.T) {
+	got := noSpaces("Foo Bar Bat")
+	want := "FooBarBat"
+	if got != want {
+		t.Fatalf("noSpaces('Foo Bar Bat') == %v; want %v", got, want)
+	}
+}
