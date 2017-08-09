@@ -409,6 +409,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	}
 	keyStrings := []string{}
 	for _, k := range keys {
+		log.Printf("key: %v", k)
 		keyStrings = append(keyStrings, k.Encode())
 	}
 	_, err := datastore.PutMulti(c, keys, dice)
