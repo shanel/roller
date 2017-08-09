@@ -91,6 +91,7 @@ type Die struct {
 	Timestamp int64
 	Image     string
 	New       bool
+	IsCard    bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -325,6 +326,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 			Timestamp: ts,
 			Image:     diu,
 			New:       true,
+			IsCard:    true,
 		}
 		log.Printf("appending die: %v", d)
 		dice = append(dice, &d)
