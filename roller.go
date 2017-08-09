@@ -312,6 +312,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die
 		if err != nil {
 			log.Printf("could not get die image: %v", err)
 		}
+		log.Print(diu)
 		dk := dieKey(c, roomKey, int64(i))
 		d := Die{
 			Size:      "card",
@@ -323,7 +324,9 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die
 			Image:     diu,
 			New:       true,
 		}
+		log.Printf("appending die: %v", d)
 		dice = append(dice, &d)
+		log.Printf("appending in key: %v", dk)
 		keys = append(keys, dk)
 	}
 }
