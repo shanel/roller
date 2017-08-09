@@ -445,7 +445,11 @@
     {{range .Dice}} {{if .New}}
     <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
          style="transform: translate({{.X}}px, {{.Y}}px);">
+        {{if .IsCard}}
+        <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+        {{else}}
         <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+        {{end}}
     </div>
     {{else}}
     <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
