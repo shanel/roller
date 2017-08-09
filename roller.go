@@ -40,6 +40,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/adamclerk/deck"
 	"github.com/dustinkirkland/golang-petname"
 	"github.com/golang/freetype"
 	"golang.org/x/image/font"
@@ -51,11 +52,20 @@ import (
 	//"appengine/user"
 )
 
-// As we create urls for the die images, store them here so we don't keep making them
-var diceURLs = map[string]string{}
-var refreshDelta = int64(2)
-var lastRoll = map[string]int{}
-var lastAction = map[string]string{}
+var (
+	// As we create urls for the die images, store them here so we don't keep making them
+	diceURLs     = map[string]string{}
+	refreshDelta = int64(2)
+	lastRoll     = map[string]int{}
+	lastAction   = map[string]string{}
+	cardToPNG    = map[string]string{
+		"A♣": "ace_of_clubs.png", "2♣": "2_of_clubs.png", "3♣": "3_of_clubs.png", "4♣": "4_of_clubs.png", "5♣": "5_of_clubs.png", "6♣": "6_of_clubs.png", "7♣": "7_of_clubs.png", "8♣": "8_of_clubs.png", "9♣": "9_of_clubs.png", "T♣": "10_of_clubs.png", "J♣": "jack_of_clubs.png", "Q♣": "queen_of_clubs.png", "K♣": "king_of",
+		"A♦": "ace_of_diamonds.png", "2♦": "2_of_diamonds.png", "3♦": "3_of_diamonds.png", "4♦": "4_of_diamonds.png", "5♦": "5_of_diamonds.png", "6♦": "6_of_diamonds.png", "7♦": "7_of_diamonds.png", "8♦": "8_of_diamonds.png", "9♦": "9_of_diamonds.png", "T♦": "10_of_diamonds.png", "J♦": "jack_of_diamonds.png", "Q♦": "queen_of_diamonds.png", "K♦": "king_of",
+		"A♥": "ace_of_hearts.png", "2♥": "2_of_hearts.png", "3♥": "3_of_hearts.png", "4♥": "4_of_hearts.png", "5♥": "5_of_hearts.png", "6♥": "6_of_hearts.png", "7♥": "7_of_hearts.png", "8♥": "8_of_hearts.png", "9♥": "9_of_hearts.png", "T♥": "10_of_hearts.png", "J♥": "jack_of_hearts.png", "Q♥": "queen_of_hearts.png", "K♥": "king_of",
+		"A♠": "ace_of_spades.png", "2♠": "2_of_spades.png", "3♠": "3_of_spades.png", "4♠": "4_of_spades.png", "5♠": "5_of_spades.png", "6♠": "6_of_spades.png", "7♠": "7_of_spades.png", "8♠": "8_of_spades.png", "9♠": "9_of_spades.png", "T♠": "10_of_spades.png", "J♠": "jack_of_spades.png", "Q♠": "queen_of_spades.png", "K♠": "king_of"}
+	faceMap = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "J": 10, "Q": 11, "K": 12}
+	suitMap = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
+)
 
 type Update struct {
 	Timestamp int64
@@ -67,6 +77,7 @@ type Room struct {
 	Updates   []byte // hooray having to use json
 	Timestamp int64
 	Slug      string
+	Deck      string
 }
 
 type Die struct {
@@ -99,6 +110,7 @@ type Passer struct {
 	RollTotal  int
 	RollAvg    float64
 	LastAction string
+	CardsLeft  int
 }
 
 func noSpaces(str string) string {
@@ -144,7 +156,14 @@ func updateRoom(c context.Context, rk string, u Update) error {
 		if err != nil {
 			return fmt.Errorf("could not marshal update: %v", err)
 		}
-		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3)}
+
+		deck.Seed()
+		d, err := deck.New(deck.Unshuffled)
+		if err != nil {
+			log.Printf("could not create deck: %v", err)
+		}
+		d.Shuffle()
+		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
 		_, err = datastore.Put(c, roomKey, &r)
 		if err != nil {
 			return fmt.Errorf("could not create updated room %v: %v", rk, err)
@@ -235,8 +254,14 @@ func newRoom(c context.Context) (string, error) {
 		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
 	roomName := generateRoomName(3)
+	deck.Seed()
+	d, err := deck.New(deck.Unshuffled)
+	if err != nil {
+		log.Printf("could not create deck: %v", err)
+	}
+	d.Shuffle()
 	var k *datastore.Key
-	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName})
+	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName, Deck: d.GetSignature()})
 	if err != nil {
 		return "", fmt.Errorf("could not create new room: %v", err)
 	}
@@ -249,6 +274,59 @@ func newRoom(c context.Context) (string, error) {
 	return roomName, nil
 }
 
+func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die, keys []*datastore.Key) {
+	var room Room
+	var handSize int
+	if err := datastore.Get(c, roomKey, &room); err != nil {
+		log.Printf("issue getting room in drawCards: %v", err)
+		return
+	}
+	hand, err := deck.New(deck.Empty)
+	if err != nil {
+		log.Printf("problem creating hand: %v", err)
+		return
+	}
+	roomDeck, err := deck.New(deck.FromSignature(room.Deck))
+	if err != nil {
+		log.Printf("problem with deck signature: %v", err)
+		return
+	}
+	deckSize := roomDeck.NumberOfCards()
+	if deckSize == 0 {
+		log.Print("room deck is empty")
+		return
+	}
+	if deckSize < count {
+		roomDeck.Deal(deckSize, hand)
+		log.Printf("not enough cards in room deck, only dealt %v", deckSize)
+		handSize = deckSize
+	} else {
+		roomDeck.Deal(count, hand)
+		handSize = count
+	}
+	cards := strings.Split(hand.String(), "\n")[0:handSize]
+	ts := time.Now().Unix()
+	for i, card := range cards {
+		diu, err := getDieImageURL(c, "card", card, "")
+		if err != nil {
+			log.Printf("could not get die image: %v", err)
+		}
+		dk := dieKey(c, roomKey, int64(i))
+		d := Die{
+			Size:      "card",
+			Result:    0,
+			ResultStr: card,
+			Key:       dk,
+			KeyStr:    dk.Encode(),
+			Timestamp: ts,
+			Image:     diu,
+			New:       true,
+		}
+		dice = append(dice, &d)
+		keys = append(keys, dk)
+	}
+}
+
 func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
@@ -257,7 +335,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	ts := time.Now().Unix()
 	for size, v := range sizes {
 		var oldSize string
-		if size != "label" {
+		if size != "label" || size != "card" {
 			if size == "6p" {
 				oldSize = "6p"
 				size = "6"
@@ -321,6 +399,12 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		dice = append(dice, &l)
 		keys = append(keys, lk)
 	}
+	if sizes["cards"] != "" {
+		count, err := strconv.Atoi(sizes["cards"])
+		if err == nil {
+			drawCards(c, count, roomKey, dice, keys)
+		}
+	}
 	keyStrings := []string{}
 	for _, k := range keys {
 		keyStrings = append(keyStrings, k.Encode())
@@ -330,6 +414,19 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		return total, fmt.Errorf("could not create new dice: %v", err)
 	}
 	return total, nil
+}
+
+func getRoomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
+	k, err := datastore.DecodeKey(encodedRoomKey)
+	if err != nil {
+		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("Size =", "card") //.Limit(10)
+	dice := []Die{}
+	if _, err = q.GetAll(c, &dice); err != nil {
+		return nil, fmt.Errorf("problem executing card query: %v", err)
+	}
+	return dice, nil
 }
 
 func getRoomDice(c context.Context, encodedRoomKey, order string) ([]Die, error) {
@@ -372,7 +469,12 @@ func getDieImageURL(c context.Context, size, result, color string) (string, erro
 	if _, ok := ft[result]; ok {
 		result = ft[result]
 	}
-	d := fmt.Sprintf("%s-d%s/%s.png", color, size, result)
+	var d string
+	if size == "card" {
+		d = cardToPNG[result]
+	} else {
+		d = fmt.Sprintf("%s-d%s/%s.png", color, size, result)
+	}
 	if size == "0" || result == "token" {
 		d = fmt.Sprintf("tokens/%s_token.png", color)
 	}
@@ -384,7 +486,12 @@ func getDieImageURL(c context.Context, size, result, color string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
 	}
-	p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	var p string
+	if size == "card" {
+		p = fmt.Sprintf("https://storage.googleapis.com/%v/playing_cards/%s", bucket, d)
+	} else {
+		p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	}
 	diceURLs[d] = p
 	return p, nil
 }
@@ -494,6 +601,7 @@ func init() {
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/room/", room)
 	http.HandleFunc("/room/*", room)
+	http.HandleFunc("/shuffle", shuffle)
 
 	// Seed random number generator.
 	rand.Seed(int64(time.Now().Unix()))
@@ -588,6 +696,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"20":     r.FormValue("d20"),
 		"F":      r.FormValue("dF"),
 		"label":  r.FormValue("label"),
+		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
 	}
 	col := r.FormValue("color")
@@ -703,12 +812,32 @@ func room(w http.ResponseWriter, r *http.Request) {
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
+
+	var rm Room
+	var deckSize int
+	k, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("room: could not decode room key %v: %v", keyStr, err)
+	} else {
+		err := datastore.Get(c, k, &rm)
+		if err != nil {
+			log.Printf("could not find room: %v", err)
+		} else {
+			roomDeck, err := deck.New(deck.FromSignature(rm.Deck))
+			if err != nil {
+				log.Printf("problem with deck signature: %v", err)
+			} else {
+				deckSize = roomDeck.NumberOfCards()
+			}
+		}
+	}
 	p := Passer{
 		Dice:      dice,
 		RoomTotal: roomTotal,
 		RoomAvg:   roomAvg,
 		RollTotal: rollTotal,
 		RollAvg:   rollAvg,
+		CardsLeft: deckSize,
 	}
 	if la, ok := lastAction[room]; ok {
 		if la == "delete" {
@@ -734,6 +863,72 @@ func about(w http.ResponseWriter, _ *http.Request) {
 	} else {
 		fmt.Fprintf(w, "%s", out)
 	}
+}
+
+func shuffleDiscards(c context.Context, keyStr string) error {
+	// Get dice in the room - specifically the cards
+	// make a map[string]bool of the card ResultStr
+	// run through the keys of cardsToPNG seeing if they are
+	// in that map if not, append the hex-ified version of their
+	// string to a string. That will be the signature for the new deck.
+	// Create that deck, shuffle it, output it's signature to the room's
+	// Deck. Put the updated Room into the datastore.
+	cards, err := getRoomCards(c, keyStr)
+	if err != nil {
+		return err
+	}
+	roomCardStrings := map[string]bool{}
+	for _, card := range cards {
+		roomCardStrings[card.ResultStr] = true
+	}
+	sig := ""
+	for k := range cardToPNG {
+		if _, ok := roomCardStrings[k]; !ok {
+			pieces := strings.Split(k, "")
+			sig += fmt.Sprintf("%x%x", faceMap[pieces[0]], suitMap[pieces[1]])
+		}
+	}
+	deck.Seed()
+	d, err := deck.New(deck.FromSignature(sig))
+	if err != nil {
+		return err
+	}
+	d.Shuffle()
+	sig = d.GetSignature()
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
+	}
+	var r Room
+	t := time.Now().Unix()
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		return err
+	}
+	r.Deck = sig
+	r.Timestamp = t
+	_, err = datastore.Put(c, roomKey, &r)
+	if err != nil {
+		return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+	}
+	return nil
+}
+
+func shuffle(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in clear: %v", err)
+	}
+	// TODO(shanel): write this function
+	err = shuffleDiscards(c, keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	fp := r.Form.Get("fp")
+	lastAction[room] = "shuffle"
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func label(w http.ResponseWriter, r *http.Request) {
