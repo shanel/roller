@@ -336,7 +336,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	ts := time.Now().Unix()
 	for size, v := range sizes {
 		var oldSize string
-		if size != "label" || size != "cards" {
+		if size != "label" || size != "card" {
 			if size == "6p" {
 				oldSize = "6p"
 				size = "6"
@@ -400,8 +400,8 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		dice = append(dice, &l)
 		keys = append(keys, lk)
 	}
-	if sizes["cards"] != "" {
-		count, err := strconv.Atoi(sizes["cards"])
+	if sizes["card"] != "" {
+		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
 			log.Printf("about to draw cards")
 			drawCards(c, count, roomKey, dice, keys)
