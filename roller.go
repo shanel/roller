@@ -336,7 +336,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	ts := time.Now().Unix()
 	for size, v := range sizes {
 		var oldSize string
-		if size != "label" || size != "card" {
+		if size != "label" || size != "cards" {
 			if size == "6p" {
 				oldSize = "6p"
 				size = "6"
