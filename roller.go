@@ -305,6 +305,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die
 		handSize = count
 	}
 	cards := strings.Split(hand.String(), "\n")[0:handSize]
+	log.Printf("got these cards: %v", cards)
 	ts := time.Now().Unix()
 	for i, card := range cards {
 		diu, err := getDieImageURL(c, "card", card, "")
@@ -540,6 +541,7 @@ func fateReplace(in string) string {
 	return in
 }
 
+// TODO(shanel): This will need to handle new cards
 func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
