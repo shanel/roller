@@ -308,7 +308,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 		handSize = count
 	}
 	cards := strings.Split(hand.String(), "\n")[0:handSize]
-	log.Printf("got these cards: %v", cards)
 	ts := time.Now().Unix()
 	for i, card := range cards {
 		diu, err := getDieImageURL(c, "card", card, "")
@@ -328,9 +327,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 			New:       true,
 			IsCard:    true,
 		}
-		log.Printf("appending die: %v", d)
 		dice = append(dice, &d)
-		log.Printf("appending in key: %v", dk)
 		keys = append(keys, dk)
 	}
 	return dice, keys
@@ -411,7 +408,6 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	if sizes["card"] != "" {
 		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
-			log.Printf("about to draw cards")
 			cards, cardKeys := drawCards(c, count, roomKey)
 			for _, card := range cards {
 				dice = append(dice, card)
