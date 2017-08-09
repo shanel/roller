@@ -274,27 +274,29 @@ func newRoom(c context.Context) (string, error) {
 	return roomName, nil
 }
 
-func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die, keys []*datastore.Key) {
+func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []*datastore.Key) {
+	dice := []*Die{}
+	keys := []*datastore.Key{}
 	var room Room
 	var handSize int
 	if err := datastore.Get(c, roomKey, &room); err != nil {
 		log.Printf("issue getting room in drawCards: %v", err)
-		return
+		return dice, keys
 	}
 	hand, err := deck.New(deck.Empty)
 	if err != nil {
 		log.Printf("problem creating hand: %v", err)
-		return
+		return dice, keys
 	}
 	roomDeck, err := deck.New(deck.FromSignature(room.Deck))
 	if err != nil {
 		log.Printf("problem with deck signature: %v", err)
-		return
+		return dice, keys
 	}
 	deckSize := roomDeck.NumberOfCards()
 	if deckSize == 0 {
 		log.Print("room deck is empty")
-		return
+		return dice, keys
 	}
 	if deckSize < count {
 		roomDeck.Deal(deckSize, hand)
@@ -329,6 +331,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, dice []*Die
 		log.Printf("appending in key: %v", dk)
 		keys = append(keys, dk)
 	}
+	return dice, keys
 }
 
 func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) (int, error) {
@@ -407,7 +410,13 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
 			log.Printf("about to draw cards")
-			drawCards(c, count, roomKey, dice, keys)
+			cards, cardKeys := drawCards(c, count, roomKey)
+			for _, card := range cards {
+				dice = append(dice, card)
+			}
+			for _, ck := range cardKeys {
+				keys = append(keys, ck)
+			}
 		}
 	}
 	keyStrings := []string{}
