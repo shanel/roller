@@ -339,6 +339,11 @@
         text-align: center;
     }
 
+    img.card {
+        max-width:23%;
+        max-height:23%;
+    }
+
 </style>
 
 <body>
@@ -445,7 +450,11 @@
     {{else}}
     <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
          style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+        {{if (eq .Size "card")}}
+            <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+        {{else}}
         <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+        {{end}}
     </div>
     {{end}} {{end}}
 </div>
