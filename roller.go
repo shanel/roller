@@ -403,6 +403,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	if sizes["cards"] != "" {
 		count, err := strconv.Atoi(sizes["cards"])
 		if err == nil {
+			log.Printf("about to draw cards")
 			drawCards(c, count, roomKey, dice, keys)
 		}
 	}
