@@ -563,29 +563,25 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
+	if d.Size == "label" || d.ResultStr == "token" {
+		return nil
+	}
 	if d.IsCard {
 		// Do a single draw.
 		dice, keys := drawCards(c, 1, k.Parent())
 		// Set the location to the same as the passed in die.
-		dice[0].X = d.X
-		dice[0].Y = d.Y
-		// Put the new die.
-		_, err = datastore.Put(c, keys[0], dice[0])
-		if err != nil {
-			return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
-		}
+		d.ResultStr = dice[0].ResultStr
+		d.Image = dice[0].Image
 		// Delete the old die.
-		deleteDieHelper(c, encodedDieKey)
+		deleteDieHelper(c, keys[0].Encode())
 		// return
 		return nil
+	} else {
+		oldResultStr := fateReplace(d.ResultStr)
+		d.Result, d.ResultStr = getNewResult(d.Size)
+		d.Timestamp = time.Now().Unix()
+		d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	}
-	if d.Size == "label" || d.ResultStr == "token" {
-		return nil
-	}
-	oldResultStr := fateReplace(d.ResultStr)
-	d.Result, d.ResultStr = getNewResult(d.Size)
-	d.Timestamp = time.Now().Unix()
-	d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	_, err = datastore.Put(c, k, &d)
 	if err != nil {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
