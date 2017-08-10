@@ -563,6 +563,22 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
+	if d.IsCard {
+		// Do a single draw.
+		dice, keys := drawCards(c, 1, k.Parent())
+		// Set the location to the same as the passed in die.
+		dice[0].X = d.X
+		dice[0].Y = d.Y
+		// Put the new die.
+		_, err = datastore.Put(c, keys[0], dice[0])
+		if err != nil {
+			return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
+		}
+		// Delete the old die.
+		deleteDieHelper(c, encodedDieKey)
+		// return
+		return nil
+	}
 	if d.Size == "label" || d.ResultStr == "token" {
 		return nil
 	}
