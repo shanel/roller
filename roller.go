@@ -565,7 +565,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	}
 	if d.Size == "label" || d.ResultStr == "token" {
 		return nil
-		log.Print("label or token")
+		log.Fatal("label or token")
 	}
 	if d.IsCard {
 		// Do a single draw.
@@ -573,7 +573,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
-		log.Printf("%v", d.Image)
+		log.Fatalf("%v", d.Image)
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
 		// return
