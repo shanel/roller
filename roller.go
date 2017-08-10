@@ -563,7 +563,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.Size == "0" || d.ResultStr == "token" {
+	if d.Size == "label" || d.ResultStr == "token" {
 		return nil
 	}
 	oldResultStr := fateReplace(d.ResultStr)
