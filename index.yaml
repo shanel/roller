@@ -14,3 +14,9 @@ indexes:
   ancestor: yes
   properties:
   - name: Result
+
+- kind: Die
+  ancestor: yes
+  properties:
+  - name: Timestamp
+    direction: desc

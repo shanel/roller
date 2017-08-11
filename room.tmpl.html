@@ -160,6 +160,38 @@
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
+        function xCard() {
+            $.post("/alert", {
+                'message': 'Someone Played The X-Card'
+            }).done(function (data) {
+            });
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function rewind() {
+            $.post("/alert", {
+                'message': 'Someone Called For A Script Change: Rewind'
+            }).done(function (data) {
+            });
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function pause() {
+            $.post("/alert", {
+                'message': 'Someone Called For A Script Change: Pause'
+            }).done(function (data) {
+            });
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function fastForward() {
+            $.post("/alert", {
+                'message': 'Someone Called For A Script Change: Fast-Forward'
+            }).done(function (data) {
+            });
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
         interact('.tap-target')
             .on('tap', function (event) {
                 event.currentTarget.classList.toggle('selected');
@@ -177,6 +209,10 @@
                     var b = data;
                     var unix = Math.round(+new Date() / 1000);
                     if (b !== "") {
+                        var chunks = b.split("||");
+                        if (chunks.length == 2) {
+                            alert(chunks[1]);
+                        }
                         if (sessionStorage.lastUpdateId) {
                             if (b !== sessionStorage.lastUpdateId) {
                                 $("#refreshable").load(window.location.href + " #refreshable");
@@ -288,6 +324,12 @@
         text-align: center;
     }
 
+    .button3 {
+        background-color: black;
+        color: #f44336;
+        text-align: center;
+    }
+
     /* Tooltip container */
     .tooltip {
         position: relative;
@@ -299,8 +341,8 @@
     .tooltip .tooltiptext {
         visibility: hidden;
         width: 120px;
-        background-color: black;
-        color: #fff;
+        background-color: white;
+        color: blue;
         text-align: center;
         padding: 5px 0;
         border-radius: 6px;
@@ -440,7 +482,15 @@
     <button class="button" onclick="rerollMarked()">Reroll selected</button>
     <button class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button class="button" onclick="getNewRoom()">New room</button>
+    <button class="button button3" onclick="xCard()">X-CARD</button><div class="tooltip">?<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/x-card-rpg">What's the X-Card?</a></span></div>
 </div>
+<!--<div class="buttons">
+    Safety Tools:
+    <button class="button button3" onclick="xCard()">X-CARD</button><div class="tooltip">?<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/x-card-rpg">What's the X-Card?</a></span></div>
+    <button class="button button3" onclick="rewind()">Rewind</button><div class="tooltip">?<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
+    <button class="button button3" onclick="pause()">Pause</button><div class="tooltip">?<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
+    <button class="button button3" onclick="fastForward()">Fast-Forward</button><div class="tooltip">?<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
+</div>-->
 <br>
 <div class="about"><a href="/about">about</a></div>
 <hr>
