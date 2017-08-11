@@ -339,6 +339,10 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 		dice = append(dice, &d)
 		keys = append(keys, dk)
 	}
+	room.Deck = roomDeck.GetSignature()
+	if _, err := datastore.Put(c, roomKey, &room); err != nil {
+		log.Printf("issue updating room in drawCards: %v", err)
+	}
 	return dice, keys
 }
 
