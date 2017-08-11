@@ -220,6 +220,11 @@
         }
 
         interact('.tap-target')
+            .on('doubletap', function (event) {
+                event.currentTarget.classList.toggle('selected');
+                rerollMarked();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            })
             .on('tap', function (event) {
                 event.currentTarget.classList.toggle('selected');
             });
