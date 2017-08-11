@@ -20,7 +20,7 @@
 package roller
 
 import (
-	"crypto/md5"
+//	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -50,6 +50,7 @@ import (
 	"google.golang.org/appengine/file"
 	// Maybe use this later?
 	//"appengine/user"
+	"crypto/md5"
 )
 
 var (
@@ -71,6 +72,7 @@ type Update struct {
 	Timestamp int64
 	Updater   string
 	UpdateAll bool
+	Message   string
 }
 
 type Room struct {
@@ -234,7 +236,15 @@ func refreshRoom(c context.Context, rk, fp string) string {
 			log.Printf("could not marshal updates to send in refreshRoom: %v", err)
 			return ""
 		}
-		out = fmt.Sprintf("%x", md5.Sum(toHash))
+		for _, u := range send {
+			if u.Message != "" {
+				out = fmt.Sprintf("%x||%s", md5.Sum(toHash), u.Message)
+				break
+			}
+		}
+		if out == "" {
+			out = fmt.Sprintf("%x", md5.Sum(toHash))
+		}
 	}
 	return out
 }
@@ -314,7 +324,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 		if err != nil {
 			log.Printf("could not get die image: %v", err)
 		}
-		log.Print(diu)
 		dk := dieKey(c, roomKey, int64(i))
 		d := Die{
 			Size:      "card",
@@ -572,11 +581,9 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
-		return fmt.Errorf("%v", d.Image)
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
 		// return
-		return nil
 	} else {
 		oldResultStr := fateReplace(d.ResultStr)
 		d.Result, d.ResultStr = getNewResult(d.Size)
@@ -588,7 +595,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 	}
 	if lastRoll[room] == 0 || lastAction[room] == "reroll" {
-		if d.Size != "F" {
+		if d.Size != "F" || !d.IsCard {
 			lastRoll[room] += d.Result
 		}
 	}
@@ -617,6 +624,7 @@ func getNewResult(kind string) (int, string) {
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
+	http.HandleFunc("/alert", alert)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
 	http.HandleFunc("/label", label)
@@ -702,6 +710,22 @@ func move(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
+func alert(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	message := r.Form.Get("message")
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in roll: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
