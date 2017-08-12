@@ -20,7 +20,7 @@
 package roller
 
 import (
-//	"crypto/md5"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -50,7 +50,6 @@ import (
 	"google.golang.org/appengine/file"
 	// Maybe use this later?
 	//"appengine/user"
-	"crypto/md5"
 )
 
 var (

@@ -417,13 +417,13 @@
         text-align: center;
     }
 
-/*    .imagine {
-        text-align: center;
-        height: 600px;
-        background-image:url("https://cdn-images-1.medium.com/max/1600/1*TX66RDkbLiZeglMvh5BtDw.png");
-        background-position:center top;
-        background-repeat:no-repeat;
-    }*/
+    /*    .imagine {
+            text-align: center;
+            height: 600px;
+            background-image:url("https://cdn-images-1.medium.com/max/1600/1*TX66RDkbLiZeglMvh5BtDw.png");
+            background-position:center top;
+            background-repeat:no-repeat;
+        }*/
 
     .refreshable {
         text-align: center;
@@ -431,9 +431,9 @@
 
     img.card {
         display: block;
-        max-width:77px;
-        max-height:113px;
-        background-color:white;
+        max-width: 77px;
+        max-height: 113px;
+        background-color: white;
         width: auto;
         height: auto;
         border: 2px solid black;
@@ -533,7 +533,8 @@
     <button class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div class="buttons">
-<div class="tooltip">Safety Tools:<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/x-card-rpg">What's the X-Card?</a><br><br><a target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
+    <div class="tooltip">Safety Tools:<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/x-card-rpg">What's the X-Card?</a><br><br><a
+            target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
     <button class="button button3" onclick="xCard()">X-CARD</button>
     <button class="button button3" onclick="rewind()">Rewind</button>
     <button class="button button3" onclick="pause()">Pause</button>
@@ -545,25 +546,25 @@
 <div class="refreshable" id="refreshable">
     <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}}</p>
     <div class="imagine" id="imagine">
-    {{range .Dice}} {{if .New}}
-    <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-         style="transform: translate({{.X}}px, {{.Y}}px);">
-        {{if .IsCard}}
-        <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-        {{else}}
-        <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
-        {{end}}
-    </div>
-    {{else}}
-    <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-         style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-        {{if .IsCard}}
+        {{range .Dice}} {{if .New}}
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
+             style="transform: translate({{.X}}px, {{.Y}}px);">
+            {{if .IsCard}}
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-        {{else}}
+            {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
-        {{end}}
-    </div>
-    {{end}} {{end}}
+            {{end}}
+        </div>
+        {{else}}
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+            {{if .IsCard}}
+            <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else}}
+            <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{end}}
+        </div>
+        {{end}} {{end}}
     </div>
 </div>
 
