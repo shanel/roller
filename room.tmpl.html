@@ -227,6 +227,26 @@
             }
         }
 
+        function fixedEncodeURIComponent(str) {
+            return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
+                return '%' + c.charCodeAt(0).toString(16);
+            });
+        }
+
+        function setBackground() {
+            var url = prompt("Please enter the URL to the image you would like used as the background for the room.")
+            if (url !== null) {
+                if (url !== "") {
+                    $.post("/background", {
+                        'bg': url
+                    }).done(function (data) {
+                    });
+//                    $("#refreshable").load(window.location.href + " #refreshable");
+                    location.reload();
+                }
+            }
+        }
+
         interact('.tap-target')
             .on('doubletap', function (event) {
                 event.currentTarget.classList.toggle('selected');
@@ -333,7 +353,7 @@
     }
 
     .footer {
-        position: absolute;
+        position: fixed;
         right: 0;
         bottom: 0;
         left: 0;
@@ -417,13 +437,10 @@
         text-align: center;
     }
 
-    /*    .imagine {
-            text-align: center;
-            height: 600px;
-            background-image:url("https://cdn-images-1.medium.com/max/1600/1*TX66RDkbLiZeglMvh5BtDw.png");
-            background-position:center top;
-            background-repeat:no-repeat;
-        }*/
+    img.centered {
+        display: block;
+        margin: 0 auto;
+    }
 
     .refreshable {
         text-align: center;
@@ -483,7 +500,7 @@
 
 <h3>Roll For Your Party: A multi-user dice roller.</h3>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
-    them!</p>
+    them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
     <input type="text" name="d4" id="d4" style="width: 19px"/>
     <label for="d4">d4</label>
@@ -530,6 +547,7 @@
     <button class="button" onclick="deleteMarked()">Delete selected</button>
     <button class="button" onclick="rerollMarked()">Reroll selected</button>
     <button class="button" onclick="shuffleDiscards()">Shuffle discards</button>
+    <button class="button" onclick="setBackground()">Set background</button>
     <button class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div class="buttons">
@@ -544,9 +562,22 @@
 <div class="about"><a href="/about">about</a></div>
 <hr>
 <div class="refreshable" id="refreshable">
+
+    {{if .HasBgURL}}
+    <style type="text/css">
+        .imagine {
+            text-align: center;
+            min-height: 2000px;
+            background-image: url("{{.BgURL}}");
+            background-position: center 5%;
+            background-repeat: no-repeat;
+        }
+    </style>
+    {{end}}
     <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}}</p>
     <div class="imagine" id="imagine">
-        {{range .Dice}} {{if .New}}
+        {{range .Dice}}
+        {{if .New}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
             {{if .IsCard}}
@@ -564,7 +595,8 @@
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             {{end}}
         </div>
-        {{end}} {{end}}
+        {{end}}
+        {{end}}
     </div>
 </div>
 

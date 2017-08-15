@@ -48,7 +48,7 @@ func TestUpdateRoom(t *testing.T) {
 	}
 	defer done()
 
-        up, err := json.Marshal([]Update{})
+	up, err := json.Marshal([]Update{})
 	if err != nil {
 		t.Fatalf("could not marshal update: %v", err)
 	}
