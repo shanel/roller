@@ -58,6 +58,8 @@ var (
 	refreshDelta = int64(2)
 	lastRoll     = map[string]int{}
 	lastAction   = map[string]string{}
+	// Keep track of attempts to hit non-existent rooms and only create a new room once
+	repeatOffenders = map[string]bool{}
 	cardToPNG    = map[string]string{
 		"A♣": "ace_of_clubs.png", "2♣": "2_of_clubs.png", "3♣": "3_of_clubs.png", "4♣": "4_of_clubs.png", "5♣": "5_of_clubs.png", "6♣": "6_of_clubs.png", "7♣": "7_of_clubs.png", "8♣": "8_of_clubs.png", "9♣": "9_of_clubs.png", "T♣": "10_of_clubs.png", "J♣": "jack_of_clubs.png", "Q♣": "queen_of_clubs.png", "K♣": "king_of_clubs.png",
 		"A♦": "ace_of_diamonds.png", "2♦": "2_of_diamonds.png", "3♦": "3_of_diamonds.png", "4♦": "4_of_diamonds.png", "5♦": "5_of_diamonds.png", "6♦": "6_of_diamonds.png", "7♦": "7_of_diamonds.png", "8♦": "8_of_diamonds.png", "9♦": "9_of_diamonds.png", "T♦": "10_of_diamonds.png", "J♦": "jack_of_diamonds.png", "Q♦": "queen_of_diamonds.png", "K♦": "king_of_diamonds.png",
@@ -79,6 +81,7 @@ type Room struct {
 	Timestamp int64
 	Slug      string
 	Deck      string
+	BgURL     string
 }
 
 type Die struct {
@@ -113,6 +116,8 @@ type Passer struct {
 	RollAvg    float64
 	LastAction string
 	CardsLeft  int
+	BgURL      string
+	HasBgURL   bool
 }
 
 func noSpaces(str string) string {
@@ -187,6 +192,37 @@ func updateRoom(c context.Context, rk string, u Update) error {
 		return fmt.Errorf("could not update room %v: %v", rk, err)
 	}
 	return nil
+}
+
+func setBackground(c context.Context, rk, url string) {
+	keyStr, err := getEncodedRoomKeyFromName(c, rk)
+	if err != nil {
+		log.Printf("roomname wonkiness in setBackground: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("setBackground: could not decode room key %v: %v", rk, err)
+		return
+	}
+	var r Room
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		log.Printf("could not find room %v for setting background: %v", rk, err)
+		return
+	}
+	r.BgURL = url
+	_, err = datastore.Put(c, roomKey, &r)
+	if err != nil {
+		log.Printf("could not create updated room %v: %v", rk, err)
+	}
+
+	var testRoom Room
+	if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+		log.Printf("couldn't find the new entry: %v", err)
+	}
+	if testRoom.BgURL != url {
+		log.Printf("url is wrong")
+	}
+	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 }
 
 func refreshRoom(c context.Context, rk, fp string) string {
@@ -628,6 +664,7 @@ func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
 	http.HandleFunc("/alert", alert)
+	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
 	http.HandleFunc("/label", label)
@@ -677,6 +714,10 @@ func paused(w http.ResponseWriter, r *http.Request) {
 func refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
+	if _, ok := repeatOffenders[r.Form.Get("id")]; ok {
+		http.NotFound(w, r)
+		return
+	}
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
 		log.Printf("roomname wonkiness in refresh: %v", err)
@@ -713,6 +754,24 @@ func move(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
+func background(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	bg := r.Form.Get("bg")
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in background: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	setBackground(c, room, bg)
+	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
 func alert(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	message := r.Form.Get("message")
@@ -720,7 +779,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		log.Printf("roomname wonkiness in roll: %v", err)
+		log.Printf("roomname wonkiness in alert: %v", err)
 	}
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
@@ -817,8 +876,13 @@ func clear(w http.ResponseWriter, r *http.Request) {
 func room(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.URL.Path)
+	if _, ok := repeatOffenders[room]; ok {
+		http.NotFound(w, r)
+		return
+	}
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
+		repeatOffenders[room] = true
 		log.Printf("room wonkiness in room: %v", err)
 	}
 	dice, err := getRoomDice(c, keyStr, "Result")
@@ -831,7 +895,9 @@ func room(w http.ResponseWriter, r *http.Request) {
 		}
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
 		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
+		repeatOffenders[room] = true
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
+		return
 	}
 
 	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp")
@@ -892,6 +958,10 @@ func room(w http.ResponseWriter, r *http.Request) {
 		RollTotal: rollTotal,
 		RollAvg:   rollAvg,
 		CardsLeft: deckSize,
+	}
+	if rm.BgURL != "" {
+		p.BgURL = rm.BgURL
+		p.HasBgURL = true
 	}
 	if la, ok := lastAction[room]; ok {
 		if la == "delete" {
