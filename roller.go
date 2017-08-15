@@ -788,6 +788,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
+
 func roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
