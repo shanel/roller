@@ -334,13 +334,16 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 		log.Printf("problem creating hand: %v", err)
 		return dice, keys
 	}
+	deck.Seed()
 	roomDeck, err := deck.New(deck.FromSignature(room.Deck))
 	if err != nil {
 		log.Printf("problem with deck signature: %v", err)
 		return dice, keys
 	}
+	roomDeck.Shuffle()
 	deckSize := roomDeck.NumberOfCards()
-	if deckSize == 0 {
+	// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
+	if deckSize == 0 || room.Deck == "" {
 		log.Print("room deck is empty")
 		return dice, keys
 	}
