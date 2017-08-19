@@ -236,14 +236,11 @@
         function setBackground() {
             var url = prompt("Please enter the URL to the image you would like used as the background for the room. (To remove the current background leave this blank and submit.)")
             if (url !== null) {
- //               if (url !== "") {
                     $.post("/background", {
                         'bg': url
                     }).done(function (data) {
                     });
-//                    $("#refreshable").load(window.location.href + " #refreshable");
                     location.reload();
- //               }
             }
         }
 
