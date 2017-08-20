@@ -5,5 +5,8 @@ handlers:
 - url: /.well-known
   static_dir: well-known
 
+- url: /js
+  static_dir: js
+
 - url: /.*
   script: _go_app

@@ -24,26 +24,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"image"
-	"image/draw"
-	"image/png"
 	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
-	"unicode/utf8"
-
 	"github.com/adamclerk/deck"
 	"github.com/dustinkirkland/golang-petname"
-	"github.com/golang/freetype"
-	"golang.org/x/image/font"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -96,6 +88,7 @@ type Die struct {
 	Image     string
 	New       bool
 	IsCard    bool
+	IsLabel   bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -345,6 +338,19 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 	// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
 	if deckSize == 0 || room.Deck == "" {
 		log.Print("room deck is empty")
+		// TODO(shanel): Figure out what it appears that the number of cards for an empty deck is 52
+		// Below might be useless...
+		var empty *deck.Deck
+		empty, err = deck.New(deck.Empty)
+		if err != nil {
+			log.Printf("issue creating empty deck: %v", err)
+			return dice, keys
+		}
+		log.Printf("empty deck has %v cards", empty.NumberOfCards())
+		room.Deck = empty.GetSignature()
+		if _, err := datastore.Put(c, roomKey, &room); err != nil {
+			log.Printf("issue updating deck in drawCards: %v", err)
+		}
 		return dice, keys
 	}
 	if deckSize < count {
@@ -450,8 +456,8 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 			Key:       lk,
 			KeyStr:    lk.Encode(),
 			Timestamp: ts,
-			Image:     fmt.Sprintf("/label?text=%s&color=%s", sizes["label"], color),
 			New:       true,
+			IsLabel:   true,
 		}
 		dice = append(dice, &l)
 		keys = append(keys, lk)
@@ -614,7 +620,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.Size == "label" || d.ResultStr == "token" {
+	if d.IsLabel || d.ResultStr == "token" {
 		return fmt.Errorf("label or token")
 	}
 	if d.IsCard {
@@ -670,7 +676,6 @@ func init() {
 	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
-	http.HandleFunc("/label", label)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/refresh", refresh)
@@ -1059,66 +1064,3 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func label(w http.ResponseWriter, r *http.Request) {
-	text, err := url.QueryUnescape(r.URL.Query()["text"][0])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	col := r.URL.Query()["color"][0]
-
-	// Read the font data.
-	fontBytes, err := ioutil.ReadFile("Roboto-Regular.ttf")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	f, err := freetype.ParseFont(fontBytes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	cols := map[string]string{
-		"clear":  "ffffff",
-		"blue":   "1e90ff",
-		"green":  "008b45",
-		"orange": "ff8c00",
-		"red":    "ff3333",
-		"violet": "8a2be2",
-		"gold":   "ffd700",
-	}
-	if _, ok := cols[col]; !ok {
-		log.Printf("couldn't find color %s", col)
-		http.Error(w, fmt.Sprintf("couldn't find color %s", col), http.StatusInternalServerError)
-	}
-	// Initialize the context.
-	//fg, bg := image.NewUniform(Convert(cols[col])), image.Black
-	fg, bg := image.Black, image.Opaque
-	rc := utf8.RuneCountInString(text)
-	if (rc % 2) == 0 {
-		rc += 1
-	}
-	width := int(math.Ceil((float64(rc)*float64(18))/float64(72))) * 52
-	rgba := image.NewRGBA(image.Rect(0, 0, width, 48))
-	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
-	fc := freetype.NewContext()
-	fc.SetDPI(96)
-	fc.SetFont(f)
-	fc.SetFontSize(18)
-	fc.SetClip(rgba.Bounds())
-	fc.SetDst(rgba)
-	fc.SetSrc(fg)
-	fc.SetHinting(font.HintingNone)
-
-	// Draw the text.
-	pt := freetype.Pt(10, 10+int(fc.PointToFixed(18)>>6))
-	_, err = fc.DrawString(text, pt)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	pt.Y += fc.PointToFixed(18 * 1.5)
-
-	err = png.Encode(w, rgba)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}

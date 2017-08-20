@@ -7,6 +7,9 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
 
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>-->
+    <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
+    <!--<script src="/js/jquery.postitall.js"></script>-->
 
     <script type="text/javascript" language="javascript">
 
@@ -453,6 +456,23 @@
         border: 2px solid black;
     }
 
+    /*TODO(shanel): Store this style stuff in the element's actual style tag.*/
+    .label {
+        /*width: 25%;*/
+        /*height: 100%;*/
+        /*min-height: 6.5em;*/
+        /*margin: 10%;*/
+
+        /*background-color: #29e;*/
+        /*color: white;*/
+
+        /*border-radius: 0.75em;*/
+        /*padding: 4%;*/
+
+        /*-webkit-transform: translate(0px, 0px);*/
+        /*transform: translate(0px, 0px);*/
+    }
+
 </style>
 
 <body>
@@ -493,7 +513,6 @@
         animation: octocat-wave 560ms ease-in-out
     }
 }</style>
-
 
 <h3>Roll For Your Party: A multi-user dice roller.</h3>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
@@ -571,10 +590,17 @@
         }
     </style>
     {{end}}
-    <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}}</p>
+    <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}} Cards Left: {{.CardsLeft}}</p>
     <div class="imagine" id="imagine">
         {{range .Dice}}
         {{if .New}}
+        {{if .IsLabel}}
+        <!--TODO(shanel): Have full style here, not just the move stuff.-->
+        <div id="{{.KeyStr}}" class="draggable tap-target label" data-x="{{.X}}" data-y="{{.Y}}"
+             style="transform: translate({{.X}}px, {{.Y}}px);">
+            <p><h3>{{.ResultStr}}</h3></p>
+        </div>
+        {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
             {{if .IsCard}}
@@ -582,6 +608,13 @@
             {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             {{end}}
+        </div>
+        {{end}}
+        {{else}}
+        {{if .IsLabel}}
+        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+            <p><h3>{{.ResultStr}}</h3></p>
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
@@ -592,6 +625,7 @@
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             {{end}}
         </div>
+        {{end}}
         {{end}}
         {{end}}
     </div>
