@@ -6,8 +6,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/jquery.darktooltip.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/darktooltip.css">
 
-    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
     <!--<script src="/js/jquery.postitall.js"></script>-->
 
@@ -297,6 +299,10 @@
         }
 
         setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
+
+
+
+
     </script>
 </head>
 
@@ -407,6 +413,8 @@
         padding: 5px 0;
         border-radius: 6px;
 
+
+
         /* Position the tooltip text - see examples below! */
         position: absolute;
         z-index: 1;
@@ -414,6 +422,8 @@
 
     /* Show the tooltip text when you mouse over the tooltip container */
     .tooltip:hover .tooltiptext {
+        -webkit-transition-delay: 1s; /* Safari */
+        transition-delay: 1s;
         visibility: visible;
     }
 
@@ -523,9 +533,7 @@
     <input type="text" name="d6" id="d6" style="width: 19px"/>
     <label for="d6">d6</label>
     <input type="text" name="d6p" id="d6p" style="width: 19px"/>
-    <label for="d6p">
-        <div class="tooltip">d6(P)<span class="tooltiptext">d6 with pips</span></div>
-    </label>
+    <label id="pipped" for="d6p">d6(P)</label>
     <input type="text" name="d8" id="d8" style="width: 19px"/>
     <label for="d8">d8</label>
     <input type="text" name="d10" id="d10" style="width: 19px"/>
@@ -535,15 +543,15 @@
     <input type="text" name="d20" id="d20" style="width: 19px"/>
     <label for="d20">d20</label>
     <input type="text" name="dF" id="dF" style="width: 19px"/>
-    <label for="dF">dF</label>
-    <label for="tokens">tokens: </label>
+    <label id="fateLabel" for="dF">dF</label>
+    <label id="tokenLabel" for="tokens">tokens: </label>
     <input type="text" name="tokens" id="tokens" style="width: 19px"/>
-    <label for="cards">cards: </label>
+    <label id="cardLabel" for="cards">cards: </label>
     <input type="text" name="cards" id="cards" style="width: 19px"/>
-    <label for="label">label: </label>
+    <label id="labelLabel" for="label">label: </label>
     <input type="text" name="label" id="label" style="width: 100"/>
 
-    <label for="selectColor">color: </label>
+    <label id="colorLabel" for="selectColor">color: </label>
     <select id="selectColor" name="color">
         <option value="clear" style="color: #ffffff">Clear</option>
         <option value="blue" style="color: #1e90ff">Blue</option>
@@ -559,21 +567,110 @@
 </form>
 <div class="buttons">
     <button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit</button>
-    <button class="button" onclick="clearAllDice()">Clear</button>
-    <button class="button" onclick="deleteMarked()">Delete selected</button>
-    <button class="button" onclick="rerollMarked()">Reroll selected</button>
-    <button class="button" onclick="shuffleDiscards()">Shuffle discards</button>
-    <button class="button" onclick="setBackground()">Set background</button>
-    <button class="button" onclick="getNewRoom()">New room</button>
+    <button id="clearButton" class="button" onclick="clearAllDice()">Clear</button>
+    <button id="deleteButton" class="button" onclick="deleteMarked()">Delete selected</button>
+    <button id="rerollButton" class="button" onclick="rerollMarked()">Reroll selected</button>
+    <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
+    <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
+    <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div class="buttons">
-    <div class="tooltip">Safety Tools:<span class="tooltiptext"><a target="_blank" href="http://tinyurl.com/x-card-rpg">What's the X-Card?</a><br><br><a
-            target="_blank" href="http://tinyurl.com/nphed7m">What's Script Change?</a></span></div>
-    <button class="button button3" onclick="xCard()">X-CARD</button>
-    <button class="button button3" onclick="rewind()">Rewind</button>
-    <button class="button button3" onclick="pause()">Pause</button>
-    <button class="button button3" onclick="fastForward()">Fast-Forward</button>
+    <span id="safetyLabel">Safety Tools:</span>
+    <button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>
+    <button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>
+    <button id="pauseButton" class="button button3" onclick="pause()">Pause</button>
+    <button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>
 </div>
+<script>
+    // Dark tool tips
+    $("#clearButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to remove everything from the room.',
+        hoverDelay: 1000
+    });
+    $("#deleteButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to delete a previously clicked (and thus highlighted in red) item.',
+        hoverDelay: 1000
+    });
+    $("#rerollButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to reroll/redraw a previously clicked (and thus highlighted in red) item in place. (You can also double-click items to reroll them.)',
+        hoverDelay: 1000
+    });
+    $("#shuffleButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to shuffle previously cleared/deleted cards back into the deck.',
+        hoverDelay: 1000
+    });
+    $("#backgroundButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to set a background image for the room.',
+        hoverDelay: 1000
+    });
+    $("#newRoomButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to leave this room for a newly created one.',
+        hoverDelay: 1000
+    });
+    $("#pipped").darkTooltip({
+        gravity: 'south',
+        content: 'd6 with pips',
+        hoverDelay: 1000
+    });
+    $("#fateLabel").darkTooltip({
+        gravity: 'south',
+        content: 'Fate/Fudge dice',
+        hoverDelay: 1000
+    });
+    $("#tokenLabel").darkTooltip({
+        gravity: 'south',
+        content: 'colored blank tokens',
+        hoverDelay: 1000
+    });
+    $("#labelLabel").darkTooltip({
+        gravity: 'south',
+        content: 'movable pieces of text',
+        hoverDelay: 1000
+    });
+    $("#colorLabel").darkTooltip({
+        gravity: 'south',
+        content: 'choose the color of the dice/tokens you are about to generate',
+        hoverDelay: 1000
+    });
+    $("#safetyButton").darkTooltip({
+        gravity: 'north',
+        theme: 'light',
+        content: '<a target="_blank" href="http://tinyurl.com/x-card-rpg">What\'s the X-Card?</a><br><br><a\n' +
+        '            target="_blank" href="http://tinyurl.com/nphed7m">What\'s Script Change? (Rewind/Pause/Fast-Forward)</a>',
+        hoverDelay: 1000
+    });
+    $("#cardButton").darkTooltip({
+        gravity: 'south',
+        content: 'face up playing cards (no jokers) - use "Shuffle discards" button to refill deck',
+        hoverDelay: 1000
+    });
+    $("#xCardButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to <a target="_blank" href="http://tinyurl.com/x-card-rpg">X-Card</a> content (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#rewindButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Rewind (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#pauseButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Pause (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#fastForwardButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Fast Forward (anonymously)',
+        hoverDelay: 1000
+    });
+</script>
 <br>
 <div class="about"><a href="/about">about</a></div>
 <hr>
