@@ -274,6 +274,7 @@ func setBackground(c context.Context, rk, url string) {
 	keyStr, err := getEncodedRoomKeyFromName(c, rk)
 	if err != nil {
 		log.Printf("roomname wonkiness in setBackground: %v", err)
+		return
 	}
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
@@ -289,14 +290,67 @@ func setBackground(c context.Context, rk, url string) {
 	_, err = datastore.Put(c, roomKey, &r)
 	if err != nil {
 		log.Printf("could not create updated room %v: %v", rk, err)
+		return
 	}
 
 	var testRoom Room
 	if err = datastore.Get(c, roomKey, &testRoom); err != nil {
 		log.Printf("couldn't find the new entry: %v", err)
+		return
 	}
 	if testRoom.BgURL != url {
 		log.Printf("url is wrong")
+		return
+	}
+	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+}
+
+func addCustomSet(c context.Context, rk, name, url string) {
+	keyStr, err := getEncodedRoomKeyFromName(c, rk)
+	if err != nil {
+		log.Printf("roomname wonkiness in addCustomSet: %v", err)
+		return
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("addCustomSet: could not decode room key %v: %v", rk, err)
+		return
+	}
+	var r Room
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		log.Printf("could not find room %v for adding custom set: %v", rk, err)
+		return
+	}
+	cs, err := newCustomSet(url)
+	if err != nil {
+		log.Printf("issue with custom set: %v", err)
+		return
+	}
+	rcs, err := r.GetCustomSets()
+	if err != nil {
+		log.Printf("%v", err)
+		return
+	}
+	rcs[name] = cs
+	err = r.SetCustomSets(rcs)
+	if err != nil {
+		log.Printf("%v", err)
+		return
+	}
+	_, err = datastore.Put(c, roomKey, &r)
+	if err != nil {
+		log.Printf("could not create updated room %v: %v", rk, err)
+		return
+	}
+
+	var testRoom Room
+	if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+		log.Printf("couldn't find the new entry: %v", err)
+		return
+	}
+	if testRoom.BgURL != url {
+		log.Printf("url is wrong")
+		return
 	}
 	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 }
@@ -804,6 +858,7 @@ func getNewResult(kind string) (int, string) {
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
+	http.HandleFunc("/addcustomset", addcustomset)
 	http.HandleFunc("/alert", alert)
 	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
@@ -908,6 +963,25 @@ func background(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	setBackground(c, room, bg)
+	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func addcustomset(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.Form.Get("name")
+	link := r.Form.Get("link")
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in background: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	addCustomSet(c, room, name, link)
 	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
