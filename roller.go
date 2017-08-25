@@ -545,15 +545,16 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 			diu := card
 			dk := dieKey(c, roomKey, int64(i))
 			d := Die{
-				Size:         "card",
-				Result:       i,
-				ResultStr:    "",
-				Key:          dk,
-				KeyStr:       dk.Encode(),
-				Timestamp:    ts,
-				Image:        diu,
-				New:          true,
-				IsCustomItem: true,
+				Size:          "card", // should this be "custom" ???
+				Result:        i,
+				ResultStr:     "",
+				Key:           dk,
+				KeyStr:        dk.Encode(),
+				Timestamp:     ts,
+				Image:         diu,
+				New:           true,
+				IsCustomItem:  true,
+				CustomSetName: deckName,
 			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
