@@ -23,6 +23,12 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/adamclerk/deck"
+	"github.com/dustinkirkland/golang-petname"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/file"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -34,12 +40,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"github.com/adamclerk/deck"
-	"github.com/dustinkirkland/golang-petname"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/file"
 	// Maybe use this later?
 	//"appengine/user"
 )
@@ -69,26 +69,109 @@ type Update struct {
 }
 
 type Room struct {
-	Updates   []byte // hooray having to use json
-	Timestamp int64
-	Slug      string
-	Deck      string
-	BgURL     string
+	Updates    []byte // hooray having to use json
+	Timestamp  int64
+	Slug       string
+	Deck       string
+	BgURL      string
+	CustomSets []byte // yup, having to use json again...
+}
+
+func (r *Room) GetCustomSets() (CustomSets, error) {
+	out := CustomSets{}
+	err := json.Unmarshal(r.CustomSets, &out)
+	if err != nil {
+		return out, fmt.Errorf("could not unmarshal updates in BuildCustomSets: %v", err)
+	}
+	return out, nil
+}
+
+func (r *Room) SetCustomSets(cs CustomSets) error {
+	toSave, err := json.Marshal(cs)
+	if err != nil {
+		return err
+	}
+	r.CustomSets = toSave
+}
+
+type CustomSets map[string]CustomSet
+
+type CustomSet struct {
+	// TODO(shanel): maybe make this use a mutex in the future?
+	Template map[int]string // url map for easy searching
+	Instance map[int]string
+}
+
+func (cs *CustomSet) Draw(c int) (map[int]string, error) {
+	left := len(cs.Instance)
+	out := map[int]string{}
+	if left == 0 {
+		return out, error.New("the deck is empty")
+	}
+	if left < c {
+		for i, j := range cs.Instance {
+			out[i] = j
+		}
+		cs.Instance = map[int]string{}
+		return out, fmt.Errorf("could not draw full %v entries, only %v left in set", c, left)
+	}
+	out := map[int]string{}
+	remove := make([]int, c)
+	for i := 0; i < c; i++ {
+		remove = append(remove, rand.Intn(left))
+		left--
+	}
+	for _, k := range remove {
+		out[k] = cs.Instance[k]
+		delete(cs.Instance, k)
+	}
+	return out, nil
+}
+
+func (cs *CustomSet) shuffleDiscards(stillOut map[int]bool) {
+	newInstance := map[int]string{}
+	for k, v := range cs.Template {
+		if _, ok := stillout[k]; !ok {
+			newInstance[k] = v
+		}
+	}
+	cs.Instance = newInstance
+}
+
+func newCustomSet(u string) (CustomSet, error) {
+	resp, err := http.Get(u)
+	defer resp.Body.Close()
+
+	if err != nil {
+		return CustomSet{}, err
+	}
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return CustomSet{}, err
+	}
+	pieces := strings.Split(string(bytes), "\n")
+	cs := CustomSet{Template: map[int]string{}, Instance: map[int]string{}}
+	for i, p := range pieces {
+		cs.Template[i] = p
+		cs.Instance[i] = p
+	}
+	return cs, nil
 }
 
 type Die struct {
-	Size      string // for fate dice this won't be an integer
-	Result    int    // For fate dice make this one of three very large numbers?
-	ResultStr string
-	X         float64
-	Y         float64
-	Key       *datastore.Key
-	KeyStr    string
-	Timestamp int64
-	Image     string
-	New       bool
-	IsCard    bool
-	IsLabel   bool
+	Size         string // for fate dice this won't be an integer
+	Result       int    // For fate dice make this one of three very large numbers?
+	ResultStr    string
+	X            float64
+	Y            float64
+	Key          *datastore.Key
+	KeyStr       string
+	Timestamp    int64
+	Image        string
+	New          bool
+	IsCard       bool
+	IsLabel      bool
+	IsCustomItem bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -313,7 +396,7 @@ func newRoom(c context.Context) (string, error) {
 	return roomName, nil
 }
 
-func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []*datastore.Key) {
+func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName string) ([]*Die, []*datastore.Key) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
@@ -322,70 +405,105 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key) ([]*Die, []
 		log.Printf("issue getting room in drawCards: %v", err)
 		return dice, keys
 	}
-	hand, err := deck.New(deck.Empty)
-	if err != nil {
-		log.Printf("problem creating hand: %v", err)
-		return dice, keys
-	}
-	deck.Seed()
-	roomDeck, err := deck.New(deck.FromSignature(room.Deck))
-	if err != nil {
-		log.Printf("problem with deck signature: %v", err)
-		return dice, keys
-	}
-	roomDeck.Shuffle()
-	deckSize := roomDeck.NumberOfCards()
-	// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
-	if deckSize == 0 || room.Deck == "" {
-		log.Print("room deck is empty")
-		// TODO(shanel): Figure out what it appears that the number of cards for an empty deck is 52
-		// Below might be useless...
-		var empty *deck.Deck
-		empty, err = deck.New(deck.Empty)
+	if deckName == "" {
+		hand, err := deck.New(deck.Empty)
 		if err != nil {
-			log.Printf("issue creating empty deck: %v", err)
+			log.Printf("problem creating hand: %v", err)
 			return dice, keys
 		}
-		log.Printf("empty deck has %v cards", empty.NumberOfCards())
-		room.Deck = empty.GetSignature()
-		if _, err := datastore.Put(c, roomKey, &room); err != nil {
-			log.Printf("issue updating deck in drawCards: %v", err)
-		}
-		return dice, keys
-	}
-	if deckSize < count {
-		roomDeck.Deal(deckSize, hand)
-		log.Printf("not enough cards in room deck, only dealt %v", deckSize)
-		handSize = deckSize
-	} else {
-		roomDeck.Deal(count, hand)
-		handSize = count
-	}
-	cards := strings.Split(hand.String(), "\n")[0:handSize]
-	ts := time.Now().Unix()
-	for i, card := range cards {
-		diu, err := getDieImageURL(c, "card", card, "")
+		deck.Seed()
+		roomDeck, err := deck.New(deck.FromSignature(room.Deck))
 		if err != nil {
-			log.Printf("could not get die image: %v", err)
+			log.Printf("problem with deck signature: %v", err)
+			return dice, keys
 		}
-		dk := dieKey(c, roomKey, int64(i))
-		d := Die{
-			Size:      "card",
-			Result:    0,
-			ResultStr: card,
-			Key:       dk,
-			KeyStr:    dk.Encode(),
-			Timestamp: ts,
-			Image:     diu,
-			New:       true,
-			IsCard:    true,
+		roomDeck.Shuffle()
+		deckSize := roomDeck.NumberOfCards()
+		// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
+		if deckSize == 0 || room.Deck == "" {
+			log.Print("room deck is empty")
+			// TODO(shanel): Figure out what it appears that the number of cards for an empty deck is 52
+			// Below might be useless...
+			var empty *deck.Deck
+			empty, err = deck.New(deck.Empty)
+			if err != nil {
+				log.Printf("issue creating empty deck: %v", err)
+				return dice, keys
+			}
+			log.Printf("empty deck has %v cards", empty.NumberOfCards())
+			room.Deck = empty.GetSignature()
+			if _, err := datastore.Put(c, roomKey, &room); err != nil {
+				log.Printf("issue updating deck in drawCards: %v", err)
+			}
+			return dice, keys
 		}
-		dice = append(dice, &d)
-		keys = append(keys, dk)
-	}
-	room.Deck = roomDeck.GetSignature()
-	if _, err := datastore.Put(c, roomKey, &room); err != nil {
-		log.Printf("issue updating room in drawCards: %v", err)
+		if deckSize < count {
+			roomDeck.Deal(deckSize, hand)
+			log.Printf("not enough cards in room deck, only dealt %v", deckSize)
+			handSize = deckSize
+		} else {
+			roomDeck.Deal(count, hand)
+			handSize = count
+		}
+		cards := strings.Split(hand.String(), "\n")[0:handSize]
+		ts := time.Now().Unix()
+		for i, card := range cards {
+			diu, err := getDieImageURL(c, "card", card, "")
+			if err != nil {
+				log.Printf("could not get die image: %v", err)
+			}
+			dk := dieKey(c, roomKey, int64(i))
+			d := Die{
+				Size:      "card",
+				Result:    0,
+				ResultStr: card,
+				Key:       dk,
+				KeyStr:    dk.Encode(),
+				Timestamp: ts,
+				Image:     diu,
+				New:       true,
+				IsCard:    true,
+			}
+			dice = append(dice, &d)
+			keys = append(keys, dk)
+		}
+		room.Deck = roomDeck.GetSignature()
+		if _, err := datastore.Put(c, roomKey, &room); err != nil {
+			log.Printf("issue updating room in drawCards: %v", err)
+		}
+	} else {
+		// do the custom set stuff here...
+		customSets, err := room.GetCustomSets()
+		if err != nil {
+			log.Printf("issue getting custom etds in drawCards: %v", err)
+			return dice, keys
+		}
+		cs, ok := customSets[deckName]
+		if !ok {
+			log.Printf("no custom set with name %v", deckName)
+			return dice, keys
+		}
+		drawn, err := cs.Draw(count)
+		if err != nil {
+			fmt.Printf("problem with custom draw: %v", err)
+		}
+		for i, card := range drawn {
+			diu := card
+			dk := dieKey(c, roomKey, int64(i))
+			d := Die{
+				Size:         "card",
+				Result:       i,
+				ResultStr:    "",
+				Key:          dk,
+				KeyStr:       dk.Encode(),
+				Timestamp:    ts,
+				Image:        diu,
+				New:          true,
+				IsCustomItem: true,
+			}
+			dice = append(dice, &d)
+			keys = append(keys, dk)
+		}
 	}
 	return dice, keys
 }
@@ -462,10 +580,11 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		dice = append(dice, &l)
 		keys = append(keys, lk)
 	}
+	// TODO(shanel): Need to integrate custom card stuff here
 	if sizes["card"] != "" {
 		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
-			cards, cardKeys := drawCards(c, count, roomKey)
+			cards, cardKeys := drawCards(c, count, roomKey, "")
 			for _, card := range cards {
 				dice = append(dice, card)
 			}
@@ -489,9 +608,22 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 func getRoomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
-		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
+		return nil, fmt.Errorf("getRoomCards: could not decode room key %v: %v", encodedRoomKey, err)
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).Filter("Size =", "card") //.Limit(10)
+	dice := []Die{}
+	if _, err = q.GetAll(c, &dice); err != nil {
+		return nil, fmt.Errorf("problem executing card query: %v", err)
+	}
+	return dice, nil
+}
+
+func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
+	k, err := datastore.DecodeKey(encodedRoomKey)
+	if err != nil {
+		return nil, fmt.Errorf("getRoomCustomCards: could not decode room key %v: %v", encodedRoomKey, err)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsCustomCard =", true) //.Limit(10)
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing card query: %v", err)
@@ -625,7 +757,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	}
 	if d.IsCard {
 		// Do a single draw.
-		dice, keys := drawCards(c, 1, k.Parent())
+		dice, keys := drawCards(c, 1, k.Parent(), "")
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
@@ -998,7 +1130,7 @@ func about(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func shuffleDiscards(c context.Context, keyStr string) error {
+func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 	// Get dice in the room - specifically the cards
 	// make a map[string]bool of the card ResultStr
 	// run through the keys of cardsToPNG seeing if they are
@@ -1006,42 +1138,78 @@ func shuffleDiscards(c context.Context, keyStr string) error {
 	// string to a string. That will be the signature for the new deck.
 	// Create that deck, shuffle it, output it's signature to the room's
 	// Deck. Put the updated Room into the datastore.
-	cards, err := getRoomCards(c, keyStr)
-	if err != nil {
-		return err
-	}
-	roomCardStrings := map[string]bool{}
-	for _, card := range cards {
-		roomCardStrings[card.ResultStr] = true
-	}
-	sig := ""
-	for k := range cardToPNG {
-		if _, ok := roomCardStrings[k]; !ok {
-			pieces := strings.Split(k, "")
-			sig += fmt.Sprintf("%x%x", faceMap[pieces[0]], suitMap[pieces[1]])
+	if deckName != "" {
+		cards, err := getRoomCustomCards(c, keyStr)
+		if err != nil {
+			return err
 		}
-	}
-	deck.Seed()
-	d, err := deck.New(deck.FromSignature(sig))
-	if err != nil {
-		return err
-	}
-	d.Shuffle()
-	sig = d.GetSignature()
-	roomKey, err := datastore.DecodeKey(keyStr)
-	if err != nil {
-		return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
-	}
-	var r Room
-	t := time.Now().Unix()
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		return err
-	}
-	r.Deck = sig
-	r.Timestamp = t
-	_, err = datastore.Put(c, roomKey, &r)
-	if err != nil {
-		return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+		stillOut := map[int]bool{}
+		for k := range cards {
+			stillOut[k.Result] = true
+		}
+		roomKey, err := datastore.DecodeKey(keyStr)
+		if err != nil {
+			return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
+		}
+		var r Room
+		t := time.Now().Unix()
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return err
+		}
+		cs, err := r.GetCustomSets()
+		if err != nil {
+			return err
+		}
+		toShuffle, ok := cs[deckName]
+		if !ok {
+			return fmt.Errorf("could not find custom set %v", deckName)
+		}
+		toShuffle.ShuffleDiscards(stillOut)
+		cs[deckName] = toShuffle
+		r.SetCustomSets(cs)
+		r.Timestamp = t
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+		}
+	} else {
+		cards, err := getRoomCards(c, keyStr)
+		if err != nil {
+			return err
+		}
+		roomCardStrings := map[string]bool{}
+		for _, card := range cards {
+			roomCardStrings[card.ResultStr] = true
+		}
+		sig := ""
+		for k := range cardToPNG {
+			if _, ok := roomCardStrings[k]; !ok {
+				pieces := strings.Split(k, "")
+				sig += fmt.Sprintf("%x%x", faceMap[pieces[0]], suitMap[pieces[1]])
+			}
+		}
+		deck.Seed()
+		d, err := deck.New(deck.FromSignature(sig))
+		if err != nil {
+			return err
+		}
+		d.Shuffle()
+		sig = d.GetSignature()
+		roomKey, err := datastore.DecodeKey(keyStr)
+		if err != nil {
+			return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
+		}
+		var r Room
+		t := time.Now().Unix()
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return err
+		}
+		r.Deck = sig
+		r.Timestamp = t
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+		}
 	}
 	return nil
 }
@@ -1054,7 +1222,7 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("roomname wonkiness in clear: %v", err)
 	}
 	// TODO(shanel): write this function
-	err = shuffleDiscards(c, keyStr)
+	err = shuffleDiscards(c, keyStr, r.Form.Get("deck"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -1063,4 +1231,3 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
-
