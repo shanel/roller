@@ -159,19 +159,20 @@ func newCustomSet(u string) (CustomSet, error) {
 }
 
 type Die struct {
-	Size         string // for fate dice this won't be an integer
-	Result       int    // For fate dice make this one of three very large numbers?
-	ResultStr    string
-	X            float64
-	Y            float64
-	Key          *datastore.Key
-	KeyStr       string
-	Timestamp    int64
-	Image        string
-	New          bool
-	IsCard       bool
-	IsLabel      bool
-	IsCustomItem bool
+	Size          string // for fate dice this won't be an integer
+	Result        int    // For fate dice make this one of three very large numbers?
+	ResultStr     string
+	X             float64
+	Y             float64
+	Key           *datastore.Key
+	KeyStr        string
+	Timestamp     int64
+	Image         string
+	New           bool
+	IsCard        bool
+	IsLabel       bool
+	IsCustomItem  bool
+	CustomSetName string
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -819,6 +820,13 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
 		// return
+	} else if d.IsCustomItem {
+		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName)
+		// Set the location to the same as the passed in die.
+		d.ResultStr = dice[0].ResultStr
+		d.Image = dice[0].Image
+		// Delete the old die.
+		deleteDieHelper(c, keys[0].Encode())
 	} else {
 		oldResultStr := fateReplace(d.ResultStr)
 		d.Result, d.ResultStr = getNewResult(d.Size)
