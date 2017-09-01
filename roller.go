@@ -491,7 +491,6 @@ func newRoom(c context.Context) (string, error) {
 }
 
 func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName string) ([]*Die, []*datastore.Key) {
-	log.Printf("inside drawCards, count is %v", count)
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
@@ -526,7 +525,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 				log.Printf("issue creating empty deck: %v", err)
 				return dice, keys
 			}
-			log.Printf("empty deck has %v cards", empty.NumberOfCards())
 			room.Deck = empty.GetSignature()
 			if _, err := datastore.Put(c, roomKey, &room); err != nil {
 				log.Printf("issue updating deck in drawCards: %v", err)
@@ -578,9 +576,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 			log.Printf("no custom set with name %v", deckName)
 			return dice, keys
 		}
-		log.Printf("in else clause, count is %v", count)
 		drawn, err := cs.Draw(count)
-		log.Printf("drawn length: %v", len(drawn))
 		if err != nil {
 			fmt.Printf("problem with custom draw: %v", err)
 		}
@@ -1052,9 +1048,7 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log.Printf("about to do addCustomSet with name=%v and entries=%v", name, entries)
 	addCustomSet(c, room, name, entries)
-	//	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -1158,7 +1152,6 @@ func clear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
-	log.Printf("fp: %v", fp)
 	lastAction[room] = "clear"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1383,13 +1376,11 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("roomname wonkiness in shuffle: %v", err)
 	}
-	// TODO(shanel): write this function
 	err = shuffleDiscards(c, keyStr, r.Form.Get("deck"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
-	log.Printf("fp: %v", fp)
 	lastAction[room] = "shuffle"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1403,14 +1394,11 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("roomname wonkiness in draw: %v", err)
 	}
-	// TODO(shanel): write this function
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
 		log.Printf("draw: could not decode room key %v: %v", keyStr, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log.Printf("deckName: %v", r.Form.Get("deck"))
-	log.Printf("about to call drawCards with count 1")
 	dice, keys := drawCards(c, 1, roomKey, r.Form.Get("deck"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1420,7 +1408,6 @@ func draw(w http.ResponseWriter, r *http.Request) {
 		log.Printf("could not create new dice: %v", err)
 	}
 	fp := r.Form.Get("fp")
-	log.Printf("fp: %v", fp)
 	lastAction[room] = "draw"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
