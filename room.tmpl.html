@@ -541,8 +541,9 @@
 
     img.card {
         display: block;
-        max-width: 77px;
-        max-height: 113px;
+        /*max-width: 77px;*/
+        max-width: 120px;
+        max-height: 120px;
         background-color: white;
         width: auto;
         height: auto;
@@ -690,6 +691,7 @@
 </div>
 <script>
     // Dark tool tips
+    // TODO(shanel): Add tooltips for custom sets.
     $("#clearButton").darkTooltip({
         gravity: 'south',
         content: 'Use this to remove everything from the room.',
@@ -775,6 +777,11 @@
     $("#fastForwardButton").darkTooltip({
         gravity: 'north',
         content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Fast Forward (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#addCustomSetButton").darkTooltip({
+        gravity: 'east',
+        content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). After creating it you\'ll see two buttons appear beside this. One is to draw a single item (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like.',
         hoverDelay: 1000
     });
 </script>
