@@ -329,12 +329,16 @@
             var dialog, form,
 
                 name = $("#name"),
-                entry = $("#lines");
+                entry = $("#lines"),
+                height = $("#height"),
+                width = $("#width");
 
             function addEntry() {
                 $.post("/addcustomset", {
                     'name': name.val(),
-                    'entries': entry.val()
+                    'entries': entry.val(),
+                    'height': height.val(),
+                    'width': width.val()
                 }).done(function (data) {
                 });
                 dialog.dialog("close");
@@ -541,7 +545,6 @@
 
     img.card {
         display: block;
-        /*max-width: 77px;*/
         max-width: 120px;
         max-height: 120px;
         background-color: white;
@@ -549,6 +552,19 @@
         height: auto;
         border: 2px solid black;
     }
+
+    {{range .CustomSets}}
+    img.{{.Name}} {
+        display: block;
+        max-width: {{.Width}}px;
+        max-height: {{.Height}}px;
+        background-color: white;
+        width: auto;
+        height: auto;
+        border: 2px solid black;
+    }
+
+    {{end}}
 
     /*TODO(shanel): Store this style stuff in the element's actual style tag.*/
     .label {
@@ -612,9 +628,15 @@
 
     <form id="myForm">
         <fieldset>
-            <label for="name">Name</label>
+            <label for="name">Name:</label>
             <input type="text" name="name" id="name" value="Single Word Set Name"
-                   class="text ui-widget-content ui-corner-all">
+                   class="text ui-widget-content ui-corner-all"><br>
+            <label for="height">Max Height (in pixels):</label>
+            <input type="text" name="height" id="height" value="120" size="3"
+                   class="text ui-widget-content ui-corner-all"><br>
+            <label for="height">Max Width (in pixels):</label>
+            <input type="text" name="width" id="width" value="120" size="3"
+                   class="text ui-widget-content ui-corner-all"><br>
             <!-- Allow form submission with keyboard without duplicating the dialog button -->
             <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
         </fieldset>
@@ -781,7 +803,7 @@
     });
     $("#addCustomSetButton").darkTooltip({
         gravity: 'east',
-        content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). After creating it you\'ll see two buttons appear beside this. One is to draw a single item (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like.',
+        content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). You\'ll also put in max sizes for the images, the default 120 is fine. After creating it you\'ll see two buttons appear beside this. One is to draw a single item (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like. Using the same name will overwrite the previous set.',
         hoverDelay: 1000
     });
 </script>
@@ -815,7 +837,9 @@
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
-            {{if .IsCard}}
+            {{if .IsCustomItem}}
+            <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else if .IsCard}}
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
@@ -832,7 +856,9 @@
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-            {{if .IsCard}}
+            {{if .IsCustomItem}}
+            <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else if .IsCard}}
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">

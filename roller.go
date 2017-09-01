@@ -103,8 +103,10 @@ type CustomSets map[string]CustomSet
 
 type CustomSet struct {
 	// TODO(shanel): maybe make this use a mutex in the future?
-	Template map[string]string // url map for easy searching
-	Instance map[string]string
+	Template  map[string]string // url map for easy searching
+	Instance  map[string]string
+	MaxHeight string
+	MaxWidth  string
 }
 
 func (cs *CustomSet) Draw(c int) (map[string]string, error) {
@@ -158,6 +160,8 @@ type PassedCustomSet struct {
 	SnakeName string
 	Pull      template.JS
 	Randomize template.JS
+	Height    template.JS
+	Width     template.JS
 }
 
 func newCustomSetFromURL(u string) (CustomSet, error) {
@@ -180,7 +184,7 @@ func newCustomSetFromURL(u string) (CustomSet, error) {
 	}
 	return cs, nil
 }
-func newCustomSetFromNewlineSeparatedString(u string) (CustomSet, error) {
+func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet, error) {
 	// Get rid of random space at front or end
 	u = strings.TrimSpace(u)
 	// This will make single item lists work
@@ -189,7 +193,7 @@ func newCustomSetFromNewlineSeparatedString(u string) (CustomSet, error) {
 	}
 	pieces := strings.Split(u, "\n")
 	log.Printf("pieces: %v", pieces)
-	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
+	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}, MaxHeight: height, MaxWidth: width}
 	for i, p := range pieces {
 		si := strconv.Itoa(i)
 		cs.Template[si] = p
@@ -213,6 +217,8 @@ type Die struct {
 	IsLabel       bool
 	IsCustomItem  bool
 	CustomSetName string
+	CustomHeight  string
+	CustomWidth   string
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -347,7 +353,7 @@ func setBackground(c context.Context, rk, url string) {
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 }
 
-func addCustomSet(c context.Context, rk, name, lines string) {
+func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 	//func addCustomSet(c context.Context, rk, name, url string) {
 	keyStr, err := getEncodedRoomKeyFromName(c, rk)
 	if err != nil {
@@ -364,7 +370,7 @@ func addCustomSet(c context.Context, rk, name, lines string) {
 		log.Printf("could not find room %v for adding custom set: %v", rk, err)
 		return
 	}
-	cs, err := newCustomSetFromNewlineSeparatedString(lines)
+	cs, err := newCustomSetFromNewlineSeparatedString(lines, height, width)
 	//cs, err := newCustomSet(url)
 	if err != nil {
 		log.Printf("issue with custom set: %v", err)
@@ -601,6 +607,8 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 				IsCustomItem:  true,
 				IsCard:        true,
 				CustomSetName: deckName,
+				CustomHeight:  cs.MaxHeight,
+				CustomWidth:   cs.MaxWidth,
 			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
@@ -1038,6 +1046,8 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	name := r.Form.Get("name")
 	entries := r.Form.Get("entries")
+	height := r.Form.Get("height")
+	width := r.Form.Get("width")
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1048,7 +1058,7 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	addCustomSet(c, room, name, entries)
+	addCustomSet(c, room, name, entries, height, width)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -1250,7 +1260,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	} else {
 		for i, s := range rcs {
 			sn := strings.Replace(i, " ", "_", -1)
-			pcs := PassedCustomSet{len(s.Instance), i, sn, template.JS(fmt.Sprintf("pull_from_%s()", sn)), template.JS(fmt.Sprintf("randomize_discards_from_%s()", sn))}
+			pcs := PassedCustomSet{len(s.Instance), i, sn, template.JS(fmt.Sprintf("pull_from_%s()", sn)), template.JS(fmt.Sprintf("randomize_discards_from_%s()", sn)), template.JS(s.MaxHeight), template.JS(s.MaxWidth)}
 			p.CustomSets = append(p.CustomSets, pcs)
 		}
 	}
