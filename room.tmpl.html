@@ -7,7 +7,9 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/jquery.darktooltip.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/darktooltip.css">
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/darktooltip.css">
+    <link rel="stylesheet" type="text/css" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
@@ -118,7 +120,6 @@
         // this is used later in the resizing and gesture demos
         window.dragMoveListener = dragMoveListener;
 
-
         function deleteMarked() {
             var toDelete = document.getElementsByClassName("selected");
             for (var i = 0; i < toDelete.length; i++) {
@@ -158,6 +159,8 @@
                 });
             }
             $("#refreshable").load(window.location.href + " #refreshable");
+            $("#refreshable").load(window.location.href + " #refreshable");
+            $("#refreshable").load(window.location.href + " #refreshable");
         }
 
         function shuffleDiscards() {
@@ -166,6 +169,62 @@
             }).done(function (data) {
             });
             $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        // Some functions *are* actually passing stuff in the post, others aren't. Why?
+        {
+            {
+                range.CustomSets
+            }
+        }
+
+        function {
+            {.
+                Pull
+            }
+        }
+
+        {
+            $.post("/draw", {
+                fp: fp,
+                deck: {;
+            {.
+                Name
+            }
+        }
+        }).
+            done(function (data) {
+            });
+            location.reload();
+//            $("#refreshable").load(window.location.href + " #refreshable");
+
+        }
+
+        function {
+            {.
+                Randomize
+            }
+        }
+
+        {
+            $.post("/shuffle", {
+                'fp': fp,
+                'deck': {;
+            {.
+                Name
+            }
+        }
+        }).
+            done(function (data) {
+            });
+            location.reload();
+//            $("#refreshable").load(window.location.href + " #refreshable");
+
+        }
+        {
+            {
+                end
+            }
         }
 
         function xCard() {
@@ -239,13 +298,13 @@
         }
 
         function setBackground() {
-            var url = prompt("Please enter the URL to the image you would like used as the background for the room. (To remove the current background leave this blank and submit.)")
+            var url = prompt("Please enter the URL to the image you would like used as the background for the room. (To remove the current background leave this blank and submit.)");
             if (url !== null) {
-                    $.post("/background", {
-                        'bg': url
-                    }).done(function (data) {
-                    });
-                    location.reload();
+                $.post("/background", {
+                    'bg': url
+                }).done(function (data) {
+                });
+                location.reload();
             }
         }
 
@@ -300,10 +359,52 @@
 
         setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
 
+        // I don't love this code, but it gets the job done I guess.
+        $(function () {
+            var dialog, form,
 
+                name = $("#name"),
+                entry = $("#lines");
 
+            function addEntry() {
+                $.post("/addcustomset", {
+                    'name': name.val(),
+                    'entries': entry.val()
+                }).done(function (data) {
+                });
+                dialog.dialog("close");
+                location.reload();
+                return true;
+            }
 
+            dialog = $("#dialog-form").dialog({
+                autoOpen: false,
+                height: 400,
+                width: 350,
+                modal: true,
+                buttons: {
+                    "Create a set": addEntry,
+                    Cancel: function () {
+                        dialog.dialog("close");
+                    }
+                },
+                close: function () {
+                    form[0].reset();
+                }
+            });
+
+            form = dialog.find("form").on("submit", function (event) {
+                event.preventDefault();
+                addEntry();
+            });
+
+            $("#addCustomSetButton").button().on("click", function () {
+                dialog.dialog("open");
+            });
+        });
     </script>
+
+
 </head>
 
 <!--TODO(shanel): This should probably be in its own file eventually.-->
@@ -372,6 +473,25 @@
         font-size: x-small;
     }
 
+    .ui-button {
+        background-color: #e7e7e7;
+        color: black;
+        padding: 5px 5px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+
+    .ui-button,
+    .ui-button:link,
+    .ui-button:visited,
+    .ui-button:hover,
+    .ui-button:active {
+    }
+
     button {
         background-color: #e7e7e7;
         color: black;
@@ -412,8 +532,6 @@
         text-align: center;
         padding: 5px 0;
         border-radius: 6px;
-
-
 
         /* Position the tooltip text - see examples below! */
         position: absolute;
@@ -524,6 +642,20 @@
     }
 }</style>
 
+<div id="dialog-form" title="Create new entry" style="display: none">
+
+    <form id="myForm">
+        <fieldset>
+            <label for="name">Name</label>
+            <input type="text" name="name" id="name" value="Single Word Set Name"
+                   class="text ui-widget-content ui-corner-all">
+            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+        </fieldset>
+    </form>
+    <textarea name="lines" id="lines" form="myForm" class="textarea ui-widget-content ui-corner-all">Enter one image url per line...</textarea>
+</div>
+
 <h3>Roll For Your Party: A multi-user dice roller.</h3>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
@@ -573,6 +705,16 @@
     <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
+</div>
+<div class="buttons">
+    <button id="addCustomSetButton" class="button">Add custom set</button>
+    {{range .CustomSets}}
+    <button id="pull_from_{{.SnakeName}}_button" class="button" onclick={{.Pull}}>Pull from {{.Name}} ({{.Remaining}})
+    </button>
+    <button id="randomize_discards_from_{{.SnakeName}}_button" class="button" onclick={{.Randomize}}>Randomize discards
+        from {{.Name}}
+    </button>
+    {{end}}
 </div>
 <div class="buttons">
     <span id="safetyLabel">Safety Tools:</span>
@@ -695,7 +837,8 @@
         <!--TODO(shanel): Have full style here, not just the move stuff.-->
         <div id="{{.KeyStr}}" class="draggable tap-target label" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
-            <p><h3>{{.ResultStr}}</h3></p>
+            <p>
+            <h3>{{.ResultStr}}</h3></p>
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
@@ -711,7 +854,8 @@
         {{if .IsLabel}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-            <p><h3>{{.ResultStr}}</h3></p>
+            <p>
+            <h3>{{.ResultStr}}</h3></p>
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
@@ -739,4 +883,5 @@
 </div>
 
 </body>
+
 </html>

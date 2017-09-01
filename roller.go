@@ -79,9 +79,13 @@ type Room struct {
 
 func (r *Room) GetCustomSets() (CustomSets, error) {
 	out := CustomSets{}
+	if len(r.CustomSets) == 0 {
+		return out, nil
+	}
 	err := json.Unmarshal(r.CustomSets, &out)
 	if err != nil {
-		return out, fmt.Errorf("could not unmarshal updates in BuildCustomSets: %v", err)
+		log.Printf(string(r.CustomSets))
+		return out, fmt.Errorf("could not unmarshal updates in GetCustomSets: %v", err)
 	}
 	return out, nil
 }
@@ -92,34 +96,44 @@ func (r *Room) SetCustomSets(cs CustomSets) error {
 		return err
 	}
 	r.CustomSets = toSave
+	return nil
 }
 
 type CustomSets map[string]CustomSet
 
 type CustomSet struct {
 	// TODO(shanel): maybe make this use a mutex in the future?
-	Template map[int]string // url map for easy searching
-	Instance map[int]string
+	Template map[string]string // url map for easy searching
+	Instance map[string]string
 }
 
-func (cs *CustomSet) Draw(c int) (map[int]string, error) {
+func (cs *CustomSet) Draw(c int) (map[string]string, error) {
+	log.Printf("before draw, cs is: %v", cs)
 	left := len(cs.Instance)
-	out := map[int]string{}
+	out := map[string]string{}
 	if left == 0 {
-		return out, error.New("the deck is empty")
+		return out, fmt.Errorf("the deck is empty")
 	}
-	if left < c {
+	if left <= c {
 		for i, j := range cs.Instance {
 			out[i] = j
 		}
-		cs.Instance = map[int]string{}
+		cs.Instance = map[string]string{}
 		return out, fmt.Errorf("could not draw full %v entries, only %v left in set", c, left)
 	}
-	out := map[int]string{}
-	remove := make([]int, c)
+	remove := []string{}
+	keys := []string{}
+	for k := range cs.Instance {
+		keys = append(keys, k)
+	}
+	dest := make([]string, len(keys))
+	perm := rand.Perm(len(keys))
+	for i, v := range perm {
+		dest[v] = keys[i]
+	}
 	for i := 0; i < c; i++ {
-		remove = append(remove, rand.Intn(left))
-		left--
+		log.Printf("in loop, i: %v, c: %v", i, c)
+		remove = append(remove, dest[i])
 	}
 	for _, k := range remove {
 		out[k] = cs.Instance[k]
@@ -128,17 +142,25 @@ func (cs *CustomSet) Draw(c int) (map[int]string, error) {
 	return out, nil
 }
 
-func (cs *CustomSet) shuffleDiscards(stillOut map[int]bool) {
-	newInstance := map[int]string{}
+func (cs *CustomSet) shuffleDiscards(stillOut map[string]bool) {
+	newInstance := map[string]string{}
 	for k, v := range cs.Template {
-		if _, ok := stillout[k]; !ok {
+		if _, ok := stillOut[k]; !ok {
 			newInstance[k] = v
 		}
 	}
 	cs.Instance = newInstance
 }
 
-func newCustomSet(u string) (CustomSet, error) {
+type PassedCustomSet struct {
+	Remaining int
+	Name      string
+	SnakeName string
+	Pull      template.JS
+	Randomize template.JS
+}
+
+func newCustomSetFromURL(u string) (CustomSet, error) {
 	resp, err := http.Get(u)
 	defer resp.Body.Close()
 
@@ -150,10 +172,28 @@ func newCustomSet(u string) (CustomSet, error) {
 		return CustomSet{}, err
 	}
 	pieces := strings.Split(string(bytes), "\n")
-	cs := CustomSet{Template: map[int]string{}, Instance: map[int]string{}}
+	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
 	for i, p := range pieces {
-		cs.Template[i] = p
-		cs.Instance[i] = p
+		si := strconv.Itoa(i)
+		cs.Template[si] = p
+		cs.Instance[si] = p
+	}
+	return cs, nil
+}
+func newCustomSetFromNewlineSeparatedString(u string) (CustomSet, error) {
+	// Get rid of random space at front or end
+	u = strings.TrimSpace(u)
+	// This will make single item lists work
+	if !strings.Contains(u, "\n") {
+		u += "\n"
+	}
+	pieces := strings.Split(u, "\n")
+	log.Printf("pieces: %v", pieces)
+	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
+	for i, p := range pieces {
+		si := strconv.Itoa(i)
+		cs.Template[si] = p
+		cs.Instance[si] = p
 	}
 	return cs, nil
 }
@@ -195,6 +235,7 @@ type Passer struct {
 	CardsLeft  int
 	BgURL      string
 	HasBgURL   bool
+	CustomSets []PassedCustomSet
 }
 
 func noSpaces(str string) string {
@@ -303,10 +344,11 @@ func setBackground(c context.Context, rk, url string) {
 		log.Printf("url is wrong")
 		return
 	}
-	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 }
 
-func addCustomSet(c context.Context, rk, name, url string) {
+func addCustomSet(c context.Context, rk, name, lines string) {
+	//func addCustomSet(c context.Context, rk, name, url string) {
 	keyStr, err := getEncodedRoomKeyFromName(c, rk)
 	if err != nil {
 		log.Printf("roomname wonkiness in addCustomSet: %v", err)
@@ -322,7 +364,8 @@ func addCustomSet(c context.Context, rk, name, url string) {
 		log.Printf("could not find room %v for adding custom set: %v", rk, err)
 		return
 	}
-	cs, err := newCustomSet(url)
+	cs, err := newCustomSetFromNewlineSeparatedString(lines)
+	//cs, err := newCustomSet(url)
 	if err != nil {
 		log.Printf("issue with custom set: %v", err)
 		return
@@ -349,11 +392,7 @@ func addCustomSet(c context.Context, rk, name, url string) {
 		log.Printf("couldn't find the new entry: %v", err)
 		return
 	}
-	if testRoom.BgURL != url {
-		log.Printf("url is wrong")
-		return
-	}
-	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 }
 
 func refreshRoom(c context.Context, rk, fp string) string {
@@ -452,6 +491,7 @@ func newRoom(c context.Context) (string, error) {
 }
 
 func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName string) ([]*Die, []*datastore.Key) {
+	log.Printf("inside drawCards, count is %v", count)
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
@@ -460,6 +500,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 		log.Printf("issue getting room in drawCards: %v", err)
 		return dice, keys
 	}
+	ts := time.Now().Unix()
 	if deckName == "" {
 		hand, err := deck.New(deck.Empty)
 		if err != nil {
@@ -501,7 +542,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 			handSize = count
 		}
 		cards := strings.Split(hand.String(), "\n")[0:handSize]
-		ts := time.Now().Unix()
 		for i, card := range cards {
 			diu, err := getDieImageURL(c, "card", card, "")
 			if err != nil {
@@ -530,7 +570,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 		// do the custom set stuff here...
 		customSets, err := room.GetCustomSets()
 		if err != nil {
-			log.Printf("issue getting custom etds in drawCards: %v", err)
+			log.Printf("issue getting custom sets in drawCards: %v", err)
 			return dice, keys
 		}
 		cs, ok := customSets[deckName]
@@ -538,16 +578,24 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 			log.Printf("no custom set with name %v", deckName)
 			return dice, keys
 		}
+		log.Printf("in else clause, count is %v", count)
 		drawn, err := cs.Draw(count)
+		log.Printf("drawn length: %v", len(drawn))
 		if err != nil {
 			fmt.Printf("problem with custom draw: %v", err)
 		}
+		customSets[deckName] = cs
 		for i, card := range drawn {
+			ii, err := strconv.Atoi(i)
+			if err != nil {
+				log.Printf("%v", err)
+				continue
+			}
 			diu := card
-			dk := dieKey(c, roomKey, int64(i))
+			dk := dieKey(c, roomKey, int64(ii))
 			d := Die{
 				Size:          "card", // should this be "custom" ???
-				Result:        i,
+				Result:        ii,
 				ResultStr:     "",
 				Key:           dk,
 				KeyStr:        dk.Encode(),
@@ -555,10 +603,23 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 				Image:         diu,
 				New:           true,
 				IsCustomItem:  true,
+				IsCard:        true,
 				CustomSetName: deckName,
 			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
+		}
+		err = room.SetCustomSets(customSets)
+		if err != nil {
+			log.Printf("issue setting custom sets in drawCards: %v", err)
+			return dice, keys
+		}
+		if _, err := datastore.Put(c, roomKey, &room); err != nil {
+			log.Printf("issue updating room in drawCards: %v", err)
+		}
+		var testRoom Room
+		if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+			log.Printf("couldn't find the new entry: %v", err)
 		}
 	}
 	return dice, keys
@@ -651,7 +712,6 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	}
 	keyStrings := []string{}
 	for _, k := range keys {
-		log.Printf("key: %v", k)
 		keyStrings = append(keyStrings, k.Encode())
 	}
 	_, err := datastore.PutMulti(c, keys, dice)
@@ -679,7 +739,7 @@ func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error)
 	if err != nil {
 		return nil, fmt.Errorf("getRoomCustomCards: could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsCustomCard =", true) //.Limit(10)
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsCustomItem =", true) //.Limit(10)
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing card query: %v", err)
@@ -867,11 +927,12 @@ func getNewResult(kind string) (int, string) {
 func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
-	http.HandleFunc("/addcustomset", addcustomset)
+	http.HandleFunc("/addcustomset", handleAddingCustomSet)
 	http.HandleFunc("/alert", alert)
 	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/draw", draw)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/refresh", refresh)
@@ -972,14 +1033,15 @@ func background(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	setBackground(c, room, bg)
-	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	//	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func addcustomset(w http.ResponseWriter, r *http.Request) {
+func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	name := r.Form.Get("name")
-	link := r.Form.Get("link")
+	entries := r.Form.Get("entries")
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -990,8 +1052,10 @@ func addcustomset(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	addCustomSet(c, room, name, link)
-	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	log.Printf("about to do addCustomSet with name=%v and entries=%v", name, entries)
+	addCustomSet(c, room, name, entries)
+	//	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1076,12 +1140,14 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
+	log.Printf("fp: %v", r.Form.Get("fp"))
 	lastAction[room] = "reroll"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+	r.ParseForm()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
@@ -1092,6 +1158,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
+	log.Printf("fp: %v", fp)
 	lastAction[room] = "clear"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1176,12 +1243,23 @@ func room(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p := Passer{
-		Dice:      dice,
-		RoomTotal: roomTotal,
-		RoomAvg:   roomAvg,
-		RollTotal: rollTotal,
-		RollAvg:   rollAvg,
-		CardsLeft: deckSize,
+		Dice:       dice,
+		RoomTotal:  roomTotal,
+		RoomAvg:    roomAvg,
+		RollTotal:  rollTotal,
+		RollAvg:    rollAvg,
+		CardsLeft:  deckSize,
+		CustomSets: []PassedCustomSet{},
+	}
+	rcs, err := rm.GetCustomSets()
+	if err != nil {
+		log.Printf("problem with custom sets: %v", err)
+	} else {
+		for i, s := range rcs {
+			sn := strings.Replace(i, " ", "_", -1)
+			pcs := PassedCustomSet{len(s.Instance), i, sn, template.JS(fmt.Sprintf("pull_from_%s()", sn)), template.JS(fmt.Sprintf("randomize_discards_from_%s()", sn))}
+			p.CustomSets = append(p.CustomSets, pcs)
+		}
 	}
 	if rm.BgURL != "" {
 		p.BgURL = rm.BgURL
@@ -1226,9 +1304,9 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 		if err != nil {
 			return err
 		}
-		stillOut := map[int]bool{}
-		for k := range cards {
-			stillOut[k.Result] = true
+		stillOut := map[string]bool{}
+		for _, k := range cards {
+			stillOut[strconv.Itoa(k.Result)] = true
 		}
 		roomKey, err := datastore.DecodeKey(keyStr)
 		if err != nil {
@@ -1247,7 +1325,7 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 		if !ok {
 			return fmt.Errorf("could not find custom set %v", deckName)
 		}
-		toShuffle.ShuffleDiscards(stillOut)
+		toShuffle.shuffleDiscards(stillOut)
 		cs[deckName] = toShuffle
 		r.SetCustomSets(cs)
 		r.Timestamp = t
@@ -1299,10 +1377,11 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 
 func shuffle(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+	r.ParseForm()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		log.Printf("roomname wonkiness in clear: %v", err)
+		log.Printf("roomname wonkiness in shuffle: %v", err)
 	}
 	// TODO(shanel): write this function
 	err = shuffleDiscards(c, keyStr, r.Form.Get("deck"))
@@ -1310,7 +1389,39 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
+	log.Printf("fp: %v", fp)
 	lastAction[room] = "shuffle"
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func draw(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in draw: %v", err)
+	}
+	// TODO(shanel): write this function
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("draw: could not decode room key %v: %v", keyStr, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	log.Printf("deckName: %v", r.Form.Get("deck"))
+	log.Printf("about to call drawCards with count 1")
+	dice, keys := drawCards(c, 1, roomKey, r.Form.Get("deck"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	_, err = datastore.PutMulti(c, keys, dice)
+	if err != nil {
+		log.Printf("could not create new dice: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	log.Printf("fp: %v", fp)
+	lastAction[room] = "draw"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
