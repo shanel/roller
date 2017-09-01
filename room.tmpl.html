@@ -171,61 +171,26 @@
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
-        // Some functions *are* actually passing stuff in the post, others aren't. Why?
-        {
-            {
-                range.CustomSets
-            }
-        }
-
-        function {
-            {.
-                Pull
-            }
-        }
-
-        {
+        {{range.CustomSets}}
+        function {{.Pull}} {
             $.post("/draw", {
                 fp: fp,
-                deck: {;
-            {.
-                Name
-            }
-        }
-        }).
-            done(function (data) {
-            });
-            location.reload();
-//            $("#refreshable").load(window.location.href + " #refreshable");
-
+                deck: {{.Name}}
+        }).done(function (data) {});
+        location.reload();
+        $("#refreshable").load(window.location.href + " #refreshable");
         }
 
-        function {
-            {.
-                Randomize
-            }
-        }
 
-        {
+        function {{.Randomize}} {
             $.post("/shuffle", {
-                'fp': fp,
-                'deck': {;
-            {.
-                Name
-            }
-        }
-        }).
-            done(function (data) {
-            });
+                fp: fp,
+                deck: {{.Name}}
+        }).done(function (data) {});
             location.reload();
-//            $("#refreshable").load(window.location.href + " #refreshable");
-
+            $("#refreshable").load(window.location.href + " #refreshable");
         }
-        {
-            {
-                end
-            }
-        }
+        {{end}}
 
         function xCard() {
             var message = prompt("If you would like to be specific about the content requiring your use of this safety tool, you may do so here. If not, you may leave it blank.");
