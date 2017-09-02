@@ -145,8 +145,10 @@
                 });
             }
             if (toReroll.length > 0) {
+                $("#customButtons").load(window.location.href + " #customButtons");
                 $("#refreshable").load(window.location.href + " #refreshable");
             }
+            $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
@@ -182,7 +184,7 @@
                 deck: {{.Name}},
                 count: count
         }).done(function (data) {});
-        location.reload();
+        $("#customButtons").load(window.location.href + " #customButtons");
         $("#refreshable").load(window.location.href + " #refreshable");
         }
 
@@ -192,7 +194,7 @@
                 fp: fp,
                 deck: {{.Name}}
         }).done(function (data) {});
-            location.reload();
+            $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
         }
         {{end}}
@@ -563,7 +565,7 @@
         display: block;
         max-width: {{.Width}}px;
         max-height: {{.Height}}px;
-        background-color: white;
+        /*background-color: white;*/
         width: auto;
         height: auto;
         /*border: 2px solid black;*/
@@ -699,7 +701,7 @@
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
-<div class="buttons">
+<div id="customButtons" class="buttons">
     <button id="addCustomSetButton" class="button">Add custom set</button>
     {{range .CustomSets}}
     <button id="pull_from_{{.SnakeName}}_button" class="button" onclick={{.Pull}}>Pull from {{.Name}} ({{.Remaining}})

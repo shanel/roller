@@ -875,17 +875,16 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if d.IsLabel || d.ResultStr == "token" {
 		return fmt.Errorf("label or token")
 	}
-	if d.IsCard {
+	if d.IsCustomItem {
 		// Do a single draw.
-		dice, keys := drawCards(c, 1, k.Parent(), "")
+		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName)
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
-		// return
-	} else if d.IsCustomItem {
-		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName)
+	} else if d.IsCard {
+		dice, keys := drawCards(c, 1, k.Parent(), "")
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
