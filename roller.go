@@ -1409,7 +1409,12 @@ func draw(w http.ResponseWriter, r *http.Request) {
 		log.Printf("draw: could not decode room key %v: %v", keyStr, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	dice, keys := drawCards(c, 1, roomKey, r.Form.Get("deck"))
+	count, err := strconv.Atoi(r.Form.Get("count"))
+	if err != nil {
+		log.Printf("%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	dice, keys := drawCards(c, count, roomKey, r.Form.Get("deck"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

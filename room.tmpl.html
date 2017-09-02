@@ -173,9 +173,14 @@
 
         {{range.CustomSets}}
         function {{.Pull}} {
+            var count = prompt("How many items would you like to pull from {{.Name}}?")
+            if (count == null) {
+                count = "1";
+            }
             $.post("/draw", {
                 fp: fp,
-                deck: {{.Name}}
+                deck: {{.Name}},
+                count: count
         }).done(function (data) {});
         location.reload();
         $("#refreshable").load(window.location.href + " #refreshable");
@@ -561,7 +566,7 @@
         background-color: white;
         width: auto;
         height: auto;
-        border: 2px solid black;
+        /*border: 2px solid black;*/
     }
 
     {{end}}
