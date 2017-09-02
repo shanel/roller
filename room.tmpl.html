@@ -349,7 +349,7 @@
                 }).done(function (data) {
                 });
                 dialog.dialog("close");
-                location.reload();
+                $("#customButtons").load(window.location.href + " #customButtons");
                 return true;
             }
 
