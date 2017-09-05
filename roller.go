@@ -219,6 +219,8 @@ type Die struct {
 	CustomSetName string
 	CustomHeight  string
 	CustomWidth   string
+	HiddenBy      string
+	IsHidden      bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -496,7 +498,7 @@ func newRoom(c context.Context) (string, error) {
 	return roomName, nil
 }
 
-func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName string) ([]*Die, []*datastore.Key) {
+func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, hidden, fp string) ([]*Die, []*datastore.Key) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
@@ -563,6 +565,10 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 				New:       true,
 				IsCard:    true,
 			}
+			if hidden != "" {
+				d.HiddenBy = fp
+				d.IsHidden = true
+			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
 		}
@@ -610,6 +616,10 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 				CustomHeight:  cs.MaxHeight,
 				CustomWidth:   cs.MaxWidth,
 			}
+			if hidden != "" {
+				d.HiddenBy = fp
+				d.IsHidden = true
+			}
 			dice = append(dice, &d)
 			keys = append(keys, dk)
 		}
@@ -629,7 +639,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName st
 	return dice, keys
 }
 
-func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color string) (int, error) {
+func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color, hidden, fp string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var totalCount int
@@ -705,7 +715,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	if sizes["card"] != "" {
 		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
-			cards, cardKeys := drawCards(c, count, roomKey, "")
+			cards, cardKeys := drawCards(c, count, roomKey, "", hidden, fp)
 			for _, card := range cards {
 				dice = append(dice, card)
 			}
@@ -863,6 +873,52 @@ func fateReplace(in string) string {
 }
 
 // TODO(shanel): This will need to handle new cards
+func revealDieHelper(c context.Context, encodedDieKey, room string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	if d.IsCard || d.IsCustomItem {
+		d.IsHidden = false
+		d.HiddenBy = ""
+		_, err = datastore.Put(c, k, &d)
+		if err != nil {
+			return fmt.Errorf("problem revealing room die %v: %v", encodedDieKey, err)
+		}
+		// Fake updater so Safari will work?
+		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+		return nil
+	}
+	return fmt.Errorf("Only cards and custom items can be hidden.")
+}
+
+func hideDieHelper(c context.Context, encodedDieKey, room, hiddenBy string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	if d.IsCard || d.IsCustomItem {
+		d.IsHidden = true
+		d.HiddenBy = hiddenBy
+		_, err = datastore.Put(c, k, &d)
+		if err != nil {
+			return fmt.Errorf("problem hidinging room die %v: %v", encodedDieKey, err)
+		}
+		// Fake updater so Safari will work?
+		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+		return nil
+	}
+	return fmt.Errorf("Only cards and custom items can be hidden.")
+}
+
 func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
@@ -875,16 +931,17 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if d.IsLabel || d.ResultStr == "token" {
 		return fmt.Errorf("label or token")
 	}
+
 	if d.IsCustomItem {
 		// Do a single draw.
-		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName)
+		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName, strconv.FormatBool(d.IsHidden), d.HiddenBy)
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
 	} else if d.IsCard {
-		dice, keys := drawCards(c, 1, k.Parent(), "")
+		dice, keys := drawCards(c, 1, k.Parent(), "", strconv.FormatBool(d.IsHidden), d.HiddenBy)
 		// Set the location to the same as the passed in die.
 		d.ResultStr = dice[0].ResultStr
 		d.Image = dice[0].Image
@@ -936,10 +993,12 @@ func init() {
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
 	http.HandleFunc("/draw", draw)
+	http.HandleFunc("/hide", hideDie)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/refresh", refresh)
 	http.HandleFunc("/reroll", rerollDie)
+	http.HandleFunc("/reveal", revealDie)
 	http.HandleFunc("/roll", roll)
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/room/", room)
@@ -1103,14 +1162,15 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
 	}
+	fp := r.FormValue("fp")
 	col := r.FormValue("color")
-	total, err := newRoll(c, toRoll, roomKey, col)
+	total, err := newRoll(c, toRoll, roomKey, col, r.FormValue("hiddenDraw"), fp)
 	if err != nil {
 		log.Printf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	lastRoll[room] = total
-	fp := r.FormValue("fp")
+
 	lastAction[room] = "roll"
 	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1128,6 +1188,37 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "delete"
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func revealDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	lastRoll[room] = 0
+	// Do we need to be worried dice will be revealed from other rooms?
+	err := revealDieHelper(c, keyStr, room)
+	if err != nil {
+		log.Printf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	lastAction[room] = "reveal"
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+func hideDie(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	lastRoll[room] = 0
+	// Do we need to be worried dice will be revealed from other rooms?
+	err := hideDieHelper(c, keyStr, room, r.Form.Get("fp"))
+	if err != nil {
+		log.Printf("%v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	lastAction[room] = "hide"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1244,8 +1335,19 @@ func room(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Cull out cards that should not be seen...
+	filteredDice := []Die{}
+	fp := ""
+	if cook, err := r.Cookie("fp"); err == nil {
+		fp = cook.Value
+	}
+	for _, tf := range dice {
+		if tf.HiddenBy == fp || tf.HiddenBy == "" {
+			filteredDice = append(filteredDice, tf)
+		}
+	}
 	p := Passer{
-		Dice:       dice,
+		Dice:       filteredDice,
 		RoomTotal:  roomTotal,
 		RoomAvg:    roomAvg,
 		RollTotal:  rollTotal,
@@ -1413,7 +1515,8 @@ func draw(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	dice, keys := drawCards(c, count, roomKey, r.Form.Get("deck"))
+	fp := r.Form.Get("fp")
+	dice, keys := drawCards(c, count, roomKey, r.Form.Get("deck"), r.Form.Get("hidden"), fp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -1421,7 +1524,7 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("could not create new dice: %v", err)
 	}
-	fp := r.Form.Get("fp")
+
 	lastAction[room] = "draw"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)

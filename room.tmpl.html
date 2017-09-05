@@ -12,16 +12,23 @@
     <link rel="stylesheet" type="text/css" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.4/js.cookie.min.js"></script>
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
     <!--<script src="/js/jquery.postitall.js"></script>-->
 
     <script type="text/javascript" language="javascript">
+
+
+        var hideDraws = false;
 
         var fp = "";
         new Fingerprint2().get(function (result, components) {
             fp = result; //a hash, representing your device fingerprint
             var x = document.getElementsByName("fp");
             x[0].value = fp;
+            Cookies.set('fp', fp);
+            Cookies.set('fp', fp, {path: '/room'});
+            Cookies.set('fp', fp, {path: ''});
         });
 
         // target elements with the "draggable" class
@@ -120,6 +127,12 @@
         // this is used later in the resizing and gesture demos
         window.dragMoveListener = dragMoveListener;
 
+        function rollEm() {
+            // TODO(shanel): *SHOULD* be able to do color dropdown leact-chosen setting here somehow...
+            $("#rollem").submit();
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
         function deleteMarked() {
             var toDelete = document.getElementsByClassName("selected");
             for (var i = 0; i < toDelete.length; i++) {
@@ -130,6 +143,36 @@
                 });
             }
             if (toDelete.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function hideMarked() {
+            var toHide = document.getElementsByClassName("selected");
+            for (var i = 0; i < toHide.length; i++) {
+                $.post("/hide", {
+                    id: toHide[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toHide.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function revealMarked() {
+            var toReveal = document.getElementsByClassName("selected");
+            for (var i = 0; i < toReveal.length; i++) {
+                $.post("/reveal", {
+                    id: toReveal[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toReveal.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
             }
             $("#refreshable").load(window.location.href + " #refreshable");
@@ -182,6 +225,7 @@
             $.post("/draw", {
                 fp: fp,
                 deck: {{.Name}},
+                hidden: hideDraws,
                 count: count
         }).done(function (data) {});
         $("#customButtons").load(window.location.href + " #customButtons");
@@ -277,6 +321,22 @@
                 }).done(function (data) {
                 });
                 location.reload();
+            }
+        }
+
+
+        function hiddenDraws() {
+            // if cookie is true, then box should be checked and hideDraws should be true
+            // if cookie is false, then box should be unchecked and hideDraws should be fales
+            // if cookie doesn't exist, if checkbox is checked, then hideDraws should be set to true and cookie too
+            // if checkbox is unchecked stuff should be unset
+
+            if (document.getElementById('hiddenDraw').checked) {
+                hideDraws = true;
+                Cookies.set('hide_draws', 'true', { path: '' });
+            } else {
+                hideDraws = false;
+                Cookies.set('hide_draws', 'false', { path: '' });
             }
         }
 
@@ -480,6 +540,8 @@
         border-radius: 8px;
     }
 
+
+
     .button2 {
         background-color: #f44336;
         color: white;
@@ -521,6 +583,10 @@
         visibility: visible;
     }
 
+    .drawbox {
+        text-align: center;
+    }
+
     p {
         text-align: center;
     }
@@ -558,6 +624,10 @@
         width: auto;
         height: auto;
         border: 2px solid black;
+    }
+
+    img.hidden {
+        border: 5px solid purple;
     }
 
     {{range .CustomSets}}
@@ -680,22 +750,27 @@
 
     <label id="colorLabel" for="selectColor">color: </label>
     <select id="selectColor" name="color">
-        <option value="clear" style="color: #ffffff">Clear</option>
-        <option value="blue" style="color: #1e90ff">Blue</option>
-        <option value="green" style="color: #008b45">Green</option>
-        <option value="orange" style="color: #ff8c00">Orange</option>
-        <option value="red" style="color: #ff3333">Red</option>
-        <option value="violet" style="color: #8a2be2">Purple</option>
-        <option value="gold" style="color: #ffd700">Yellow</option>
+        <option id="ClearColor" value="clear" style="color: #ffffff">Clear</option>
+        <option id="BlueColor" value="blue" style="color: #1e90ff">Blue</option>
+        <option id="GreenColor" value="green" style="color: #008b45">Green</option>
+        <option id="OrangeColor" value="orange" style="color: #ff8c00">Orange</option>
+        <option id="RedColor" value="red" style="color: #ff3333">Red</option>
+        <option id="PurpleColor" value="violet" style="color: #8a2be2">Purple</option>
+        <option id="YellowColor" value="gold" style="color: #ffd700">Yellow</option>
     </select>
+    <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
+    <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
 
     <input type="hidden" name="fp" value="">
     <p></p>
 </form>
 <div class="buttons">
-    <button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit</button>
+    <button class="button button2" onClick="rollEm()">Submit</button>
+    <!--<button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit</button>-->
     <button id="clearButton" class="button" onclick="clearAllDice()">Clear</button>
     <button id="deleteButton" class="button" onclick="deleteMarked()">Delete selected</button>
+    <button id="revealButton" class="button" onclick="revealMarked()">Reveal selected</button>
+    <button id="hideButton" class="button" onclick="hideMarked()">Hide selected</button>
     <button id="rerollButton" class="button" onclick="rerollMarked()">Reroll selected</button>
     <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
@@ -731,9 +806,19 @@
         content: 'Use this to delete a previously clicked (and thus highlighted in red) item.',
         hoverDelay: 1000
     });
+    $("#revealButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to reveal a previously hidden (purple bordered) clicked (and thus highlighted in red) card.',
+        hoverDelay: 1000
+    });
     $("#rerollButton").darkTooltip({
         gravity: 'south',
         content: 'Use this to reroll/redraw a previously clicked (and thus highlighted in red) item in place. (You can also double-click items to reroll them.)',
+        hoverDelay: 1000
+    });
+    $("#hideButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to hide a clicked (and thus highlighted in red) card.',
         hoverDelay: 1000
     });
     $("#shuffleButton").darkTooltip({
@@ -813,6 +898,12 @@
         content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). You\'ll also put in max sizes for the images, the default 120 is fine. After creating it you\'ll see two buttons appear beside this. One is to draw items from the pool/deck (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like. Using the same name will overwrite the previous set.',
         hoverDelay: 1000
     });
+
+    if (Cookies.get('hide_draws') == 'true') {
+        hideDraws = true;
+        document.getElementById('hiddenDraw').checked = true;
+    }
+
 </script>
 <br>
 <div class="about"><a href="/about">about</a></div>
@@ -845,9 +936,17 @@
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
             {{if .IsCustomItem}}
+            {{if .IsHidden}}
+            <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else}}
             <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else if .IsCard}}
+            {{if .IsHidden}}
+            <img class="hidden card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else}}
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             {{end}}
@@ -864,9 +963,17 @@
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
             {{if .IsCustomItem}}
+            {{if .IsHidden}}
+            <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else}}
             <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else if .IsCard}}
+            {{if .IsHidden}}
+            <img class="hidden card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{else}}
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else}}
             <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
             {{end}}
