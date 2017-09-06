@@ -129,7 +129,6 @@
 
         function rollEm() {
             var col = "clear";
-            // TODO(shanel): *SHOULD* be able to do color dropdown leact-chosen setting here somehow...
             $('#rollem').submit(function() {
                 // get all the inputs into an array.
                 var $inputs = $('#rollem :input');
@@ -216,9 +215,7 @@
                 }).done(function (data) {
                 });
             }
-            $("#refreshable").load(window.location.href + " #refreshable");
-            $("#refreshable").load(window.location.href + " #refreshable");
-            $("#refreshable").load(window.location.href + " #refreshable");
+            location.reload();
         }
 
         function shuffleDiscards() {
