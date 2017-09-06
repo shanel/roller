@@ -128,7 +128,20 @@
         window.dragMoveListener = dragMoveListener;
 
         function rollEm() {
+            var col = "clear";
             // TODO(shanel): *SHOULD* be able to do color dropdown leact-chosen setting here somehow...
+            $('#rollem').submit(function() {
+                // get all the inputs into an array.
+                var $inputs = $('#rollem :input');
+
+                // not sure if you wanted this, but I thought I'd add it.
+                // get an associative array of just the values.
+                var values = {};
+                $inputs.each(function() {
+                    values[this.name] = $(this).val();
+                });
+                localStorage.setItem("selectedColor", values["color"]);
+            });
             $("#rollem").submit();
             $("#refreshable").load(window.location.href + " #refreshable");
         }
@@ -938,6 +951,10 @@
     if (Cookies.get('hide_draws') == 'true') {
         hideDraws = true;
         document.getElementById('hiddenDraw').checked = true;
+    }
+
+    if (typeof(localStorage.getItem("selectedColor")) !== "undefined") {
+        $("#selectColor").val(localStorage.getItem("selectedColor"));
     }
 
 </script>
