@@ -57,7 +57,7 @@ var (
 		"A♦": "ace_of_diamonds.png", "2♦": "2_of_diamonds.png", "3♦": "3_of_diamonds.png", "4♦": "4_of_diamonds.png", "5♦": "5_of_diamonds.png", "6♦": "6_of_diamonds.png", "7♦": "7_of_diamonds.png", "8♦": "8_of_diamonds.png", "9♦": "9_of_diamonds.png", "T♦": "10_of_diamonds.png", "J♦": "jack_of_diamonds.png", "Q♦": "queen_of_diamonds.png", "K♦": "king_of_diamonds.png",
 		"A♥": "ace_of_hearts.png", "2♥": "2_of_hearts.png", "3♥": "3_of_hearts.png", "4♥": "4_of_hearts.png", "5♥": "5_of_hearts.png", "6♥": "6_of_hearts.png", "7♥": "7_of_hearts.png", "8♥": "8_of_hearts.png", "9♥": "9_of_hearts.png", "T♥": "10_of_hearts.png", "J♥": "jack_of_hearts.png", "Q♥": "queen_of_hearts.png", "K♥": "king_of_hearts.png",
 		"A♠": "ace_of_spades.png", "2♠": "2_of_spades.png", "3♠": "3_of_spades.png", "4♠": "4_of_spades.png", "5♠": "5_of_spades.png", "6♠": "6_of_spades.png", "7♠": "7_of_spades.png", "8♠": "8_of_spades.png", "9♠": "9_of_spades.png", "T♠": "10_of_spades.png", "J♠": "jack_of_spades.png", "Q♠": "queen_of_spades.png", "K♠": "king_of_spades.png"}
-	faceMap = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "J": 10, "Q": 11, "K": 12}
+	faceMap = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "T": 9, "J": 10, "Q": 11, "K": 12}
 	suitMap = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
 )
 
@@ -84,7 +84,6 @@ func (r *Room) GetCustomSets() (CustomSets, error) {
 	}
 	err := json.Unmarshal(r.CustomSets, &out)
 	if err != nil {
-		log.Printf(string(r.CustomSets))
 		return out, fmt.Errorf("could not unmarshal updates in GetCustomSets: %v", err)
 	}
 	return out, nil
@@ -110,7 +109,6 @@ type CustomSet struct {
 }
 
 func (cs *CustomSet) Draw(c int) (map[string]string, error) {
-	log.Printf("before draw, cs is: %v", cs)
 	left := len(cs.Instance)
 	out := map[string]string{}
 	if left == 0 {
@@ -134,7 +132,6 @@ func (cs *CustomSet) Draw(c int) (map[string]string, error) {
 		dest[v] = keys[i]
 	}
 	for i := 0; i < c; i++ {
-		log.Printf("in loop, i: %v, c: %v", i, c)
 		remove = append(remove, dest[i])
 	}
 	for _, k := range remove {
@@ -192,7 +189,6 @@ func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet,
 		u += "\n"
 	}
 	pieces := strings.Split(u, "\n")
-	log.Printf("pieces: %v", pieces)
 	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}, MaxHeight: height, MaxWidth: width}
 	for i, p := range pieces {
 		si := strconv.Itoa(i)
@@ -502,7 +498,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
-	var handSize int
 	if err := datastore.Get(c, roomKey, &room); err != nil {
 		log.Printf("issue getting room in drawCards: %v", err)
 		return dice, keys
@@ -542,12 +537,10 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 		if deckSize < count {
 			roomDeck.Deal(deckSize, hand)
 			log.Printf("not enough cards in room deck, only dealt %v", deckSize)
-			handSize = deckSize
 		} else {
 			roomDeck.Deal(count, hand)
-			handSize = count
 		}
-		cards := strings.Split(hand.String(), "\n")[0:handSize]
+		cards := strings.Split(strings.TrimSuffix(hand.String(), "\n"), "\n")
 		for i, card := range cards {
 			diu, err := getDieImageURL(c, "card", card, "")
 			if err != nil {
@@ -756,7 +749,7 @@ func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error)
 	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsCustomItem =", true) //.Limit(10)
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
-		return nil, fmt.Errorf("problem executing card query: %v", err)
+		return nil, fmt.Errorf("problem executing custom card query: %v", err)
 	}
 	return dice, nil
 }
@@ -781,17 +774,20 @@ func clearRoomDice(c context.Context, encodedRoomKey string) error {
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).KeysOnly()
 	out := q.Run(c)
+	nuke := []*datastore.Key{}
 	for {
 		d, err := out.Next(nil)
 		if err != nil {
 			break
 		}
-		// TODO(shanel): Refactor to use DeleteMulti
-		err = datastore.Delete(c, d)
-		if err != nil {
-			return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
-		}
+		nuke = append(nuke, d)
 	}
+	err = datastore.DeleteMulti(c, nuke)
+	if err != nil {
+		return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
+	}
+	// Fake updater so Safari will work?
+	updateRoom(c, k.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	return nil
 }
 
@@ -873,7 +869,7 @@ func fateReplace(in string) string {
 }
 
 // TODO(shanel): This will need to handle new cards
-func revealDieHelper(c context.Context, encodedDieKey, room string) error {
+func revealDieHelper(c context.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -893,7 +889,7 @@ func revealDieHelper(c context.Context, encodedDieKey, room string) error {
 		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 		return nil
 	}
-	return fmt.Errorf("Only cards and custom items can be hidden.")
+	return fmt.Errorf("Only cards and custom items can be revealed.")
 }
 
 func hideDieHelper(c context.Context, encodedDieKey, room, hiddenBy string) error {
@@ -910,7 +906,7 @@ func hideDieHelper(c context.Context, encodedDieKey, room, hiddenBy string) erro
 		d.HiddenBy = hiddenBy
 		_, err = datastore.Put(c, k, &d)
 		if err != nil {
-			return fmt.Errorf("problem hidinging room die %v: %v", encodedDieKey, err)
+			return fmt.Errorf("problem hiding room die %v: %v", encodedDieKey, err)
 		}
 		// Fake updater so Safari will work?
 		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
@@ -1096,7 +1092,6 @@ func background(w http.ResponseWriter, r *http.Request) {
 	}
 	setBackground(c, room, bg)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
-	//	updateRoom(c, roomKey.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1198,7 +1193,7 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
 	// Do we need to be worried dice will be revealed from other rooms?
-	err := revealDieHelper(c, keyStr, room)
+	err := revealDieHelper(c, keyStr)
 	if err != nil {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1234,7 +1229,6 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
-	log.Printf("fp: %v", r.Form.Get("fp"))
 	lastAction[room] = "reroll"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -1447,14 +1441,16 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 			roomCardStrings[card.ResultStr] = true
 		}
 		sig := ""
+		withCards := []deck.Card{}
 		for k := range cardToPNG {
 			if _, ok := roomCardStrings[k]; !ok {
 				pieces := strings.Split(k, "")
-				sig += fmt.Sprintf("%x%x", faceMap[pieces[0]], suitMap[pieces[1]])
+				cc := deck.Card(faceMap[pieces[0]]*4 + suitMap[pieces[1]])
+				withCards = append(withCards, cc)
 			}
 		}
 		deck.Seed()
-		d, err := deck.New(deck.FromSignature(sig))
+		d, err := deck.New(deck.WithCards(withCards...))
 		if err != nil {
 			return err
 		}
@@ -1493,7 +1489,7 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.Form.Get("fp")
 	lastAction[room] = "shuffle"
-	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1526,6 +1522,6 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lastAction[room] = "draw"
-	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true})
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }

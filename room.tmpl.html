@@ -209,12 +209,13 @@
 
         function clearAllDice() {
             var clear = confirm("Clear all dice from room?");
-            if (clear == true) {
+            if (clear === true) {
                 $.post("/clear", {
                     'fp': fp
                 }).done(function (data) {
                 });
             }
+            location.reload();
             location.reload();
         }
 
@@ -228,8 +229,8 @@
 
         {{range.CustomSets}}
         function {{.Pull}} {
-            var count = prompt("How many items would you like to pull from {{.Name}}?")
-            if (count == null) {
+            var count = prompt("How many items would you like to pull from {{.Name}}?");
+            if (count === null) {
                 count = "1";
             }
             $.post("/draw", {
