@@ -348,7 +348,7 @@
         }
 
         function sortedDice() {
-            if (document.getElementById('sortDice').checked) {
+            if (document.getElementById('sortTheDice').checked) {
                 sortDice = true;
                 Cookies.set('sort_dice', 'true', { path: '' });
             } else {
@@ -808,8 +808,8 @@
     </select>
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
     <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
-    <label id="sortDiceLabel" for="sortDice">Sort dice: </label>
-    <input type="checkbox" name="sortDice" id="sortDice" onclick="sortedDice()" checked/>
+    <label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>
+    <input type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
 
     <input type="hidden" name="fp" value="">
     <p></p>
@@ -956,14 +956,14 @@
 
     if (Cookies.get('hide_draws') == 'true') {
         hideDraws = true;
-        document.getElementById('hiddenDraw').checked = true;
     }
+    document.getElementById('hiddenDraw').checked = hideDraws;
 
-    if (Cookies.get('sort_dice') == 'true') {
-        hideDraws = true;
-        document.getElementById('sortDice').checked = true;
+    if (Cookies.get('sort_dice') == 'false') {
+        sortDice = false;
     }
-    console.log(localStorage.getItem("selectedColor") == "null");
+    document.getElementById('sortTheDice').checked = sortDice;
+
     if ((localStorage.getItem("selectedColor") !== "null") && (typeof(localStorage.getItem("selectedColor")) !== "undefined")) {
         $("#selectColor").val(localStorage.getItem("selectedColor"));
     }
