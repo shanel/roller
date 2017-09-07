@@ -20,6 +20,7 @@
 
 
         var hideDraws = false;
+        var sortDice = true;
 
         var fp = "";
         new Fingerprint2().get(function (result, components) {
@@ -337,17 +338,22 @@
 
 
         function hiddenDraws() {
-            // if cookie is true, then box should be checked and hideDraws should be true
-            // if cookie is false, then box should be unchecked and hideDraws should be fales
-            // if cookie doesn't exist, if checkbox is checked, then hideDraws should be set to true and cookie too
-            // if checkbox is unchecked stuff should be unset
-
             if (document.getElementById('hiddenDraw').checked) {
                 hideDraws = true;
                 Cookies.set('hide_draws', 'true', { path: '' });
             } else {
                 hideDraws = false;
                 Cookies.set('hide_draws', 'false', { path: '' });
+            }
+        }
+
+        function sortedDice() {
+            if (document.getElementById('sortDice').checked) {
+                sortDice = true;
+                Cookies.set('sort_dice', 'true', { path: '' });
+            } else {
+                sortDice = false;
+                Cookies.set('sort_dice', 'false', { path: '' });
             }
         }
 
@@ -802,6 +808,8 @@
     </select>
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
     <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
+    <label id="sortDiceLabel" for="sortDice">Sort dice: </label>
+    <input type="checkbox" name="sortDice" id="sortDice" onclick="sortedDice()" checked/>
 
     <input type="hidden" name="fp" value="">
     <p></p>
@@ -951,7 +959,12 @@
         document.getElementById('hiddenDraw').checked = true;
     }
 
-    if (typeof(localStorage.getItem("selectedColor")) !== "undefined") {
+    if (Cookies.get('sort_dice') == 'true') {
+        hideDraws = true;
+        document.getElementById('sortDice').checked = true;
+    }
+    console.log(localStorage.getItem("selectedColor") == "null");
+    if ((localStorage.getItem("selectedColor") !== "null") && (typeof(localStorage.getItem("selectedColor")) !== "undefined")) {
         $("#selectColor").val(localStorage.getItem("selectedColor"));
     }
 

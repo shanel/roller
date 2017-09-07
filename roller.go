@@ -754,12 +754,22 @@ func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error)
 	return dice, nil
 }
 
-func getRoomDice(c context.Context, encodedRoomKey, order string) ([]Die, error) {
+func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, error) {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
 		return nil, fmt.Errorf("getRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
 	}
-	q := datastore.NewQuery("Die").Ancestor(k).Order(order) //.Limit(10)
+	var q *datastore.Query
+	var bSort bool
+	bSort, err = strconv.ParseBool(sort)
+	if err != nil {
+		bSort = true
+	}
+	if bSort {
+		q = datastore.NewQuery("Die").Ancestor(k).Order(order) //.Limit(10)
+	} else {
+		q = datastore.NewQuery("Die").Ancestor(k)
+	}
 	dice := []Die{}
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
@@ -1263,7 +1273,11 @@ func room(w http.ResponseWriter, r *http.Request) {
 		repeatOffenders[room] = true
 		log.Printf("room wonkiness in room: %v", err)
 	}
-	dice, err := getRoomDice(c, keyStr, "Result")
+	sort := "true"
+	if cook, err := r.Cookie("sort_dice"); err == nil {
+		sort = cook.Value
+	}
+	dice, err := getRoomDice(c, keyStr, "Result", sort)
 	if err != nil {
 		newRoom, err := newRoom(c)
 		if err != nil {
@@ -1278,7 +1292,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp")
+	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp", sort)
 	if err != nil {
 		log.Printf("could not get dice for totals: %v", err)
 	}
