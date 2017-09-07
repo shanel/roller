@@ -1292,7 +1292,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp", sort)
+	diceForTotals, err := getRoomDice(c, keyStr, "-Timestamp", "true")
 	if err != nil {
 		log.Printf("could not get dice for totals: %v", err)
 	}
