@@ -1005,9 +1005,11 @@
     if (saveRolls) {
         var p = JSON.parse(localStorage.getItem("lastRoll"));
         for (var key in p) {
-            if (p.hasOwnProperty(key)) {
-                if (document.getElementById(key) !== null) {
-                    document.getElementById(key).value = p[key];
+            if (key.search("d") !== -1) {
+                if (p.hasOwnProperty(key)) {
+                    if (document.getElementById(key) !== null) {
+                        document.getElementById(key).value = p[key];
+                    }
                 }
             }
         }
