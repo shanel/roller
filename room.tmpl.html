@@ -953,6 +953,11 @@
         content: 'Check this so draws from playing cards and custom sets are not seen by other room users until you select them and click the "Reveal selected" button..',
         hoverDelay: 1000
     });
+    $("#sortDiceLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Uncheck this if you do not want dice results sorted by result.',
+        hoverDelay: 1000
+    });
 
     if (Cookies.get('hide_draws') == 'true') {
         hideDraws = true;
