@@ -75,6 +75,7 @@ type Room struct {
 	Deck       string
 	BgURL      string
 	CustomSets []byte // yup, having to use json again...
+	Modifier   int
 }
 
 func (r *Room) GetCustomSets() (CustomSets, error) {
@@ -230,16 +231,18 @@ func (d *Die) getPosition() (float64, float64) {
 }
 
 type Passer struct {
-	Dice       []Die
-	RoomTotal  int
-	RoomAvg    float64
-	RollTotal  int
-	RollAvg    float64
-	LastAction string
-	CardsLeft  int
-	BgURL      string
-	HasBgURL   bool
-	CustomSets []PassedCustomSet
+	Dice              []Die
+	RoomTotal         int
+	RoomAvg           float64
+	RollTotal         int
+	RollAvg           float64
+	LastAction        string
+	CardsLeft         int
+	BgURL             string
+	HasBgURL          bool
+	CustomSets        []PassedCustomSet
+	Modifier          int
+	ModifiedRollTotal int
 }
 
 func noSpaces(str string) string {
@@ -271,7 +274,7 @@ func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 	return name, fmt.Errorf("couldn't find a room key for %v", name)
 }
 
-func updateRoom(c context.Context, rk string, u Update) error {
+func updateRoom(c context.Context, rk string, u Update, modifier int) error {
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
 		return fmt.Errorf("updateRoom: could not decode room key %v: %v", rk, err)
@@ -309,6 +312,7 @@ func updateRoom(c context.Context, rk string, u Update) error {
 		return fmt.Errorf("could not marshal updates in updateRoom: %v", err)
 	}
 	r.Timestamp = t
+	r.Modifier = modifier
 	_, err = datastore.Put(c, roomKey, &r)
 	if err != nil {
 		return fmt.Errorf("could not update room %v: %v", rk, err)
@@ -348,7 +352,7 @@ func setBackground(c context.Context, rk, url string) {
 		log.Printf("url is wrong")
 		return
 	}
-	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
 func addCustomSet(c context.Context, rk, name, lines, height, width string) {
@@ -396,7 +400,7 @@ func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 		log.Printf("couldn't find the new entry: %v", err)
 		return
 	}
-	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
 func refreshRoom(c context.Context, rk, fp string) string {
@@ -797,7 +801,7 @@ func clearRoomDice(c context.Context, encodedRoomKey string) error {
 		return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, k.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return nil
 }
 
@@ -848,7 +852,7 @@ func updateDieLocation(c context.Context, encodedDieKey, fp string, x, y float64
 	if err != nil {
 		return fmt.Errorf("could not update die %v with new position: %v", encodedDieKey, err)
 	}
-	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
 	return nil
 }
 
@@ -866,7 +870,7 @@ func deleteDieHelper(c context.Context, encodedDieKey string) error {
 		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return nil
 }
 
@@ -896,7 +900,7 @@ func revealDieHelper(c context.Context, encodedDieKey string) error {
 			return fmt.Errorf("problem revealing room die %v: %v", encodedDieKey, err)
 		}
 		// Fake updater so Safari will work?
-		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 		return nil
 	}
 	return fmt.Errorf("Only cards and custom items can be revealed.")
@@ -919,7 +923,7 @@ func hideDieHelper(c context.Context, encodedDieKey, room, hiddenBy string) erro
 			return fmt.Errorf("problem hiding room die %v: %v", encodedDieKey, err)
 		}
 		// Fake updater so Safari will work?
-		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 		return nil
 	}
 	return fmt.Errorf("Only cards and custom items can be hidden.")
@@ -969,7 +973,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		}
 	}
 	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return nil
 }
 
@@ -1101,7 +1105,7 @@ func background(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	setBackground(c, room, bg)
-	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1122,7 +1126,7 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	addCustomSet(c, room, name, entries, height, width)
-	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1139,7 +1143,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message})
+	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1169,6 +1173,13 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.FormValue("fp")
 	col := r.FormValue("color")
+	mod := r.FormValue("modifier")
+	mod = strings.TrimLeft(mod, " +")
+	var modInt int
+	modInt, err = strconv.Atoi(mod)
+	if err != nil {
+		modInt = 0
+	}
 	total, err := newRoll(c, toRoll, roomKey, col, r.FormValue("hiddenDraw"), fp)
 	if err != nil {
 		log.Printf("%v", err)
@@ -1177,7 +1188,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	lastRoll[room] = total
 
 	lastAction[room] = "roll"
-	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, modInt)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1257,7 +1268,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.Form.Get("fp")
 	lastAction[room] = "clear"
-	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1355,13 +1366,15 @@ func room(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p := Passer{
-		Dice:       filteredDice,
-		RoomTotal:  roomTotal,
-		RoomAvg:    roomAvg,
-		RollTotal:  rollTotal,
-		RollAvg:    rollAvg,
-		CardsLeft:  deckSize,
-		CustomSets: []PassedCustomSet{},
+		Dice:              filteredDice,
+		RoomTotal:         roomTotal,
+		RoomAvg:           roomAvg,
+		RollTotal:         rollTotal,
+		RollAvg:           rollAvg,
+		CardsLeft:         deckSize,
+		CustomSets:        []PassedCustomSet{},
+		Modifier:          rm.Modifier,
+		ModifiedRollTotal: rollTotal + rm.Modifier,
 	}
 	rcs, err := rm.GetCustomSets()
 	if err != nil {
@@ -1445,6 +1458,9 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 		if err != nil {
 			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
 		}
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return err
+		}
 	} else {
 		cards, err := getRoomCards(c, keyStr)
 		if err != nil {
@@ -1485,6 +1501,9 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 		if err != nil {
 			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
 		}
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1503,7 +1522,7 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.Form.Get("fp")
 	lastAction[room] = "shuffle"
-	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1534,8 +1553,11 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("could not create new dice: %v", err)
 	}
+	if err = datastore.Get(c, roomKey, &r); err != nil {
+		log.Printf("%v", err)
+	}
 
 	lastAction[room] = "draw"
-	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true})
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
