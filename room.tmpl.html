@@ -823,12 +823,12 @@
         <option id="PurpleColor" value="violet" style="color: #8a2be2">Purple</option>
         <option id="YellowColor" value="gold" style="color: #ffd700">Yellow</option>
     </select>
-    <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
-    <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
-    <label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>
-    <input type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
-    <label id="savedRollLabel" for="savedRoll">Save last roll: </label>
-    <input type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>
+    <!--<label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>-->
+    <!--<input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>-->
+    <!--<label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>-->
+    <!--<input type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>-->
+    <!--<label id="savedRollLabel" for="savedRoll">Save last roll: </label>-->
+    <!--<input type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>-->
 
     <input type="hidden" name="fp" value="">
     <p></p>
@@ -861,6 +861,14 @@
     <button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>
     <button id="pauseButton" class="button button3" onclick="pause()">Pause</button>
     <button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>
+</div>
+<div id="prefs" class="buttons">
+    <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
+    <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
+    <label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>
+    <input type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
+    <label id="savedRollLabel" for="savedRoll">Save last roll: </label>
+    <input type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>
 </div>
 <script>
     // Dark tool tips
