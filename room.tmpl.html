@@ -914,6 +914,11 @@
         content: 'd6 with pips',
         hoverDelay: 1000
     });
+    $("#modifier").darkTooltip({
+        gravity: 'south',
+        content: 'modifies the total displayed after the roll',
+        hoverDelay: 1000
+    });
     $("#fateLabel").darkTooltip({
         gravity: 'south',
         content: 'Fate/Fudge dice',
@@ -1009,7 +1014,7 @@
     if (saveRolls) {
         var p = JSON.parse(localStorage.getItem("lastRoll"));
         for (var key in p) {
-            if (key.search("d") !== -1) {
+            if ((key.search("d") !== -1) && key !== "modifier") {
                 if (p.hasOwnProperty(key)) {
                     if (document.getElementById(key) !== null) {
                         document.getElementById(key).value = p[key];
