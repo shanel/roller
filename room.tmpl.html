@@ -18,9 +18,10 @@
 
     <script type="text/javascript" language="javascript">
 
-
+        var DEFAULT_COLOR = "clear";
         var hideDraws = false;
         var sortDice = true;
+        var saveRolls = false;
 
         var fp = "";
         new Fingerprint2().get(function (result, components) {
@@ -129,7 +130,6 @@
         window.dragMoveListener = dragMoveListener;
 
         function rollEm() {
-            var col = "clear";
             $('#rollem').submit(function() {
                 // get all the inputs into an array.
                 var $inputs = $('#rollem :input');
@@ -140,6 +140,10 @@
                 $inputs.each(function() {
                     values[this.name] = $(this).val();
                 });
+                if (values["color"] === "") {
+                    values["color"] = DEFAULT_COLOR;
+                }
+                localStorage.setItem("lastRoll", JSON.stringify(values));
                 localStorage.setItem("selectedColor", values["color"]);
             });
             $("#rollem").submit();
@@ -357,6 +361,15 @@
             }
         }
 
+        function savedRolls() {
+            if (document.getElementById('savedRoll').checked) {
+                hideDraws = true;
+                Cookies.set('save_rolls', 'true', { path: '' });
+            } else {
+                hideDraws = false;
+                Cookies.set('save_rolls', 'false', { path: '' });
+            }
+        }
         interact('.tap-target')
             .on('doubletap', function (event) {
                 event.currentTarget.classList.toggle('selected');
@@ -814,6 +827,8 @@
     <input type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
     <label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>
     <input type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
+    <label id="savedRollLabel" for="savedRoll">Save last roll: </label>
+    <input type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>
 
     <input type="hidden" name="fp" value="">
     <p></p>
@@ -962,6 +977,11 @@
         content: 'Uncheck this if you do not want dice results sorted by result.',
         hoverDelay: 1000
     });
+    $("#savedRollLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want to roll the same thing you rolled last time.',
+        hoverDelay: 1000
+    });
 
     if (Cookies.get('hide_draws') == 'true') {
         hideDraws = true;
@@ -973,10 +993,25 @@
     }
     document.getElementById('sortTheDice').checked = sortDice;
 
+    if (Cookies.get('save_rolls') == 'true') {
+        saveRolls = true;
+    }
+    document.getElementById('savedRoll').checked = saveRolls;
+
     if ((localStorage.getItem("selectedColor") !== "null") && (typeof(localStorage.getItem("selectedColor")) !== "undefined")) {
         $("#selectColor").val(localStorage.getItem("selectedColor"));
     }
 
+    if (saveRolls) {
+        var p = JSON.parse(localStorage.getItem("lastRoll"));
+        for (var key in p) {
+            if (p.hasOwnProperty(key)) {
+                if (document.getElementById(key) !== null) {
+                    document.getElementById(key).value = p[key];
+                }
+            }
+        }
+    }
 </script>
 <br>
 <div class="about"><a href="/about">about</a></div>
