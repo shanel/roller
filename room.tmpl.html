@@ -427,6 +427,7 @@
                 });
                 dialog.dialog("close");
                 $("#customButtons").load(window.location.href + " #customButtons");
+                location.reload();
                 return true;
             }
 
@@ -443,12 +444,15 @@
                 },
                 close: function () {
                     form[0].reset();
+                    $("#customButtons").load(window.location.href + " #customButtons");
+                    location.reload();
                 }
             });
 
             form = dialog.find("form").on("submit", function (event) {
                 event.preventDefault();
                 addEntry();
+                location.reload();
             });
 
             $("#addCustomSetButton").button().on("click", function () {
