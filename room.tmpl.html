@@ -47,7 +47,7 @@
                 },
                 // call this function on every dragmove event
                 onmove: dragMoveListener,
-                onend: dragMoveEnd,
+                onend: dragMoveEnd
                 // call this function on every dragend event
             });
 
@@ -228,7 +228,7 @@
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
-        {{range.CustomSets}}
+        {{range .CustomSets}}
         function {{.Pull}} {
             var count = prompt("How many items would you like to pull from {{.Name}}?");
             if (count === null) {
