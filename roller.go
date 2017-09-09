@@ -906,7 +906,7 @@ func revealDieHelper(c context.Context, encodedDieKey string) error {
 	return fmt.Errorf("Only cards and custom items can be revealed.")
 }
 
-func hideDieHelper(c context.Context, encodedDieKey, room, hiddenBy string) error {
+func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -1229,7 +1229,7 @@ func hideDie(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
 	// Do we need to be worried dice will be revealed from other rooms?
-	err := hideDieHelper(c, keyStr, room, r.Form.Get("fp"))
+	err := hideDieHelper(c, keyStr, r.Form.Get("fp"))
 	if err != nil {
 		log.Printf("%v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)

@@ -394,7 +394,7 @@
                     var unix = Math.round(+new Date() / 1000);
                     if (b !== "") {
                         var chunks = b.split("||");
-                        if (chunks.length == 2) {
+                        if (chunks.length === 2) {
                             alert(chunks[1]);
                         }
                         if (sessionStorage.lastUpdateId) {
@@ -812,7 +812,7 @@
     <label id="cardLabel" for="cards">cards: </label>
     <input type="text" name="cards" id="cards" style="width: 19px"/>
     <label id="labelLabel" for="label">label: </label>
-    <input type="text" name="label" id="label" style="width: 100"/>
+    <input type="text" name="label" id="label" style="width: 100px"/>
 
     <label id="colorLabel" for="selectColor">color: </label>
     <select id="selectColor" name="color">
@@ -993,17 +993,17 @@
         hoverDelay: 1000
     });
 
-    if (Cookies.get('hide_draws') == 'true') {
+    if (Cookies.get('hide_draws') === 'true') {
         hideDraws = true;
     }
     document.getElementById('hiddenDraw').checked = hideDraws;
 
-    if (Cookies.get('sort_dice') == 'false') {
+    if (Cookies.get('sort_dice') === 'false') {
         sortDice = false;
     }
     document.getElementById('sortTheDice').checked = sortDice;
 
-    if (Cookies.get('save_rolls') == 'true') {
+    if (Cookies.get('save_rolls') === 'true') {
         saveRolls = true;
     }
     document.getElementById('savedRoll').checked = saveRolls;
