@@ -13,6 +13,8 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.4/js.cookie.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>-->
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/2.6.2/jquery.contextMenu.min.js"></script>-->
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
     <!--<script src="/js/jquery.postitall.js"></script>-->
 
@@ -474,24 +476,32 @@
             });
         });
 
+//        $(function() {
+//            $.contextMenu({
+//                selector: '.context-menu-one',
+//                callback: function(key, options) {
+//                    if (key === "delete") {
+//                        deleteMarked();
+//                    } else if (key === "hide") {
+//                        hideMarked();
+//                    } else if (key === "reroll") {
+//                        rerollMarked();
+//                    } else if (key === "reveal") {
+//                        revealMarked();
+//                    }
+//                },
+//                items: {
+//                    "delete": {name: "Delete"},
+//                    "hide": {name: "Hide"},
+//                    "reroll": {name: "Reroll"},
+//                    "reveal": {name: "Reveal"}
+//                }
+//            });
 
-//        function drop(evt) {
-//            console.debug("DROP registered ----------");
-//
-//            evt.stopPropagation();
-//            evt.preventDefault();
-//            var droppedHTML = evt.dataTransfer.getData("text/html");
-//            var dropContext = $('<div>').append(droppedHTML);
-//            var imgURL = $(dropContext).find("img").attr('src');
-//
-//            console.debug(imgURL);
-//            $("#lines").val("");
-//            $("#lines").append(imgURL);
-//            $("#lines").append("\n");
-//        }
-//
-//        var dropbox = document.getElementById('dropbox');
-//        dropbox.addEventListener('drop', drop, false);
+//            $('.context-menu-one').on('click', function(e){
+//                console.log('clicked', this);
+//            })
+        });
 
     </script>
 
