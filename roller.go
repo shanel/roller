@@ -380,13 +380,13 @@ func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 	}
 	rcs, err := r.GetCustomSets()
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in addCustomSet%v", err)
 		return
 	}
 	rcs[name] = cs
 	err = r.SetCustomSets(rcs)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("other error in addCustomSet: %v", err)
 		return
 	}
 	_, err = datastore.Put(c, roomKey, &r)
@@ -562,7 +562,8 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				New:       true,
 				IsCard:    true,
 			}
-			if hidden != "" {
+			log.Printf("hidden: %v", hidden)
+			if hidden != "" && hidden != "false" {
 				d.HiddenBy = fp
 				d.IsHidden = true
 			}
@@ -593,7 +594,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 		for i, card := range drawn {
 			ii, err := strconv.Atoi(i)
 			if err != nil {
-				log.Printf("%v", err)
+				log.Printf("error in drawCards: %v", err)
 				continue
 			}
 			diu := card
@@ -613,7 +614,8 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				CustomHeight:  cs.MaxHeight,
 				CustomWidth:   cs.MaxWidth,
 			}
-			if hidden != "" {
+			log.Printf("hidden: %v", hidden)
+			if hidden != "" && hidden != "false" {
 				d.HiddenBy = fp
 				d.IsHidden = true
 			}
@@ -974,6 +976,8 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	}
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return nil
 }
 
@@ -1182,7 +1186,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	}
 	total, err := newRoll(c, toRoll, roomKey, col, r.FormValue("hiddenDraw"), fp)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in roll: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	lastRoll[room] = total
@@ -1200,7 +1204,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	// Do we need to be worried dice will be deleted from other rooms?
 	err := deleteDieHelper(c, keyStr)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in deleteDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "delete"
@@ -1216,7 +1220,7 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	// Do we need to be worried dice will be revealed from other rooms?
 	err := revealDieHelper(c, keyStr)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in revealDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "reveal"
@@ -1231,7 +1235,7 @@ func hideDie(w http.ResponseWriter, r *http.Request) {
 	// Do we need to be worried dice will be revealed from other rooms?
 	err := hideDieHelper(c, keyStr, r.Form.Get("fp"))
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in hideDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "hide"
@@ -1247,7 +1251,7 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	// Do we need to be worried dice will be rerolled from other rooms?
 	err := rerollDieHelper(c, keyStr, room)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in rerollDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "reroll"
@@ -1541,7 +1545,7 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	}
 	count, err := strconv.Atoi(r.Form.Get("count"))
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("error in draw: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
@@ -1553,8 +1557,8 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("could not create new dice: %v", err)
 	}
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		log.Printf("%v", err)
+	if err = datastore.Get(c, roomKey, &Room{}); err != nil {
+		log.Printf("other error in draw: %v", err)
 	}
 
 	lastAction[room] = "draw"
