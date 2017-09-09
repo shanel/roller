@@ -843,7 +843,7 @@
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div id="customButtons" class="buttons">
-    <button id="addCustomSetButton" class="button">Add custom set</button>
+    <button id="addCustomSetButton" class="button ui-button ui-corner-all ui-widget">Add custom set</button>
     {{range .CustomSets}}
     <button id="pull_from_{{.SnakeName}}_button" class="button" onclick={{.Pull}}>Pull from {{.Name}} ({{.Remaining}})
     </button>
