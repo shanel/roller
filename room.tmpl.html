@@ -21,6 +21,7 @@
 
         var DEFAULT_COLOR = "clear";
         var hideDraws = false;
+        var showFunkyDice = false;
         var sortDice = true;
         var saveRolls = false;
 
@@ -131,6 +132,7 @@
         window.dragMoveListener = dragMoveListener;
 
         function rollEm() {
+            console.log("running");
             $('#rollem').submit(function() {
                 // get all the inputs into an array.
                 var $inputs = $('#rollem :input');
@@ -147,7 +149,9 @@
                 localStorage.setItem("lastRoll", JSON.stringify(values));
                 localStorage.setItem("selectedColor", values["color"]);
             });
+            console.log("here");
             $("#rollem").submit();
+            console.log("another here");
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
@@ -372,6 +376,18 @@
                 Cookies.set('save_rolls', 'false', { path: '' });
             }
         }
+
+        function funkierDice() {
+            if (document.getElementById('funkyDice').checked) {
+                showFunkyDice = true;
+                Cookies.set('funky_dice', 'true', { path: '' });
+            } else {
+                showFunkyDice = false;
+                Cookies.set('funky_dice', 'false', { path: '' });
+            }
+            location.reload();
+        }
+
         interact('.tap-target')
             .on('doubletap', function (event) {
                 event.currentTarget.classList.toggle('selected');
@@ -507,6 +523,11 @@
 
     .tap-target {
         display: inline-block;
+    }
+
+    .funky {
+        border-style: solid;
+        border-color: black;
     }
 
     .tap-target.selected {
@@ -695,17 +716,17 @@
     }
 
     /*TODO(shanel): Store this style stuff in the element's actual style tag.*/
-    .label {
+    .funky {
         /*width: 25%;*/
         /*height: 100%;*/
         /*min-height: 6.5em;*/
-        /*margin: 10%;*/
+        /*max-height: 1%;*/
+        margin: 1%;
+        background-color: #29e;
+        color: white;
 
-        /*background-color: #29e;*/
-        /*color: white;*/
-
-        /*border-radius: 0.75em;*/
-        /*padding: 4%;*/
+        border-radius: 0.75em;
+        /*padding: 0.01%;*/
 
         /*-webkit-transform: translate(0px, 0px);*/
         /*transform: translate(0px, 0px);*/
@@ -777,22 +798,40 @@
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
+    <input type="text" name="d3" id="d3" style="width: 19px"/>
+    <label id="d3Label" for="d3">d3</label>
     <input type="text" name="d4" id="d4" style="width: 19px"/>
-    <label for="d4">d4</label>
+    <label id="d4Label" for="d4">d4</label>
+    <input type="text" name="d5" id="d5" style="width: 19px"/>
+    <label id="d5Label" for="d5">d5</label>
     <input type="text" name="d6" id="d6" style="width: 19px"/>
-    <label for="d6">d6</label>
+    <label id="d6Label" for="d6">d6</label>
     <input type="text" name="d6p" id="d6p" style="width: 19px"/>
-    <label id="pipped" for="d6p">d6(P)</label>
+    <label id="d6pLabel" id="pipped" for="d6p">d6(P)</label>
+    <input type="text" name="d7" id="d7" style="width: 19px"/>
+    <label id="d7Label" for="d7">d7</label>
     <input type="text" name="d8" id="d8" style="width: 19px"/>
-    <label for="d8">d8</label>
+    <label id="d8Label" for="d8">d8</label>
     <input type="text" name="d10" id="d10" style="width: 19px"/>
-    <label for="d10">d10</label>
+    <label id="d10Label" for="d10">d10</label>
     <input type="text" name="d12" id="d12" style="width: 19px"/>
-    <label for="d12">d12</label>
+    <!--<input type="text" name="d10p" id="d10p" style="width: 19px"/>-->
+    <!--<label id="d10pLabel" for="d10p">d10p</label>-->
+    <label id="d12Label" for="d12">d12</label>
+    <input type="text" name="d14" id="d14" style="width: 19px"/>
+    <label id="d14Label" for="d14">d14</label>
+    <input type="text" name="d16" id="d16" style="width: 19px"/>
+    <label id="d16Label" for="d16">d16</label>
     <input type="text" name="d20" id="d20" style="width: 19px"/>
-    <label for="d20">d20</label>
+    <label id="d20Label" for="d20">d20</label>
+    <input type="text" name="d24" id="d24" style="width: 19px"/>
+    <label id="d24Label" for="d24">d24</label>
+    <input type="text" name="d30" id="d30" style="width: 19px"/>
+    <label id="d30Label" for="d30">d30</label>
+    <input type="text" name="d100" id="d100" style="width: 19px"/>
+    <label id="d100Label" for="d100">d100</label>
     <input type="text" name="dF" id="dF" style="width: 19px"/>
-    <label id="fateLabel" for="dF">dF </label>
+    <label id="dFLabel" id="fateLabel" for="dF">dF </label>
      <!--&#10084; -->
     &nbsp; (&#7508;&#7461;&#7508;) &nbsp;
     <label id="tokenLabel" for="tokens">tokens: </label>
@@ -854,6 +893,8 @@
     <input form="rollem" type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
     <label id="savedRollLabel" for="savedRoll">Save last roll: </label>
     <input form="rollem" type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>
+    <label id="funkyDiceLabel" for="funkyDice">Funky dice: </label>
+    <input form="rollem" type="checkbox" name="funkyDice" id="funkyDice" onclick="funkierDice()"/>
 </div>
 <script>
     // Dark tool tips
@@ -980,11 +1021,31 @@
         content: 'Check this if you want to roll the same thing you rolled last time.',
         hoverDelay: 1000
     });
+    $("#funkyDiceLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want d3, d5, d7, d14, d16, d24, d30, and d100 in addition to other dice.',
+        hoverDelay: 1000
+    });
 
     if (Cookies.get('hide_draws') === 'true') {
         hideDraws = true;
     }
     document.getElementById('hiddenDraw').checked = hideDraws;
+
+    if (Cookies.get('funky_dice') === 'true') {
+        showFunkyDice = true;
+    }
+    document.getElementById('funkyDice').checked = showFunkyDice;
+
+    if (showFunkyDice !== true) {
+        var funk = ["d3", "d5", "d7", "d14", "d16", "d24", "d30", "d100"];
+//        var funk = ["d3", "d5", "d7", "d10p", "d14", "d16", "d24", "d30", "d100"];
+        var funkLen = funk.length;
+        for (var i = 0; i < funkLen; i++) {
+            document.getElementById(funk[i] + "Label").style.display = 'none';
+            document.getElementById(funk[i]).style.display = 'none';
+        }
+    }
 
     if (Cookies.get('sort_dice') === 'false') {
         sortDice = false;
@@ -1038,12 +1099,18 @@
         {{range .Dice}}
         {{if .New}}
         {{if .IsLabel}}
-        <!--TODO(shanel): Have full style here, not just the move stuff.-->
+        {{if .IsFunky}}
+        <div id="{{.KeyStr}}" class="draggable tap-target funky" data-x="{{.X}}" data-y="{{.Y}}"
+             style="transform: translate({{.X}}px, {{.Y}}px);">
+            <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+        </div>
+        {{else if .IsLabel}}
         <div id="{{.KeyStr}}" class="draggable tap-target label" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
             <p>
             <h3>{{.ResultStr}}</h3></p>
         </div>
+        {{end}}
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
@@ -1066,11 +1133,18 @@
         {{end}}
         {{else}}
         {{if .IsLabel}}
-        <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
+        {{if .IsFunky}}
+        <div id="{{.KeyStr}}" class="draggable tap-target funky" data-x="{{.X}}" data-y="{{.Y}}"
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+            <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+        </div>
+        {{else}}
+        <div id="{{.KeyStr}}" class="draggable tap-target label" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
             <p>
             <h3>{{.ResultStr}}</h3></p>
         </div>
+        {{end}}
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">

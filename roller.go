@@ -218,6 +218,7 @@ type Die struct {
 	CustomWidth   string
 	HiddenBy      string
 	IsHidden      bool
+	IsFunky       bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -641,6 +642,17 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color, hidden, fp string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
+	funky := map[string]bool{
+		"3": true,
+		"5": true,
+		"7": true,
+		//"10p": true,
+		"14":  true,
+		"16":  true,
+		"24":  true,
+		"30":  true,
+		"100": true,
+	}
 	var totalCount int
 	var total int
 	ts := time.Now().Unix()
@@ -651,7 +663,9 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				oldSize = "6p"
 				size = "6"
 			}
-			count, err := strconv.Atoi(v)
+			var count int
+			var err error
+			count, err = strconv.Atoi(v)
 			if err != nil {
 				continue
 			}
@@ -672,8 +686,11 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					total += r
 				}
 				var diu string
+				_, funky := funky[size]
 				if oldSize == "6p" {
 					diu, err = getDieImageURL(c, oldSize, rs, color)
+				} else if funky {
+					diu = ""
 				} else {
 					diu, err = getDieImageURL(c, size, rs, color)
 				}
@@ -690,6 +707,11 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					Timestamp: ts,
 					Image:     diu,
 					New:       true,
+				}
+				if funky {
+					d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, size)
+					d.IsLabel = true
+					d.IsFunky = true
 				}
 				dice = append(dice, &d)
 				keys = append(keys, dk)
@@ -940,7 +962,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsLabel || d.ResultStr == "token" {
+	if (d.IsLabel && !d.IsFunky) || d.ResultStr == "token" {
 		return fmt.Errorf("label or token")
 	}
 
@@ -962,6 +984,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	} else {
 		oldResultStr := fateReplace(d.ResultStr)
 		d.Result, d.ResultStr = getNewResult(d.Size)
+		d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
 		d.Timestamp = time.Now().Unix()
 		d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	}
@@ -982,19 +1005,28 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 }
 
 func getNewResult(kind string) (int, string) {
-	s, err := strconv.Atoi(kind)
-	if err != nil {
-		// Assume fate die
-		r := rand.Intn(3)
-		if r == 0 {
-			return math.MaxInt16 - 2, "-"
+	var s int
+	var err error
+	if kind == "10p" { // TODO(shanel): this can probably go away due to d100
+		s = 10
+	} else {
+		s, err = strconv.Atoi(kind)
+		if err != nil {
+			// Assume fate die
+			r := rand.Intn(3)
+			if r == 0 {
+				return math.MaxInt16 - 2, "-"
+			}
+			if r == 1 {
+				return math.MaxInt16, "+"
+			}
+			return math.MaxInt16 - 1, " "
 		}
-		if r == 1 {
-			return math.MaxInt16, "+"
-		}
-		return math.MaxInt16 - 1, " "
 	}
 	r := rand.Intn(s) + 1
+	//if kind == "10p" {
+	//	r = (r -1) * 10
+	//}
 	return r, strconv.Itoa(r)
 }
 
@@ -1152,6 +1184,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 }
 
 func roll(w http.ResponseWriter, r *http.Request) {
+	log.Printf("**************************************************")
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1163,13 +1196,22 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	toRoll := map[string]string{
-		"4":      r.FormValue("d4"),
-		"6":      r.FormValue("d6"),
-		"6p":     r.FormValue("d6p"),
-		"8":      r.FormValue("d8"),
-		"10":     r.FormValue("d10"),
+		"3":  r.FormValue("d3"),
+		"4":  r.FormValue("d4"),
+		"5":  r.FormValue("d5"),
+		"6":  r.FormValue("d6"),
+		"6p": r.FormValue("d6p"),
+		"7":  r.FormValue("d7"),
+		"8":  r.FormValue("d8"),
+		"10": r.FormValue("d10"),
+		//"10p":      r.FormValue("d10p"),
 		"12":     r.FormValue("d12"),
+		"14":     r.FormValue("d14"),
+		"16":     r.FormValue("d16"),
 		"20":     r.FormValue("d20"),
+		"24":     r.FormValue("d24"),
+		"30":     r.FormValue("d30"),
+		"100":    r.FormValue("d100"),
 		"F":      r.FormValue("dF"),
 		"label":  r.FormValue("label"),
 		"card":   r.FormValue("cards"),
@@ -1324,6 +1366,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		if i == 0 {
 			newestTimestamp = d.Timestamp
 		}
+		log.Printf("size: %v", d.Size)
 		if _, err := strconv.Atoi(d.Size); err == nil {
 			roomTotal += d.Result
 			roomCount++
