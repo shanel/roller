@@ -1196,7 +1196,6 @@ func alert(w http.ResponseWriter, r *http.Request) {
 }
 
 func roll(w http.ResponseWriter, r *http.Request) {
-	log.Printf("**************************************************")
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1229,6 +1228,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
 	}
+	log.Printf("toRoll: %v", toRoll)
 	fp := r.FormValue("fp")
 	col := r.FormValue("color")
 	mod := r.FormValue("modifier")
@@ -1378,7 +1378,6 @@ func room(w http.ResponseWriter, r *http.Request) {
 		if i == 0 {
 			newestTimestamp = d.Timestamp
 		}
-		log.Printf("size: %v", d.Size)
 		if _, err := strconv.Atoi(d.Size); err == nil {
 			roomTotal += d.Result
 			roomCount++

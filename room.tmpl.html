@@ -149,9 +149,7 @@
                 localStorage.setItem("lastRoll", JSON.stringify(values));
                 localStorage.setItem("selectedColor", values["color"]);
             });
-            console.log("here");
             $("#rollem").submit();
-            console.log("another here");
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
@@ -387,6 +385,28 @@
             }
             location.reload();
         }
+
+
+        interact('.label-tap-target')
+            .on('doubletap', function (event) {
+                var theId = event.currentTarget.id;
+                var chunks = theId.split("L");
+                var die = chunks[0];
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': die,
+                    'value': '1',
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            });
 
         interact('.tap-target')
             .on('doubletap', function (event) {
@@ -799,44 +819,42 @@
     them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
     <input type="text" name="d3" id="d3" style="width: 19px"/>
-    <label id="d3Label" for="d3">d3</label>
-    <input type="text" name="d4" id="d4" style="width: 19px"/>
-    <label id="d4Label" for="d4">d4</label>
+    <label id="d3Label" for="d3" class="label-tap-target">d4</label>
     <input type="text" name="d5" id="d5" style="width: 19px"/>
-    <label id="d5Label" for="d5">d5</label>
+    <label id="d5Label" for="d5" class="label-tap-target">d5</label>
     <input type="text" name="d6" id="d6" style="width: 19px"/>
-    <label id="d6Label" for="d6">d6</label>
+    <label id="d6Label" for="d6" class="label-tap-target">d6</label>
     <input type="text" name="d6p" id="d6p" style="width: 19px"/>
-    <label id="d6pLabel" id="pipped" for="d6p">d6(P)</label>
+    <label id="d6pLabel" id="pipped" for="d6p" class="label-tap-target">d6(P)</label>
     <input type="text" name="d7" id="d7" style="width: 19px"/>
-    <label id="d7Label" for="d7">d7</label>
+    <label id="d7Label" for="d7" class="label-tap-target">d7</label>
     <input type="text" name="d8" id="d8" style="width: 19px"/>
-    <label id="d8Label" for="d8">d8</label>
+    <label id="d8Label" for="d8" class="label-tap-target">d8</label>
     <input type="text" name="d10" id="d10" style="width: 19px"/>
-    <label id="d10Label" for="d10">d10</label>
+    <label id="d10Label" for="d10" class="label-tap-target">d10</label>
     <input type="text" name="d12" id="d12" style="width: 19px"/>
     <!--<input type="text" name="d10p" id="d10p" style="width: 19px"/>-->
     <!--<label id="d10pLabel" for="d10p">d10p</label>-->
-    <label id="d12Label" for="d12">d12</label>
+    <label id="d12Label" for="d12" class="label-tap-target">d12</label>
     <input type="text" name="d14" id="d14" style="width: 19px"/>
-    <label id="d14Label" for="d14">d14</label>
+    <label id="d14Label" for="d14" class="label-tap-target">d14</label>
     <input type="text" name="d16" id="d16" style="width: 19px"/>
-    <label id="d16Label" for="d16">d16</label>
+    <label id="d16Label" for="d16" class="label-tap-target">d16</label>
     <input type="text" name="d20" id="d20" style="width: 19px"/>
-    <label id="d20Label" for="d20">d20</label>
+    <label id="d20Label" for="d20" class="label-tap-target">d20</label>
     <input type="text" name="d24" id="d24" style="width: 19px"/>
-    <label id="d24Label" for="d24">d24</label>
+    <label id="d24Label" for="d24" class="label-tap-target">d24</label>
     <input type="text" name="d30" id="d30" style="width: 19px"/>
-    <label id="d30Label" for="d30">d30</label>
+    <label id="d30Label" for="d30" class="label-tap-target">d30</label>
     <input type="text" name="d100" id="d100" style="width: 19px"/>
-    <label id="d100Label" for="d100">d100</label>
+    <label id="d100Label" for="d100" class="label-tap-target">d100</label>
     <input type="text" name="dF" id="dF" style="width: 19px"/>
-    <label id="dFLabel" id="fateLabel" for="dF">dF </label>
+    <label id="dFLabel" id="fateLabel" for="dF" class="label-tap-target">dF </label>
      <!--&#10084; -->
     &nbsp; (&#7508;&#7461;&#7508;) &nbsp;
-    <label id="tokenLabel" for="tokens">tokens: </label>
+    <label id="tokensLabel" for="tokens" class="label-tap-target">tokens: </label>
     <input type="text" name="tokens" id="tokens" style="width: 19px"/>
-    <label id="cardLabel" for="cards">cards: </label>
+    <label id="cardsLabel" for="cards" class="label-tap-target">cards: </label>
     <input type="text" name="cards" id="cards" style="width: 19px"/>
     <label id="labelLabel" for="label">label: </label>
     <input type="text" name="label" id="label" style="width: 100px"/>
@@ -954,9 +972,14 @@
         content: 'Fate/Fudge dice',
         hoverDelay: 1000
     });
-    $("#tokenLabel").darkTooltip({
+    $("#tokensLabel").darkTooltip({
         gravity: 'south',
         content: 'colored blank tokens',
+        hoverDelay: 1000
+    });
+    $("#cardsLabel").darkTooltip({
+        gravity: 'south',
+        content: 'face up playing cards (no jokers) - use "Shuffle discards" button to refill deck',
         hoverDelay: 1000
     });
     $("#labelLabel").darkTooltip({
