@@ -34,6 +34,18 @@
             Cookies.set('fp', fp, {path: '/room'});
             Cookies.set('fp', fp, {path: ''});
         });
+//
+//        if event.target.classList.contains('selected') {
+//            for document.getElementsByClassName('selected')
+//                }
+
+        function dragStart(target, x, y) {
+            // update the position attributes
+            target.setAttribute('start-x', x);
+            target.setAttribute('start-y', y);
+//            event.target.setAttribute('start-x', event.x0);
+//            event.target.setAttribute('start-y', event.y0);
+        }
 
         // target elements with the "draggable" class
         interact('.draggable')
@@ -44,21 +56,55 @@
                 autoScroll: true,
 
                 onstart: function (event) {
-                    // update the posiion attributes
-                    event.target.setAttribute('start-x', event.x0);
-                    event.target.setAttribute('start-y', event.y0);
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            dragStart(as[i], event.x0, event.y0);
+                        }
+                    } else {
+                        dragStart(t, event.x0, event.y0);
+                    }
+
+                    // update the position attributes
+//                    event.target.setAttribute('start-x', event.x0);
+//                    event.target.setAttribute('start-y', event.y0);
+                    // Can we do the same to all other selected items (if this is selected as well)
+                    // using their current x0/y0?
                 },
                 // call this function on every dragmove event
-                onmove: dragMoveListener,
-                onend: dragMoveEnd
+//                onmove: dragMoveListener,
+                onmove: function (event) {
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            dragMoveListener(as[i], event.dx, event.dy);
+                        }
+                    } else {
+                        dragMoveListener(t, event.dx, event.dy);
+                    }
+                },
+//                onend: dragMoveEnd
+                onend: function (event) {
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            dragMoveEnd(as[i]);
+                        }
+                    } else {
+                        dragMoveEnd(t);
+                    }
+//                    dragMoveEnd(t);
+                }
                 // call this function on every dragend event
             });
 
 
-        function dragMoveEnd(event) {
-            var target = event.target,
+        function dragMoveEnd(target) {
                 // keep the dragged position in the data-x/data-y attributes
-                x = (parseFloat(target.getAttribute('data-x')) || 0),
+                var x = (parseFloat(target.getAttribute('data-x')) || 0),
                 y = (parseFloat(target.getAttribute('data-y')) || 0);
 
 
@@ -100,11 +146,10 @@
         };
 
 
-        function dragMoveListener(event) {
-            var target = event.target,
+        function dragMoveListener(target, dx, dy) {
                 // keep the dragged position in the data-x/data-y attributes
-                x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx,
-                y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx,
+                y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
 
 
             // translate the element
@@ -128,8 +173,11 @@
         }
 
 
-        // this is used later in the resizing and gesture demos
-        window.dragMoveListener = dragMoveListener;
+//        // this is used later in the resizing and gesture demos
+//        window.dragMoveListener = function (event) {
+//            var t = event.target;
+//            dragMoveListener(t);
+//        };
 
         function rollEm() {
             console.log("running");
