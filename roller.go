@@ -209,6 +209,7 @@ type Die struct {
 	KeyStr        string
 	Timestamp     int64
 	Image         string
+	FlippedImage  string
 	New           bool
 	IsCard        bool
 	IsLabel       bool
@@ -713,6 +714,12 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					d.IsLabel = true
 					d.IsFunky = true
 				}
+				if d.ResultStr == "token" {
+					d.FlippedImage, err = getDieImageURL(c, "0", "token", "white")
+					if err != nil {
+						log.Printf("couldn't find flipped image: %v", err)
+					}
+				}
 				dice = append(dice, &d)
 				keys = append(keys, dk)
 			}
@@ -962,11 +969,16 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if (d.IsLabel && !d.IsFunky) || d.ResultStr == "token" {
-		return fmt.Errorf("label or token")
+	if d.IsLabel && !d.IsFunky {
+		return fmt.Errorf("label")
 	}
 
-	if d.IsCustomItem {
+	if d.ResultStr == "token" {
+		old := d.Image
+		d.Image = d.FlippedImage
+		d.FlippedImage = old
+		d.Timestamp = time.Now().Unix()
+	} else if d.IsCustomItem {
 		// Do a single draw.
 		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName, strconv.FormatBool(d.IsHidden), d.HiddenBy)
 		// Set the location to the same as the passed in die.
