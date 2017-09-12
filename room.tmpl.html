@@ -264,15 +264,18 @@
         }
 
         function clearAllDice() {
+            console.log("where are you firefox?");
             var clear = confirm("Clear all dice from room?");
+            console.log(clear);
             if (clear === true) {
                 $.post("/clear", {
                     'fp': fp
                 }).done(function (data) {
                 });
             }
-            location.reload();
-            location.reload();
+            $("#refreshable").load(window.location.href + " #refreshable");
+//            location.reload();
+//            location.reload();
         }
 
         function shuffleDiscards() {
