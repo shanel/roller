@@ -34,17 +34,11 @@
             Cookies.set('fp', fp, {path: '/room'});
             Cookies.set('fp', fp, {path: ''});
         });
-//
-//        if event.target.classList.contains('selected') {
-//            for document.getElementsByClassName('selected')
-//                }
 
         function dragStart(target, x, y) {
             // update the position attributes
             target.setAttribute('start-x', x);
             target.setAttribute('start-y', y);
-//            event.target.setAttribute('start-x', event.x0);
-//            event.target.setAttribute('start-y', event.y0);
         }
 
         // target elements with the "draggable" class
@@ -68,21 +62,15 @@
                                 var rect = as[i].getBoundingClientRect();
                             }
                             console.log(rect.top, rect.left);
-//                            dragStart(as[i], event.x0, event.y0);
                             dragStart(as[i], rect.left, rect.top);
                         }
                     } else {
-                        dragStart(t, event.x0, event.y0);
+                        var rect = t.getBoundingClientRect();
+                        dragStart(t, rect.left, rect.top);
                     }
 
-                    // update the position attributes
-//                    event.target.setAttribute('start-x', event.x0);
-//                    event.target.setAttribute('start-y', event.y0);
-                    // Can we do the same to all other selected items (if this is selected as well)
-                    // using their current x0/y0?
                 },
                 // call this function on every dragmove event
-//                onmove: dragMoveListener,
                 onmove: function (event) {
                     var t = event.target;
                     if (t.classList.contains('selected')) {
@@ -183,12 +171,6 @@
             target.setAttribute('data-y', y);
         }
 
-
-//        // this is used later in the resizing and gesture demos
-//        window.dragMoveListener = function (event) {
-//            var t = event.target;
-//            dragMoveListener(t);
-//        };
 
         function rollEm() {
             console.log("running");
