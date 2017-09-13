@@ -135,6 +135,8 @@
             target.setAttribute('data-x', x);
             target.setAttribute('data-y', y);
 
+            target.classList.remove('stack');
+
             $.post('/move', {
                 'id': target.id,
                 'x': x,
