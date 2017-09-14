@@ -61,7 +61,6 @@
                             } else {
                                 var rect = as[i].getBoundingClientRect();
                             }
-                            console.log(rect.top, rect.left);
                             dragStart(as[i], rect.left, rect.top);
                         }
                     } else {
@@ -171,9 +170,11 @@
             target.setAttribute('data-y', y);
         }
 
+        var bar = new $.peekABar({
+            autohide: true
+        });
 
         function rollEm() {
-            console.log("running");
             $('#rollem').submit(function() {
                 // get all the inputs into an array.
                 var $inputs = $('#rollem :input');
@@ -184,11 +185,11 @@
                 $inputs.each(function() {
                     values[this.name] = $(this).val();
                 });
-                if (values["color"] === "") {
+                if ((values["color"] === "") || (values["color"] === null) || (values["color"] === "null")) {
                     values["color"] = DEFAULT_COLOR;
                 }
-                localStorage.setItem("lastRoll", JSON.stringify(values));
-                localStorage.setItem("selectedColor", values["color"]);
+                    localStorage.setItem("lastRoll", JSON.stringify(values));
+                    localStorage.setItem("selectedColor", values["color"]);
             });
             $("#rollem").submit();
             $("#refreshable").load(window.location.href + " #refreshable");
@@ -257,9 +258,7 @@
         }
 
         function clearAllDice() {
-            console.log("where are you firefox?");
             var clear = confirm("Clear all dice from room?");
-            console.log(clear);
             if (clear === true) {
                 $.post("/clear", {
                     'fp': fp
@@ -897,7 +896,6 @@
     <label id="d100Label" for="d100" class="label-tap-target">d100</label>
     <input type="text" name="dF" id="dF" style="width: 19px"/>
     <label id="dFLabel" id="fateLabel" for="dF" class="label-tap-target">dF </label>
-     <!--&#10084; -->
     &nbsp; (&#7508;&#7461;&#7508;) &nbsp;
     <label id="tokensLabel" for="tokens" class="label-tap-target">tokens: </label>
     <input type="text" name="tokens" id="tokens" style="width: 19px"/>
@@ -924,7 +922,6 @@
 </form>
 <div class="buttons">
     <button class="button button2" onClick="rollEm()">Submit</button>
-    <!--<button class="button button2" form="rollem" formaction="/roll" formmethod="post">Submit</button>-->
     <button id="clearButton" class="button" onclick="clearAllDice()">Clear</button>
     <button id="deleteButton" class="button" onclick="deleteMarked()">Delete selected</button>
     <button id="revealButton" class="button" onclick="revealMarked()">Reveal selected</button>
@@ -1242,11 +1239,8 @@
 
 <script>
     var newOnes = document.getElementsByClassName('new');
-    console.log(newOnes);
     for (var i = 0; i < newOnes.length; i++) {
         var rect = newOnes[i].getBoundingClientRect();
-        console.log(rect.top, rect.left);
-//        console.log(rect.top, rect.right, rect.bottom, rect.left);
     }
 </script>
 
@@ -1257,6 +1251,8 @@
     <div class="attribution">
         Design and functionality based on <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a
             href="//https://catchyourhare.com/diceroller/">dice roller</a>.
+        <br>
+        <b>NOTE: The site tends to work poorly in private browsing modes.</b>
     </div>
 </div>
 
