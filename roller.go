@@ -973,7 +973,11 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		return fmt.Errorf("label")
 	}
 
-	if d.ResultStr == "token" {
+	if d.IsFunky {
+		d.Result, d.ResultStr = getNewResult(d.Size)
+		d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
+		d.Timestamp = time.Now().Unix()
+	} else if d.ResultStr == "token" {
 		old := d.Image
 		d.Image = d.FlippedImage
 		d.FlippedImage = old
@@ -996,7 +1000,6 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	} else {
 		oldResultStr := fateReplace(d.ResultStr)
 		d.Result, d.ResultStr = getNewResult(d.Size)
-		d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
 		d.Timestamp = time.Now().Unix()
 		d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 	}
