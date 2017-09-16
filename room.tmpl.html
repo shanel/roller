@@ -1168,6 +1168,11 @@
         content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). You\'ll also put in max sizes for the images, the default 120 is probably fine. (Though just use "auto" if you want full size images.)  After creating it you\'ll see two buttons appear beside this. One is to draw items from the pool/deck (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like. Using the same name will overwrite the previous set of the same name.',
         hoverDelay: 1000
     });
+    $("#addImageButton").darkTooltip({
+        gravity: 'east',
+        content: 'Add an image to the table. Just paste in the url.',
+        hoverDelay: 1000
+    });
     $("#hiddenDrawLabel").darkTooltip({
         gravity: 'north',
         content: 'Check this so draws from playing cards and custom sets are not seen by other room users until you select them and click the "Reveal selected" button..',

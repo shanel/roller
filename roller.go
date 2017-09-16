@@ -220,6 +220,7 @@ type Die struct {
 	HiddenBy      string
 	IsHidden      bool
 	IsFunky       bool
+	IsImage       bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -992,7 +993,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsLabel && !d.IsFunky {
+	if (d.IsLabel || d.IsImage) && !d.IsFunky {
 		return fmt.Errorf("label")
 	}
 
@@ -1078,6 +1079,7 @@ func init() {
 	http.HandleFunc("/delete", deleteDie)
 	http.HandleFunc("/draw", draw)
 	http.HandleFunc("/hide", hideDie)
+	http.HandleFunc("/image", addImage)
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/refresh", refresh)
@@ -1218,6 +1220,43 @@ func alert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message}, 0)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func addImage(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in roll: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	r.ParseForm()
+	ts := time.Now().Unix()
+	lk := dieKey(c, roomKey, int64(ts))
+	l := Die{
+		ResultStr: "image",
+		Key:       lk,
+		KeyStr:    lk.Encode(),
+		Timestamp: ts,
+		New:       true,
+		//IsLabel:   true,
+		IsImage:      true,
+		Image:        r.Form.Get("url"),
+		IsCustomItem: true,
+		CustomHeight: r.Form.Get("height"),
+		CustomWidth:  r.Form.Get("width"),
+	}
+	_, err = datastore.Put(c, lk, &l)
+	if err != nil {
+		log.Printf("could not create new image: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	lastAction[room] = "image"
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
