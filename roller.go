@@ -640,20 +640,36 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 	return dice, keys
 }
 
+var standardDice = map[string]bool{
+	"4":  true,
+	"6":  true,
+	"6p": true,
+	"8":  true,
+	"10": true,
+	"12": true,
+	"20": true,
+	"F":  true,
+}
+
+func isFunky(d string) bool {
+	_, ok := standardDice[d]
+	return !ok && (d != "tokens")
+}
+
 func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color, hidden, fp string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
-	funky := map[string]bool{
-		"3": true,
-		"5": true,
-		"7": true,
-		//"10p": true,
-		"14":  true,
-		"16":  true,
-		"24":  true,
-		"30":  true,
-		"100": true,
-	}
+	//funky := map[string]bool{
+	//	"3": true,
+	//	"5": true,
+	//	"7": true,
+	//	//"10p": true,
+	//	"14":  true,
+	//	"16":  true,
+	//	"24":  true,
+	//	"30":  true,
+	//	"100": true,
+	//}
 	var totalCount int
 	var total int
 	ts := time.Now().Unix()
@@ -663,6 +679,14 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 			if size == "6p" {
 				oldSize = "6p"
 				size = "6"
+			}
+			if size == "xdy" {
+				chunks := strings.Split(v, "d")
+				if len(chunks) != 2 {
+					continue
+				}
+				size = chunks[1]
+				v = chunks[0]
 			}
 			var count int
 			var err error
@@ -687,10 +711,9 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					total += r
 				}
 				var diu string
-				_, funky := funky[size]
 				if oldSize == "6p" {
 					diu, err = getDieImageURL(c, oldSize, rs, color)
-				} else if funky {
+				} else if isFunky(size) {
 					diu = ""
 				} else {
 					diu, err = getDieImageURL(c, size, rs, color)
@@ -709,7 +732,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					Image:     diu,
 					New:       true,
 				}
-				if funky {
+				if isFunky(size) {
 					d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, size)
 					d.IsLabel = true
 					d.IsFunky = true
@@ -1230,8 +1253,8 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"label":  r.FormValue("label"),
 		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
+		"xdy":    r.FormValue("xdy"),
 	}
-	log.Printf("toRoll: %v", toRoll)
 	fp := r.FormValue("fp")
 	col := r.FormValue("color")
 	mod := r.FormValue("modifier")

@@ -140,7 +140,7 @@
 
         var getNewRoom = function () {
             delete_cookie("dice_room");
-            window.location.replace("/");
+            window.open("/", "_blank");
         };
 
 
@@ -362,6 +362,26 @@
                     'message': message
                 }).done(function (data) {
                 });
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function rollXdY() {
+            var message = prompt("Enter a single arbitrary roll of the form XdY (eg 3d23).");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'xdy',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
             }
         }
@@ -927,6 +947,7 @@
     <button id="rerollButton" class="button" onclick="rerollMarked()">Reroll selected</button>
     <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
+    <button id="xdyButton" class="button" onclick="rollXdY()">XdY</button>
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div id="customButtons" class="buttons">
@@ -949,10 +970,13 @@
 <div id="prefs" class="buttons">
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
     <input form="rollem" type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>
+    &nbsp;&nbsp;&nbsp;
     <label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>
     <input form="rollem" type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>
+    &nbsp;&nbsp;&nbsp;
     <label id="savedRollLabel" for="savedRoll">Save last roll: </label>
     <input form="rollem" type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>
+    &nbsp;&nbsp;&nbsp;
     <label id="funkyDiceLabel" for="funkyDice">Funky dice: </label>
     <input form="rollem" type="checkbox" name="funkyDice" id="funkyDice" onclick="funkierDice()"/>
 </div>
