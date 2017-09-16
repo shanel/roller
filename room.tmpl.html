@@ -573,6 +573,55 @@
             });
         });
 
+        $(function () {
+            var dialog, form,
+
+                url = $("#imageUrl"),
+                height = $("#height"),
+                width = $("#width");
+
+            function addAnImage() {
+                $.post("/image", {
+                    'url': url.val(),
+                    'height': height.val(),
+                    'width': width.val()
+                }).done(function (data) {
+                });
+                dialog.dialog("close");
+                $("#customButtons").load(window.location.href + " #customButtons");
+                location.reload();
+                return true;
+            }
+
+            dialog = $("#dialog-form2").dialog({
+                autoOpen: false,
+                height: 400,
+                width: 350,
+                modal: true,
+                buttons: {
+                    "Add image": addAnImage,
+                    Cancel: function () {
+                        dialog.dialog("close");
+                    }
+                },
+                close: function () {
+                    form[0].reset();
+                    $("#customButtons").load(window.location.href + " #customButtons");
+                    location.reload();
+                }
+            });
+
+            form = dialog.find("form").on("submit", function (event) {
+                event.preventDefault();
+                addAnImage();
+                location.reload();
+            });
+
+            $("#addImageButton").button().on("click", function () {
+                dialog.dialog("open");
+            });
+        });
+
 
 
     </script>
@@ -875,6 +924,25 @@
     <textarea name="lines" id="lines" form="myForm" class="textarea ui-widget-content ui-corner-all">Enter one image url per line...</textarea>
 </div>
 
+<div id="dialog-form2" title="Add an image" style="display: none">
+
+    <form id="myForm2">
+        <fieldset>
+            <label for="imageUrl">URL</label>
+            <input type="text" name="imageUrl" id="imageUrl" value="" size="20"
+                   class="text ui-widget-content ui-corner-all"><br><br>
+            <label for="height">Max Height (in pixels):</label>
+            <input type="text" name="height" id="height" value="auto" size="3"
+                   class="text ui-widget-content ui-corner-all"><br><br>
+            <label for="height">Max Width (in pixels):</label>
+            <input type="text" name="width" id="width" value="auto" size="3"
+                   class="text ui-widget-content ui-corner-all">
+            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+        </fieldset>
+    </form>
+</div>
+
 <h3>Roll For Your Party: A multi-user dice roller.</h3>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
@@ -950,6 +1018,7 @@
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div id="customButtons" class="buttons">
+    <button id="addImageButton" class="button ui-button ui-corner-all ui-widget">Add image</button>
     <button id="addCustomSetButton" class="button ui-button ui-corner-all ui-widget">Add custom set</button>
     {{range .CustomSets}}
     <button id="pull_from_{{.SnakeName}}_button" class="button" onclick={{.Pull}}>Pull from {{.Name}} ({{.Remaining}})
