@@ -15,8 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // TODO(shanel): Need to clean up the order of this file, move the js into its own file, nuke useless comments, write tests...
-// Maybe keep track of connected users of a room to determine smallest window size and restrict dice movement to that size?
-// Probably would be good to factor out duplicate code.
 package roller
 
 import (
@@ -359,7 +357,6 @@ func setBackground(c context.Context, rk, url string) {
 }
 
 func addCustomSet(c context.Context, rk, name, lines, height, width string) {
-	//func addCustomSet(c context.Context, rk, name, url string) {
 	keyStr, err := getEncodedRoomKeyFromName(c, rk)
 	if err != nil {
 		log.Printf("roomname wonkiness in addCustomSet: %v", err)
@@ -660,17 +657,6 @@ func isFunky(d string) bool {
 func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key, color, hidden, fp string) (int, error) {
 	dice := []*Die{}
 	keys := []*datastore.Key{}
-	//funky := map[string]bool{
-	//	"3": true,
-	//	"5": true,
-	//	"7": true,
-	//	//"10p": true,
-	//	"14":  true,
-	//	"16":  true,
-	//	"24":  true,
-	//	"30":  true,
-	//	"100": true,
-	//}
 	var totalCount int
 	var total int
 	ts := time.Now().Unix()
@@ -1063,9 +1049,6 @@ func getNewResult(kind string) (int, string) {
 		}
 	}
 	r := rand.Intn(s) + 1
-	//if kind == "10p" {
-	//	r = (r -1) * 10
-	//}
 	return r, strconv.Itoa(r)
 }
 
@@ -1113,9 +1096,6 @@ func root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-// TODO(shanel): Maybe the room/die culling code should happen here? Also, I wonder if it should
-// instead of go to a separate page, just have a butter bar saying it is only updating every hour
-// or something and update the JS accordingly.
 func paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
@@ -1238,12 +1218,11 @@ func addImage(w http.ResponseWriter, r *http.Request) {
 	ts := time.Now().Unix()
 	lk := dieKey(c, roomKey, int64(ts))
 	l := Die{
-		ResultStr: "image",
-		Key:       lk,
-		KeyStr:    lk.Encode(),
-		Timestamp: ts,
-		New:       true,
-		//IsLabel:   true,
+		ResultStr:    "image",
+		Key:          lk,
+		KeyStr:       lk.Encode(),
+		Timestamp:    ts,
+		New:          true,
 		IsImage:      true,
 		Image:        r.Form.Get("url"),
 		IsCustomItem: true,
@@ -1272,15 +1251,14 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	toRoll := map[string]string{
-		"3":  r.FormValue("d3"),
-		"4":  r.FormValue("d4"),
-		"5":  r.FormValue("d5"),
-		"6":  r.FormValue("d6"),
-		"6p": r.FormValue("d6p"),
-		"7":  r.FormValue("d7"),
-		"8":  r.FormValue("d8"),
-		"10": r.FormValue("d10"),
-		//"10p":      r.FormValue("d10p"),
+		"3":      r.FormValue("d3"),
+		"4":      r.FormValue("d4"),
+		"5":      r.FormValue("d5"),
+		"6":      r.FormValue("d6"),
+		"6p":     r.FormValue("d6p"),
+		"7":      r.FormValue("d7"),
+		"8":      r.FormValue("d8"),
+		"10":     r.FormValue("d10"),
 		"12":     r.FormValue("d12"),
 		"14":     r.FormValue("d14"),
 		"16":     r.FormValue("d16"),
@@ -1540,13 +1518,6 @@ func about(w http.ResponseWriter, _ *http.Request) {
 }
 
 func shuffleDiscards(c context.Context, keyStr, deckName string) error {
-	// Get dice in the room - specifically the cards
-	// make a map[string]bool of the card ResultStr
-	// run through the keys of cardsToPNG seeing if they are
-	// in that map if not, append the hex-ified version of their
-	// string to a string. That will be the signature for the new deck.
-	// Create that deck, shuffle it, output it's signature to the room's
-	// Deck. Put the updated Room into the datastore.
 	if deckName != "" {
 		cards, err := getRoomCustomCards(c, keyStr)
 		if err != nil {
