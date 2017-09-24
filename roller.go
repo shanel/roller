@@ -188,8 +188,14 @@ func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet,
 		u += "\n"
 	}
 	pieces := strings.Split(u, "\n")
+	slimPieces := []string{}
+	for _, piece := range pieces {
+		if piece != "" {
+			slimPieces = append(slimPieces, piece)
+		}
+	}
 	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}, MaxHeight: height, MaxWidth: width}
-	for i, p := range pieces {
+	for i, p := range slimPieces {
 		si := strconv.Itoa(i)
 		cs.Template[si] = p
 		cs.Instance[si] = p
