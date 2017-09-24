@@ -18,7 +18,10 @@
 package roller
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/adamclerk/deck"
@@ -219,6 +222,8 @@ type Die struct {
 	IsHidden      bool
 	IsFunky       bool
 	IsImage       bool
+	IsNote        bool
+	NoteId        string
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -1056,11 +1061,15 @@ func init() {
 	http.HandleFunc("/", root)
 	http.HandleFunc("/about", about)
 	http.HandleFunc("/addcustomset", handleAddingCustomSet)
+	http.HandleFunc("/addnote", addNote)
 	http.HandleFunc("/alert", alert)
 	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/deletenote", deleteNote)
 	http.HandleFunc("/draw", draw)
+	http.HandleFunc("/getnote", getNote)
+	http.HandleFunc("/getnotes", getNotes)
 	http.HandleFunc("/hide", hideDie)
 	http.HandleFunc("/image", addImage)
 	http.HandleFunc("/move", move)
@@ -1073,6 +1082,7 @@ func init() {
 	http.HandleFunc("/room/", room)
 	http.HandleFunc("/room/*", room)
 	http.HandleFunc("/shuffle", shuffle)
+	http.HandleFunc("/updatenote", updateNote)
 
 	// Seed random number generator.
 	rand.Seed(int64(time.Now().Unix()))
@@ -1144,6 +1154,226 @@ func move(w http.ResponseWriter, r *http.Request) {
 	}
 	room := path.Base(r.Referer())
 	lastAction[room] = "move"
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func getNote(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	noteId := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	roomKeyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in getNote: %v", err)
+	}
+	k, err := datastore.DecodeKey(roomKeyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("NoteId =", noteId).Limit(1)
+	dice := []Die{}
+	if _, err = q.GetAll(c, &dice); err != nil {
+		log.Printf("problem executing note query to fetch %v: %v", noteId, err)
+		return
+	}
+	//fp := r.Form.Get("fp")
+	var d Die
+	if len(dice) == 0 {
+		w.Write([]byte(""))
+		log.Printf("could not find note with id: %v", noteId)
+		return
+	} else {
+		d = dice[0]
+		var data []byte
+		data, err = base64.StdEncoding.DecodeString(d.ResultStr)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("problem decoding: %v", err)
+			return
+		}
+		rdata := bytes.NewReader(data)
+		var r *gzip.Reader
+		r, err = gzip.NewReader(rdata)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("problem with gzip reader: %v", err)
+			return
+		}
+		var s []byte
+		s, err = ioutil.ReadAll(r)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("%v", err)
+			return
+
+		}
+		w.Write(s)
+		return
+	}
+	//_, err = datastore.Put(c, k, &d)
+	//if err != nil {
+	//	log.Printf("could not update note %v: %v", noteId, err)
+	//}
+	//updateRoom(c, k.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
+	//lastAction[room] = "getnote"
+	//http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func getNotes(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	room := path.Base(r.Referer())
+	roomKeyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in getNote: %v", err)
+	}
+	k, err := datastore.DecodeKey(roomKeyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsNote =", true)
+	dice := []Die{}
+	if _, err = q.GetAll(c, &dice); err != nil {
+		log.Printf("problem executing note query: %v", err)
+		return
+	}
+	outMap := map[string]string{}
+	for i, d := range dice {
+		var data []byte
+		data, err = base64.StdEncoding.DecodeString(d.ResultStr)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("problem decoding: %v", err)
+			return
+		}
+		rdata := bytes.NewReader(data)
+		var r *gzip.Reader
+		r, err = gzip.NewReader(rdata)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("problem with gzip reader: %v", err)
+			return
+		}
+		var s []byte
+		s, err = ioutil.ReadAll(r)
+		if err != nil {
+			w.Write([]byte(""))
+			log.Printf("%v", err)
+			return
+		}
+		outMap[fmt.Sprintf("PostIt_%v", i+1)] = string(s)
+	}
+	out := ""
+	for k, v := range outMap {
+		out += fmt.Sprintf("'%v': %v,", k, v)
+	}
+	w.Write([]byte(fmt.Sprintf("{%v}", out)))
+
+	//_, err = datastore.Put(c, k, &d)
+	//if err != nil {
+	//	log.Printf("could not update note %v: %v", noteId, err)
+	//}
+	//updateRoom(c, k.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
+	//lastAction[room] = "getnote"
+	//http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func updateNote(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	noteId := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	roomKeyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in updateNote: %v", err)
+	}
+	k, err := datastore.DecodeKey(roomKeyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("NoteId =", noteId).Limit(1)
+	dice := []Die{}
+	var dKeys []*datastore.Key
+	if dKeys, err = q.GetAll(c, &dice); err != nil {
+		log.Printf("problem executing note query: %v", err)
+		return
+	}
+	fp := r.Form.Get("fp")
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := gz.Write([]byte(r.Form.Get("json"))); err != nil {
+		log.Printf("%v", err)
+		return
+	}
+	if err := gz.Flush(); err != nil {
+		log.Printf("%v", err)
+		return
+	}
+	if err := gz.Close(); err != nil {
+		log.Printf("%v", err)
+		return
+	}
+	s := base64.StdEncoding.EncodeToString(b.Bytes())
+	var d Die
+	ts := time.Now().Unix()
+	lk := dieKey(c, k, int64(ts))
+	if len(dice) == 0 {
+		d = Die{
+			ResultStr: s,
+			Key:       lk,
+			KeyStr:    lk.Encode(),
+			Timestamp: ts,
+			IsNote:    true,
+			NoteId:    r.Form.Get("id"),
+		}
+	} else {
+		d = dice[0]
+		d.ResultStr = s
+	}
+	if len(dice) == 0 {
+		_, err = datastore.Put(c, lk, &d)
+	} else {
+		_, err = datastore.Put(c, dKeys[0], &d)
+	}
+	if err != nil {
+		log.Printf("could not update note %v: %v", noteId, err)
+	}
+	updateRoom(c, k.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
+	lastAction[room] = "updatenote"
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func deleteNote(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	noteId := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	roomKeyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in updateNote: %v", err)
+	}
+	k, err := datastore.DecodeKey(roomKeyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	q := datastore.NewQuery("Die").Ancestor(k).Filter("NoteId =", noteId).Limit(1)
+	dice := []Die{}
+	dkeys := []*datastore.Key{}
+	if dkeys, err = q.GetAll(c, &dice); err != nil {
+		log.Printf("problem executing note query: %v", err)
+		return
+	}
+	fp := r.Form.Get("fp")
+	if len(dice) == 0 {
+		log.Printf("found no notes with id: %v", noteId)
+		return
+	}
+	err = datastore.Delete(c, dkeys[0])
+	if err != nil {
+		log.Printf("problem deleting room note %v: %v", noteId, err)
+	}
+	updateRoom(c, k.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
+	lastAction[room] = "deletenote"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1235,6 +1465,38 @@ func addImage(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.Form.Get("fp")
 	lastAction[room] = "image"
+	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func addNote(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in addNote: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	r.ParseForm()
+	ts := time.Now().Unix()
+	lk := dieKey(c, roomKey, int64(ts))
+	l := Die{
+		ResultStr: r.Form.Get("json"),
+		Key:       lk,
+		KeyStr:    lk.Encode(),
+		Timestamp: ts,
+		IsNote:    true,
+		NoteId:    r.Form.Get("id"),
+	}
+	_, err = datastore.Put(c, lk, &l)
+	if err != nil {
+		log.Printf("could not create new image: %v", err)
+	}
+	fp := r.Form.Get("fp")
+	lastAction[room] = "note"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -1374,6 +1636,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 }
 
 func room(w http.ResponseWriter, r *http.Request) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	c := appengine.NewContext(r)
 	room := path.Base(r.URL.Path)
 	if _, ok := repeatOffenders[room]; ok {

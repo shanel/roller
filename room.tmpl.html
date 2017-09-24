@@ -14,8 +14,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.4/js.cookie.min.js"></script>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>-->
-    <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
-    <!--<script src="/js/jquery.postitall.js"></script>-->
+    <link rel="stylesheet" href="https://cdn.rawgit.com/txusko/PostItAll/65382c3a/dist/jquery.postitall.css">
+    <script src="https://cdn.rawgit.com/txusko/PostItAll/65382c3a/dist/jquery.postitall.js"></script>
+    <script src="https://cdn.rawgit.com/azaslavsky/domJSON/b2534bb2/src/domJSON.js"></script>
 
     <script type="text/javascript" language="javascript">
 
@@ -517,6 +518,22 @@
                         }
                     }
                 });
+            // Should we clear local storage and then push in all the notes that exist then reload the notes?
+            $.post("/getnotes", {
+            }).done(function (data) {
+                var c = data;
+                console.log(c);
+                if (c !== "") {
+                    localStorage.clear();
+                    var p = JSON.parse(c);
+                    for (var key in p) {
+                        if (p.hasOwnProperty(key)) {
+                            localStorage.setItem(key, p[key]);
+                        }
+                    }
+                }
+            });
+            $.PostItAll.load();
         }
 
         setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
@@ -622,7 +639,208 @@
             });
         });
 
+//        function toJSON(node) {
+//            node = node || this;
+//            var obj = {
+//                nodeType: node.nodeType
+//            };
+//            if (node.tagName) {
+//                obj.tagName = node.tagName.toLowerCase();
+//            } else
+//            if (node.nodeName) {
+//                obj.nodeName = node.nodeName;
+//            }
+//            if (node.nodeValue) {
+//                obj.nodeValue = node.nodeValue;
+//            }
+//            var attrs = node.attributes;
+//            if (attrs) {
+//                var length = attrs.length;
+//                var arr = obj.attributes = new Array(length);
+//                for (var i = 0; i < length; i++) {
+//                    attr = attrs[i];
+//                    arr[i] = [attr.nodeName, attr.nodeValue];
+//                }
+//            }
+//            var childNodes = node.childNodes;
+//            if (childNodes) {
+//                length = childNodes.length;
+//                arr = obj.childNodes = new Array(length);
+//                for (i = 0; i < length; i++) {
+//                    arr[i] = toJSON(childNodes[i]);
+//                }
+//            }
+//            return obj;
+//        }
+//
+//        function toDOM(obj) {
+//            if (typeof obj == 'string') {
+//                obj = JSON.parse(obj);
+//            }
+//            var node, nodeType = obj.nodeType;
+//            switch (nodeType) {
+//                case 1: //ELEMENT_NODE
+//                    node = document.createElement(obj.tagName);
+//                    var attributes = obj.attributes || [];
+//                    for (var i = 0, len = attributes.length; i < len; i++) {
+//                        var attr = attributes[i];
+//                        node.setAttribute(attr[0], attr[1]);
+//                    }
+//                    break;
+//                case 3: //TEXT_NODE
+//                    node = document.createTextNode(obj.nodeValue);
+//                    break;
+//                case 8: //COMMENT_NODE
+//                    node = document.createComment(obj.nodeValue);
+//                    break;
+//                case 9: //DOCUMENT_NODE
+//                    node = document.implementation.createDocument();
+//                    break;
+//                case 10: //DOCUMENT_TYPE_NODE
+//                    node = document.implementation.createDocumentType(obj.nodeName);
+//                    break;
+//                case 11: //DOCUMENT_FRAGMENT_NODE
+//                    node = document.createDocumentFragment();
+//                    break;
+//                default:
+//                    return node;
+//            }
+//            if (nodeType == 1 || nodeType == 11) {
+//                var childNodes = obj.childNodes || [];
+//                for (i = 0, len = childNodes.length; i < len; i++) {
+//                    node.appendChild(toDOM(childNodes[i]));
+//                }
+//            }
+//            return node;
+//        }
+//
+//    function noteCreated(id, options, obj) {
+//        var n = document.getElementById(id.replace('#', ''));
+//        var nJSON = domJSON.toJSON(n);
+////        var nJSON = toJSON(n);
+//        console.log("created: " + JSON.stringify(nJSON));
+//        $.post("/addnote", {
+//            'id': id,
+//            'json': JSON.stringify(nJSON),
+//            'fp': fp
+//        }).done(function (data) {
+//        });
+//        location.reload();
+//    }
+//
+//    function noteUpdated(id) {
+//        console.log(id);
+//        var n = document.getElementById(id.replace('#', ''));
+//        console.log(n.nodeType);
+//        console.log(n);
+////        var nJSON = toJSON(n);
+//        var nJSON = domJSON.toJSON(n);
+//        console.log("updated: " + JSON.stringify(nJSON));
+//        $.post("/updatenote", {
+//            'id': id.replace('#', ''),
+//            'json': JSON.stringify(nJSON),
+//            'fp': fp
+//        }).done(function (data) {
+//        });
+//        $("#refreshable").load(window.location.href + " #refreshable");
+//    }
+//
+//   function noteDeleted(id) {
+//       $.post("/deletenote", {
+//           'id': id.replace('#', ''),
+//           'fp': fp
+//       }).done(function (data) {
+//       });
+//       //$("#refreshable").load(window.location.href + " #refreshable");
+//       location.reload();
+//   }
 
+   function createNote() {
+       $.PostItAll.new({
+//           onCreated: noteCreated,
+//           onChange: noteUpdated,
+//           onRelease: noteUpdated,
+//           onDelete: noteDeleted,
+           attachedTo : {
+               element: '#imagine',
+               position: 'left',
+               arrow: false
+           },
+           features: {
+               savable : true
+           }
+       });
+   }
+
+    // external storage manager
+    var externalManager = {
+        add: function (obj, callback) {
+            var varname = 'PostIt_' + obj.id.toString();
+            var testPrefs = JSON.stringify(obj);
+            $.post("/updatenote", {
+                'id': varname,
+                'json': testPrefs,
+                'fp': fp
+            }).done(function (data) {
+            });
+//            $localStorage.setItem(varname, testPrefs);
+            //console.log('Saved', varname, testPrefs);
+            if(callback != null) callback("");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        },
+        get: function (id, callback) {
+            var varname = 'PostIt_' + id.toString();
+            var varvalue = null;
+
+            $.post("/getnote", {
+                'id': varname
+            }).done(function (data) {
+                if (data !== "") {
+                    varvalue = data;
+                }
+            });
+            if(varvalue != null)
+                varvalue = JSON.parse(varvalue);
+            else
+                varvalue = "";
+            //console.log('Loaded', varname, varvalue);
+            if(callback != null) callback(varvalue);
+        },
+        remove: function (id, callback) {
+            $.post("/deletenote", {
+                'id': 'PostIt_' + id,
+                'fp': fp
+            }).done(function (data) {
+            });
+            if (callback != null) callback();
+        },
+        removeDom: function (options, callback) {
+            this.clear(callback);
+        },
+        clear: function (callback) {
+//            $localStorage.clear();
+            console.log("trying to clear");
+            if(callback != null) callback();
+        },
+        getlength: function (callback) {
+            // pull all down and stuff into local storage
+            console.log("getlenth called");
+            callback(localStorage.length);
+        },
+        key: function (i, callback) {
+            console.log("key called");
+            i--;
+            var name = localStorage.key(i);
+            callback(name);
+        },
+        view: function () {
+            console.log('view local');
+            console.log(localStorage);
+        },
+        getAll: function (callback) {
+            console.log('TODO getAll on localStorage');
+        }
+    };
 
     </script>
 
@@ -937,7 +1155,7 @@
             <label for="height">Max Width (in pixels):</label>
             <input type="text" name="width" id="width" value="auto" size="3"
                    class="text ui-widget-content ui-corner-all">
-            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <!-- Allow form submission with keyboard without duplicating the dialog buton -->
             <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
         </fieldset>
     </form>
@@ -1015,6 +1233,7 @@
     <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
     <button id="xdyButton" class="button" onclick="rollXdY()">XdY</button>
+    <button id="newNoteButton" class="button" onclick="createNote()">Add note</button>
     <button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>
 </div>
 <div id="customButtons" class="buttons">
@@ -1315,6 +1534,9 @@
         </div>
         {{end}}
         {{else}}
+        {{if .IsNote}}
+        <div id="{{.KeyStr}}" class="note" style="display: none">{{.ResultStr}}</div>
+        {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
             {{if .IsCustomItem}}
@@ -1336,6 +1558,7 @@
         {{end}}
         {{end}}
         {{end}}
+        {{end}}
     </div>
 </div>
 
@@ -1344,6 +1567,19 @@
     for (var i = 0; i < newOnes.length; i++) {
         var rect = newOnes[i].getBoundingClientRect();
     }
+
+//    // do note stuff
+//    var allTheNotes = document.getElementsByClassName('note');
+//    var section = document.getElementById('the_notes');
+//    console.log(section);
+//    for (var i = 0; i < allTheNotes.length; i++) {
+//        console.log(allTheNotes[i].innerHTML);
+//        var DOMDocumentFragment = domJSON.toDOM(allTheNotes[i].innerHTML);
+////        allTheNotes[i].parentNode.replaceChild(allTheNotes[i], DOMDocumentFragment);
+//        // should this actually append to the_notes div?
+//        allTheNotes[i].parentNode.replaceChild(allTheNotes[i], DOMDocumentFragment);
+//        section.appendChild(allTheNotes[i], DOMDocumentFragment);
+//    }
 </script>
 
 <div class="footer">
@@ -1357,7 +1593,24 @@
         <b>NOTE: The site tends to work poorly in private browsing modes.</b>
     </div>
 </div>
+<!--<div id="the_notes"></div>-->
 
 </body>
+
+<!--<script>-->
+    <!--// do note stuff-->
+    <!--var allTheNotes = document.getElementsByClassName('note');-->
+    <!--var section = document.getElementById('the_notes');-->
+    <!--console.log(section);-->
+    <!--for (var i = 0; i < allTheNotes.length; i++) {-->
+        <!--console.log($(allTheNotes[i]).text());-->
+        <!--var DOMDocumentFragment = domJSON.toDOM($(allTheNotes[i]).text());-->
+<!--//        var DOMDocumentFragment = domJSON.toDOM(allTheNotes[i].innerHTML);-->
+<!--//        allTheNotes[i].parentNode.replaceChild(allTheNotes[i], DOMDocumentFragment);-->
+        <!--// should this actually append to the_notes div?-->
+        <!--allTheNotes[i].parentNode.replaceChild(allTheNotes[i], DOMDocumentFragment);-->
+        <!--section.appendChild(allTheNotes[i], DOMDocumentFragment);-->
+    <!--}-->
+<!--</script>-->
 
 </html>
