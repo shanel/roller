@@ -1271,9 +1271,9 @@ func getNotes(w http.ResponseWriter, r *http.Request) {
 	}
 	out := ""
 	for k, v := range outMap {
-		out += fmt.Sprintf("'%v': %v,", k, v)
+		out += fmt.Sprintf("\"%v\": %v,", k, v)
 	}
-	w.Write([]byte(fmt.Sprintf("{%v}", out)))
+	w.Write([]byte(fmt.Sprintf("{%v}", strings.TrimSuffix(out, ","))))
 
 	//_, err = datastore.Put(c, k, &d)
 	//if err != nil {

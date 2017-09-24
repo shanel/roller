@@ -522,13 +522,12 @@
             $.post("/getnotes", {
             }).done(function (data) {
                 var c = data;
-                console.log(c);
                 if (c !== "") {
                     localStorage.clear();
                     var p = JSON.parse(c);
                     for (var key in p) {
                         if (p.hasOwnProperty(key)) {
-                            localStorage.setItem(key, p[key]);
+                            localStorage.setItem(key, JSON.stringify(p[key]));
                         }
                     }
                 }
@@ -824,11 +823,9 @@
         },
         getlength: function (callback) {
             // pull all down and stuff into local storage
-            console.log("getlenth called");
             callback(localStorage.length);
         },
         key: function (i, callback) {
-            console.log("key called");
             i--;
             var name = localStorage.key(i);
             callback(name);
@@ -1568,6 +1565,7 @@
         var rect = newOnes[i].getBoundingClientRect();
     }
 
+    $.PostItAll.load();
 //    // do note stuff
 //    var allTheNotes = document.getElementsByClassName('note');
 //    var section = document.getElementById('the_notes');
