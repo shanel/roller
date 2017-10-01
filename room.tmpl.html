@@ -549,9 +549,11 @@
 
         interact('.tap-target')
             .on('doubletap', function (event) {
-                event.currentTarget.classList.toggle('selected');
-                rerollMarked();
-                $("#refreshable").load(window.location.href + " #refreshable");
+                if (!event.shiftKey) {
+                    event.currentTarget.classList.toggle('selected');
+                    rerollMarked();
+                    $("#refreshable").load(window.location.href + " #refreshable");
+                }
             })
             .on('hold', function (event) {
                 event.currentTarget.classList.toggle('stack');
