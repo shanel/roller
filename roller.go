@@ -251,6 +251,7 @@ type Passer struct {
 	CustomSets        []PassedCustomSet
 	Modifier          int
 	ModifiedRollTotal int
+	TokenCount        int
 }
 
 func noSpaces(str string) string {
@@ -1484,6 +1485,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		roomCount       int
 		roomAvg         float64
 		newestTimestamp int64
+		tokenCount      int
 	)
 	for i, d := range diceForTotals {
 		if i == 0 {
@@ -1496,6 +1498,9 @@ func room(w http.ResponseWriter, r *http.Request) {
 				rollTotal += d.Result
 				rollCount++
 			}
+		}
+		if d.ResultStr == "token" {
+			tokenCount++
 		}
 	}
 
@@ -1544,6 +1549,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		CustomSets:        []PassedCustomSet{},
 		Modifier:          rm.Modifier,
 		ModifiedRollTotal: rollTotal + rm.Modifier,
+		TokenCount:        tokenCount,
 	}
 	rcs, err := rm.GetCustomSets()
 	if err != nil {
