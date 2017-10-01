@@ -386,6 +386,86 @@
             }
         }
 
+        function create4Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c4',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function create6Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c6',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function create8Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c8',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function createTClock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'ct',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
         function fixedEncodeURIComponent(str) {
             return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
                 return '%' + c.charCodeAt(0).toString(16);
@@ -817,6 +897,10 @@
         border: 2px solid black;
     }
 
+    .hidden {
+        border: 5px solid purple;
+    }
+
     img.hidden {
         border: 5px solid purple;
     }
@@ -861,6 +945,15 @@
 
         /*-webkit-transform: translate(0px, 0px);*/
         /*transform: translate(0px, 0px);*/
+    }
+
+    .clock {
+        margin: 1%;
+        background-color: white;
+        color: black;
+        text-align: center;
+        border-radius: 0.75em;
+        width: 205px;
     }
 
 </style>
@@ -1027,6 +1120,13 @@
         from {{.Name}}
     </button>
     {{end}}
+</div>
+<div class="buttons">
+    <span id="clocksLabel">Clocks:</span>
+    <button id="4ClockButton" class="button button3" onclick="create4Clock()">4</button>
+    <button id="6ClockButton" class="button button3" onclick="create6Clock()">6</button>
+    <button id="8ClockButton" class="button button3" onclick="create8Clock()">8</button>
+    <button id="threatClockButton" class="button button3" onclick="createTClock()">Threat</button>
 </div>
 <div class="buttons">
     <span id="safetyLabel">Safety Tools:</span>
@@ -1285,6 +1385,17 @@
             <h3>{{.ResultStr}}</h3></p>
         </div>
         {{end}}
+        {{else if .IsClock}}
+        {{if .IsHidden}}
+        <div id="{{.KeyStr}}" class="hidden draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"
+             style="transform: translate({{.X}}px, {{.Y}}px);">
+        {{else}}
+        <div id="{{.KeyStr}}" class="draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"
+             style="transform: translate({{.X}}px, {{.Y}}px);">
+        {{end}}
+            <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+            <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
+        </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
@@ -1319,6 +1430,17 @@
             <h3>{{.ResultStr}}</h3></p>
         </div>
         {{end}}
+        {{else if .IsClock}}
+            {{if .IsHidden}}
+            <div id="{{.KeyStr}}" class="hidden draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"
+                 style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+            {{else}}
+            <div id="{{.KeyStr}}" class="draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"
+                 style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+            {{end}}
+            <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+            <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
+        </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">

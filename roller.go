@@ -225,6 +225,7 @@ type Die struct {
 	IsHidden      bool
 	IsFunky       bool
 	IsImage       bool
+	IsClock       bool
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -666,9 +667,17 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	var totalCount int
 	var total int
 	ts := time.Now().Unix()
+	unusual := map[string]bool{
+		"label": true,
+		"card":  true,
+		"c4":    true,
+		"c6":    true,
+		"c8":    true,
+		"ct":    true,
+	}
 	for size, v := range sizes {
 		var oldSize string
-		if size != "label" && size != "card" {
+		if _, ok := unusual[size]; !ok {
 			if size == "6p" {
 				oldSize = "6p"
 				size = "6"
@@ -739,6 +748,45 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				dice = append(dice, &d)
 				keys = append(keys, dk)
 			}
+		}
+	}
+
+	// Do clocks
+	clocks := []string{
+		"c4",
+		"c6",
+		"c8",
+		"ct",
+	}
+	for _, size := range clocks {
+		if sizes[size] != "" {
+			var p string
+			lk := dieKey(c, roomKey, int64(len(dice)))
+			d := fmt.Sprintf("clocks/%s-0.png", size)
+			if u, ok := diceURLs[d]; ok {
+				p = u
+			} else {
+				bucket, err := file.DefaultBucketName(c)
+				if err != nil {
+					log.Printf("failed to get default GCS bucket name: %v", err)
+					continue
+				}
+				p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+				diceURLs[d] = p
+			}
+			l := Die{
+				Size:      size,
+				Result:    0,
+				ResultStr: sizes[size],
+				Image:     p,
+				Key:       lk,
+				KeyStr:    lk.Encode(),
+				Timestamp: ts,
+				New:       true,
+				IsClock:   true,
+			}
+			dice = append(dice, &l)
+			keys = append(keys, lk)
 		}
 	}
 
@@ -939,7 +987,7 @@ func revealDieHelper(c context.Context, encodedDieKey string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsCard || d.IsCustomItem {
+	if d.IsCard || d.IsCustomItem || d.IsClock {
 		d.IsHidden = false
 		d.HiddenBy = ""
 		_, err = datastore.Put(c, k, &d)
@@ -962,7 +1010,7 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsCard || d.IsCustomItem {
+	if d.IsCard || d.IsCustomItem || d.IsClock {
 		d.IsHidden = true
 		d.HiddenBy = hiddenBy
 		_, err = datastore.Put(c, k, &d)
@@ -1013,6 +1061,16 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		d.Image = dice[0].Image
 		// Delete the old die.
 		deleteDieHelper(c, keys[0].Encode())
+	} else if d.IsClock {
+		sep := map[string]int{
+			"c4": 5,
+			"c6": 7,
+			"c8": 9,
+			"ct": 7,
+		}
+		oldResult := d.Result
+		d.Result = (d.Result + 1) % sep[d.Size]
+		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
 	} else {
 		oldResultStr := fateReplace(d.ResultStr)
 		d.Result, d.ResultStr = getNewResult(d.Size)
@@ -1277,6 +1335,10 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
 		"xdy":    r.FormValue("xdy"),
+		"c4":     r.FormValue("c4"),
+		"c6":     r.FormValue("c6"),
+		"c8":     r.FormValue("c8"),
+		"ct":     r.FormValue("ct"),
 	}
 	fp := r.FormValue("fp")
 	col := r.FormValue("color")
