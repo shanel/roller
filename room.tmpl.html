@@ -827,6 +827,12 @@
         text-align: center;
     }
 
+    .button4 {
+        background-color: green;
+        color: white;
+        text-align: center;
+    }
+
     /* Tooltip container */
     .tooltip {
         position: relative;
@@ -950,12 +956,17 @@
     }
 
     .clock {
-        margin: 1%;
+        /*margin: 1%;*/
         background-color: white;
         color: black;
         text-align: center;
         border-radius: 0.75em;
+        border: 2px solid black;
         width: 205px;
+    }
+
+    .clock.hidden {
+        border: 5px solid purple;
     }
 
 </style>
@@ -1106,7 +1117,7 @@
     <button id="deleteButton" class="button" onclick="deleteMarked()">Delete selected</button>
     <button id="revealButton" class="button" onclick="revealMarked()">Reveal selected</button>
     <button id="hideButton" class="button" onclick="hideMarked()">Hide selected</button>
-    <button id="rerollButton" class="button" onclick="rerollMarked()">Reroll selected</button>
+    <button id="rerollButton" class="button button4" onclick="rerollMarked()">Reroll selected</button>
     <button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>
     <button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>
     <button id="xdyButton" class="button" onclick="rollXdY()">XdY</button>
@@ -1401,6 +1412,7 @@
              style="transform: translate({{.X}}px, {{.Y}}px);">
         {{end}}
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+            <hr>
             <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
         </div>
         {{else}}
@@ -1446,6 +1458,7 @@
                  style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
             {{end}}
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
+                <hr>
             <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
         </div>
         {{else}}
@@ -1478,6 +1491,7 @@
     for (var i = 0; i < newOnes.length; i++) {
         var rect = newOnes[i].getBoundingClientRect();
     }
+
 </script>
 
 <div class="footer">
