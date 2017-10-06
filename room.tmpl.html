@@ -253,6 +253,26 @@
             $("#refreshable").load(window.location.href + " #refreshable");
         }
 
+        function decrementMarkedClock() {
+            var toDecrement = document.getElementsByClassName("decrement");
+            for (var i = 0; i < toDecrement.length; i++) {
+                if (!toDecrement[i].classList.contains("clock")) {
+                    continue
+                }
+                $.post("/decrementclock", {
+                    id: toDecrement[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toDecrement.length > 0) {
+                $("#customButtons").load(window.location.href + " #customButtons");
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
         function clearAllDice() {
             var clear = confirm("Clear all dice from room?");
             if (clear === true) {
@@ -556,7 +576,13 @@
                 }
             })
             .on('hold', function (event) {
-                event.currentTarget.classList.toggle('stack');
+                if (event.currentTarget.classList.contains("clock")) {
+                    event.currentTarget.classList.toggle('decrement');
+                    decrementMarkedClock();
+                    $("#refreshable").load(window.location.href + " #refreshable");
+                } else {
+                    event.currentTarget.classList.toggle('stack');
+                }
             })
             .on('tap', function (event) {
                 event.currentTarget.classList.toggle('selected');

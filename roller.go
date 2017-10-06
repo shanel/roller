@@ -1094,6 +1094,35 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	return nil
 }
 
+func decrementClock(c context.Context, encodedDieKey, room string) error {
+	k, err := datastore.DecodeKey(encodedDieKey)
+	if err != nil {
+		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
+	}
+	var d Die
+	if err = datastore.Get(c, k, &d); err != nil {
+		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	sep := map[string]int{
+		"c4": 5,
+		"c6": 7,
+		"c8": 9,
+		"ct": 7,
+	}
+	oldResult := d.Result
+	d.Result = (d.Result - 1) % sep[d.Size]
+	d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
+	_, err = datastore.Put(c, k, &d)
+	if err != nil {
+		return fmt.Errorf("problem decrementing clock %v: %v", encodedDieKey, err)
+	}
+	// Fake updater so Safari will work?
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	return nil
+}
+
 func getNewResult(kind string) (int, string) {
 	var s int
 	var err error
@@ -1125,6 +1154,7 @@ func init() {
 	http.HandleFunc("/background", background)
 	http.HandleFunc("/clear", clear)
 	http.HandleFunc("/delete", deleteDie)
+	http.HandleFunc("/decrementclock", handleDecrementClock)
 	http.HandleFunc("/draw", draw)
 	http.HandleFunc("/hide", hideDie)
 	http.HandleFunc("/image", addImage)
@@ -1421,6 +1451,20 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "reroll"
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	r.ParseForm()
+	keyStr := r.Form.Get("id")
+	room := path.Base(r.Referer())
+	err := decrementClock(c, keyStr, room)
+	if err != nil {
+		log.Printf("error in decrementClock: %v", err)
+		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	}
+	lastAction[room] = "decrementClock"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
