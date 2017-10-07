@@ -1109,6 +1109,9 @@ func decrementClock(c context.Context, encodedDieKey, room string) error {
 		"c8": 9,
 		"ct": 7,
 	}
+	if d.Result == 0 { // No need to wrap around.
+		return nil
+	}
 	oldResult := d.Result
 	d.Result = (d.Result - 1) % sep[d.Size]
 	d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
