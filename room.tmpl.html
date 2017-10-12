@@ -1539,13 +1539,8 @@
         </div>
         {{end}}
         {{else if .IsClock}}
-        {{if .IsHidden}}
-        <div id="{{.KeyStr}}" class="hidden draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"
+        <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);">
-        {{else}}
-        <div id="{{.KeyStr}}" class="draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"
-             style="transform: translate({{.X}}px, {{.Y}}px);">
-        {{end}}
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
             <hr>
             <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
@@ -1554,17 +1549,9 @@
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
-            {{if .IsHidden}}
-            <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{else}}
-            <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{end}}
+            <img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else if .IsCard}}
-            {{if .IsHidden}}
-            <img class="hidden card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{else}}
-            <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{end}}
+            <img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             {{if (eq .Image "")}}
             {{noescape .SVGBytes}}
@@ -1589,13 +1576,8 @@
         </div>
         {{end}}
         {{else if .IsClock}}
-            {{if .IsHidden}}
-            <div id="{{.KeyStr}}" class="hidden draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"
+            <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"
                  style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-            {{else}}
-            <div id="{{.KeyStr}}" class="draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"
-                 style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
-            {{end}}
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
                 <hr>
             <img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">
@@ -1604,17 +1586,9 @@
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
-            {{if .IsHidden}}
-            <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{else}}
-            <img class="{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{end}}
+            <img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else if .IsCard}}
-            {{if .IsHidden}}
-            <img class="hidden card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{else}}
-            <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
-            {{end}}
+            <img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             {{if (eq .Image "")}}
             {{noescape .SVGBytes}}
