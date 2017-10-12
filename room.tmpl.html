@@ -16,6 +16,7 @@
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>-->
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
     <!--<script src="/js/jquery.postitall.js"></script>-->
+    <link href="https://fonts.googleapis.com/css?family=Ubuntu+Condensed" rel="stylesheet">
 
     <script type="text/javascript" language="javascript">
 
@@ -189,6 +190,7 @@
             });
             $("#rollem").submit();
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function deleteMarked() {
@@ -202,8 +204,10 @@
             }
             if (toDelete.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function hideMarked() {
@@ -217,8 +221,10 @@
             }
             if (toHide.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function revealMarked() {
@@ -232,8 +238,10 @@
             }
             if (toReveal.length > 0) {
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function rerollMarked() {
@@ -248,9 +256,11 @@
             if (toReroll.length > 0) {
                 $("#customButtons").load(window.location.href + " #customButtons");
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
             $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function decrementMarkedClock() {
@@ -268,9 +278,11 @@
             if (toDecrement.length > 0) {
                 $("#customButtons").load(window.location.href + " #customButtons");
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
             $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         function clearAllDice() {
@@ -292,6 +304,7 @@
             }).done(function (data) {
             });
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
 
         {{range .CustomSets}}
@@ -319,6 +332,7 @@
         }).done(function (data) {});
             $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
+//            generateSVGs();
         }
         {{end}}
 
@@ -335,6 +349,7 @@
                 }).done(function (data) {
                 });
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -351,6 +366,7 @@
                 }).done(function (data) {
                 });
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -367,6 +383,7 @@
                 }).done(function (data) {
                 });
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -383,6 +400,7 @@
                 }).done(function (data) {
                 });
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -403,6 +421,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -423,6 +442,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -443,6 +463,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -463,6 +484,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -483,6 +505,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             }
         }
 
@@ -545,6 +568,75 @@
             location.reload();
         }
 
+//        function generateSVGs() {
+//            var layered = ["3", "6p", "F", "token"];
+//            // find the dice and replace the img with the correctly configured svg
+//            var allTheDice = $(".imagine").children();  // should we use children() ?
+//            for (var i = 0; i < allTheDice.length; i++) {
+//                var item = allTheDice[i];
+////        console.log(item);
+//                // skip stuff
+//                if (item.getAttribute("die-result") === "image") {
+//                    continue;
+//                }
+//                if (item.getAttribute("die-version") === "0") {
+//                    continue;
+//                }
+//                if (item.getAttribute("die-custom") === "true") {
+//                    continue;
+//                }
+//                if (item.getAttribute("svg-path") === "") {
+//                    continue;
+//                }
+//                var itemContents = item.childNodes;
+//                console.log(itemContents);
+//                if (itemContents.length === 3) {
+//                    console.log(itemContents[1]);
+//                    try {
+//                        var classy = itemContents[1].getAttribute("class");
+//                    }
+//                    catch(err) {
+//                        continue
+//                    }
+//                    if (classy !== "die") {
+//                        continue;
+//                    }
+//                    console.log(item);
+//                    // set innerHTML to the constructed svg
+////            $.get(item.getAttribute("svg-path"), function(data) {
+////                console.log(item);
+//                    // nuke image
+//                    item.innerHTML = "";
+//                    item.classList.add("die");
+//                    $("#" + item.id).load(item.getAttribute("svg-path"));
+////                $("svg", data).prependTo(item);
+////                console.log(item);
+//
+//                    var clr = item.getAttribute("die-color");
+////                svg.find(".stroke").css("stroke", "#000");
+//                    $("#" + item.id).find(".stroke").css("fill", "#000");
+//                    $("#" + item.id).find(".fill").css("fill", clr);
+//                    console.log(item.id);
+//                    var size = item.getAttribute("die-size");
+//                    if (layered.indexOf(size) >= -1) {
+//                        $("#" + item.id).find(".opt-" + item.getAttribute("die-result")).css("visibility", "visible");
+//                    } else {
+//                        $("#" + item.id).find(".value").html(item.getAttribute("die-result"));
+//                    }
+//                    $("#" + item.id).find(".value").css("fill", "#000");
+//
+//                    if("#" + item.getAttribute("die-result") === "token") {
+//                        if("#" + item.getAttribute("die-flipped") === "true") {
+//                            $("#" + item.id).find(".opt").css("visibility", "visible");
+//                        } else {
+//                            $("#" + item.id).find(".opt").css("visibility", "hidden");
+//                        }
+//                    }
+////            }, 'xml');
+//                }
+//            }
+//        }
+
 
         interact('.label-tap-target')
             .on('doubletap', function (event) {
@@ -565,6 +657,7 @@
                 $(document.body).append(newForm);
                 newForm.submit();
                 $("#refreshable").load(window.location.href + " #refreshable");
+//                generateSVGs();
             });
 
         interact('.tap-target')
@@ -573,6 +666,7 @@
                     event.currentTarget.classList.toggle('selected');
                     rerollMarked();
                     $("#refreshable").load(window.location.href + " #refreshable");
+//                    generateSVGs();
                 }
             })
             .on('hold', function (event) {
@@ -580,6 +674,7 @@
                     event.currentTarget.classList.toggle('decrement');
                     decrementMarkedClock();
                     $("#refreshable").load(window.location.href + " #refreshable");
+//                    generateSVGs();
                 } else {
                     event.currentTarget.classList.toggle('stack');
                 }
@@ -607,11 +702,13 @@
                         if (sessionStorage.lastUpdateId) {
                             if (b !== sessionStorage.lastUpdateId) {
                                 $("#refreshable").load(window.location.href + " #refreshable");
+//                                generateSVGs();
                                 sessionStorage.lastUpdateId = b;
                                 lastRealUpdate = unix;
                             }
                         } else {
                             $("#refreshable").load(window.location.href + " #refreshable");
+//                            generateSVGs();
                             sessionStorage.lastUpdateId = b;
                             lastRealUpdate = unix;
                         }
@@ -994,6 +1091,17 @@
 
     .clock.hidden {
         border: 5px solid purple;
+    }
+
+    svg {
+        display: inline-block;
+        height: 65px;
+        width: 65px;
+    }
+    .die {
+        display: inline-block;
+        height: 65px;
+        width: 65px;
     }
 
 </style>
@@ -1420,7 +1528,7 @@
         {{if .IsLabel}}
         {{if .IsFunky}}
         <div id="{{.KeyStr}}" class="draggable tap-target new funky" data-x="{{.X}}" data-y="{{.Y}}"
-             style="transform: translate({{.X}}px, {{.Y}}px);">
+             style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
         </div>
         {{else if .IsLabel}}
@@ -1444,7 +1552,7 @@
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-             style="transform: translate({{.X}}px, {{.Y}}px);">
+             style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
             {{if .IsHidden}}
             <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
@@ -1458,7 +1566,11 @@
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{end}}
             {{else}}
-            <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{if (eq .Image "")}}
+            {{noescape .SVGBytes}}
+            {{else}}
+            <img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{end}}
         </div>
         {{end}}
@@ -1466,7 +1578,7 @@
         {{if .IsLabel}}
         {{if .IsFunky}}
         <div id="{{.KeyStr}}" class="draggable tap-target funky" data-x="{{.X}}" data-y="{{.Y}}"
-             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
         </div>
         {{else}}
@@ -1490,7 +1602,7 @@
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
             {{if .IsHidden}}
             <img class="hidden {{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
@@ -1504,7 +1616,11 @@
             <img class="card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{end}}
             {{else}}
-            <img src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{if (eq .Image "")}}
+            {{noescape .SVGBytes}}
+            {{else}}
+            <img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{end}}
         </div>
         {{end}}
@@ -1518,6 +1634,66 @@
     for (var i = 0; i < newOnes.length; i++) {
         var rect = newOnes[i].getBoundingClientRect();
     }
+
+//    var layered = ["3", "6p", "F", "token"];
+//    // find the dice and replace the img with the correctly configured svg
+//    var allTheDice = $(".imagine").children();  // should we use children() ?
+//    for (var i = 0; i < allTheDice.length; i++) {
+//        var item = allTheDice[i];
+////        console.log(item);
+//        // skip stuff
+//        if (item.getAttribute("die-result") === "image") {
+//            continue;
+//        }
+//        if (item.getAttribute("die-version") === "0") {
+//            continue;
+//        }
+//        if (item.getAttribute("die-custom") === "true") {
+//            continue;
+//        }
+//        if (item.getAttribute("svg-path") === "") {
+//            continue;
+//        }
+//        var itemContents = item.childNodes;
+//        console.log(itemContents);
+//        if (itemContents.length === 3) {
+//            if (itemContents[1].getAttribute("class") !== "die") {
+//                continue;
+//            }
+//                console.log(item);
+//            // set innerHTML to the constructed svg
+////            $.get(item.getAttribute("svg-path"), function(data) {
+////                console.log(item);
+//                // nuke image
+//                item.innerHTML = "";
+//                item.classList.add("die");
+//            $("#" + item.id).load(item.getAttribute("svg-path"));
+////                $("svg", data).prependTo(item);
+////                console.log(item);
+//
+//                var clr = item.getAttribute("die-color");
+////                svg.find(".stroke").css("stroke", "#000");
+//                $("#" + item.id).find(".stroke").css("fill", "#000");
+//                $("#" + item.id).find(".fill").css("fill", clr);
+//                console.log(item.id);
+//                var size = item.getAttribute("die-size");
+//                if (layered.indexOf(size) >= -1) {
+//                    $("#" + item.id).find(".opt-" + item.getAttribute("die-result")).css("visibility", "visible");
+//                } else {
+//                    $("#" + item.id).find(".value").html(item.getAttribute("die-result"));
+//                }
+//                $("#" + item.id).find(".value").css("fill", "#000");
+//
+//                if("#" + item.getAttribute("die-result") === "token") {
+//                        if("#" + item.getAttribute("die-flipped") === "true") {
+//                            $("#" + item.id).find(".opt").css("visibility", "visible");
+//                        } else {
+//                            $("#" + item.id).find(".opt").css("visibility", "hidden");
+//                        }
+//                }
+////            }, 'xml');
+//        }
+//    }
 
 </script>
 

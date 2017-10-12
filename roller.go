@@ -21,16 +21,20 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	//"cloud.google.com/go/storage"
 	"github.com/adamclerk/deck"
+	"github.com/beevik/etree"
 	"github.com/dustinkirkland/golang-petname"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/file"
+	"google.golang.org/appengine/urlfetch"
+	//"google.golang.org/appengine/log"
 	"html/template"
 	"io/ioutil"
 	"log"
-	"math"
+	//"math"
 	"math/rand"
 	"net/http"
 	"path"
@@ -40,6 +44,10 @@ import (
 	"unicode"
 	// Maybe use this later?
 	//"appengine/user"
+	//"golang.org/x/tools/go/gcimporter15/testdata"
+	//"regexp"
+	//"bytes"
+	//"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 var (
@@ -55,8 +63,9 @@ var (
 		"A♦": "ace_of_diamonds.png", "2♦": "2_of_diamonds.png", "3♦": "3_of_diamonds.png", "4♦": "4_of_diamonds.png", "5♦": "5_of_diamonds.png", "6♦": "6_of_diamonds.png", "7♦": "7_of_diamonds.png", "8♦": "8_of_diamonds.png", "9♦": "9_of_diamonds.png", "T♦": "10_of_diamonds.png", "J♦": "jack_of_diamonds.png", "Q♦": "queen_of_diamonds.png", "K♦": "king_of_diamonds.png",
 		"A♥": "ace_of_hearts.png", "2♥": "2_of_hearts.png", "3♥": "3_of_hearts.png", "4♥": "4_of_hearts.png", "5♥": "5_of_hearts.png", "6♥": "6_of_hearts.png", "7♥": "7_of_hearts.png", "8♥": "8_of_hearts.png", "9♥": "9_of_hearts.png", "T♥": "10_of_hearts.png", "J♥": "jack_of_hearts.png", "Q♥": "queen_of_hearts.png", "K♥": "king_of_hearts.png",
 		"A♠": "ace_of_spades.png", "2♠": "2_of_spades.png", "3♠": "3_of_spades.png", "4♠": "4_of_spades.png", "5♠": "5_of_spades.png", "6♠": "6_of_spades.png", "7♠": "7_of_spades.png", "8♠": "8_of_spades.png", "9♠": "9_of_spades.png", "T♠": "10_of_spades.png", "J♠": "jack_of_spades.png", "Q♠": "queen_of_spades.png", "K♠": "king_of_spades.png"}
-	faceMap = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "T": 9, "J": 10, "Q": 11, "K": 12}
-	suitMap = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
+	faceMap      = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "T": 9, "J": 10, "Q": 11, "K": 12}
+	suitMap      = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
+	previousSVGs = map[string][]byte{}
 )
 
 type Update struct {
@@ -180,6 +189,7 @@ func newCustomSetFromURL(u string) (CustomSet, error) {
 	}
 	return cs, nil
 }
+
 func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet, error) {
 	// Get rid of random space at front or end
 	u = strings.TrimSpace(u)
@@ -201,6 +211,110 @@ func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet,
 		cs.Instance[si] = p
 	}
 	return cs, nil
+}
+
+func createSVG(c context.Context, die, result, color string) ([]byte, error) {
+	key := fmt.Sprintf("%s-%s-%s", die, result, color)
+	if found, ok := previousSVGs[key]; ok {
+		return found, nil
+	}
+	//fileName := fmt.Sprintf("%s.svg", die)
+	bucket, err := file.DefaultBucketName(c)
+	if err != nil {
+		log.Printf("failed to get default GCS bucket name: %v", err)
+		return nil, err
+	}
+	p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s.svg", bucket, die)
+	client := urlfetch.Client(c)
+	res, err := client.Get(p)
+	if err != nil {
+		log.Printf("could not get svg: %v", err)
+		return nil, err
+	}
+	defer res.Body.Close()
+	slurp, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("issue reading svg: %v", err)
+		return nil, err
+	}
+	//client, err := storage.NewClient(c)
+	//if err != nil {
+	//	log.Printf("failed to create client: %v", err)
+	//	return "", err
+	//}
+	//defer client.Close()
+	//bucketHandle := client.Bucket(bucket)
+	//rc, err := bucketHandle.Object(fileName).NewReader(c)
+	//if err != nil {
+	//	log.Printf("readFile: unable to open file from bucket %q, file %q: %v", bucket, fileName, err)
+	//	return "", err
+	//}
+	//defer rc.Close()
+	//slurp, err := ioutil.ReadAll(rc)
+	//if err != nil {
+	//	log.Printf("readFile: unable to read data from bucket %q, file %q: %v", bucket, fileName, err)
+	//	return "", err
+	//}
+
+	//	p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	colors := map[string]string{
+		"clear":  "rgb(173, 216, 230)",
+		"green":  "rgb(0, 204, 0)",
+		"red":    "rgb(255, 0, 0)",
+		"blue":   "rgb(0, 153, 255)",
+		"orange": "rgb(255, 153, 0)",
+		"purple": "rgb(153, 0, 255)",
+		"violet": "rgb(153, 0, 255)",
+		"gold":   "rgb(255, 255, 77)",
+	}
+	clr, ok := colors[color]
+	if !ok {
+		clr = colors["clear"]
+	}
+	doc := etree.NewDocument()
+	// This needs to instead pull from the bucket and we also need to stuff already made ones in a map
+	// so we don't have to *always* be pulling.
+	if err := doc.ReadFromBytes(slurp); err != nil {
+		log.Printf("read failed: %v", err)
+		return nil, err
+	}
+	root := doc.SelectElement("svg")
+	opt := fmt.Sprintf("opt opt-%s", result)
+	for _, each := range root.SelectElements("g") {
+		path := each.SelectElement("path")
+		if path != nil {
+			class := path.SelectAttrValue("class", "")
+			if class == "stroke" {
+				path.CreateAttr("style", "fill: rgb(0, 0, 0);")
+			} else if class == "fill" {
+				path.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
+			}
+		}
+		gclass := each.SelectAttrValue("class", "")
+		if gclass == opt {
+			c := each.ChildElements()
+			if len(c) != 0 {
+				c[0].CreateAttr("style", "visibility: visible;")
+			}
+		} else if gclass == "opt" { // token?
+			if result == "1" {
+				each.CreateAttr("style", "visibility: visible;")
+			} else {
+				each.CreateAttr("style", "visibility: hidden;")
+			}
+		}
+		text := each.SelectElement("text")
+		if text != nil {
+			text.SetText(result)
+		}
+	}
+	doc.Indent(2)
+	out, err := doc.WriteToBytes()
+	log.Printf("%s", out)
+	if err == nil {
+		previousSVGs[key] = out
+	}
+	return out, err
 }
 
 type Die struct {
@@ -226,6 +340,13 @@ type Die struct {
 	IsFunky       bool
 	IsImage       bool
 	IsClock       bool
+	Color         string
+	IsFlipped     bool
+	Version       int // Use this to determine whether to use old display logic or new
+	SVGPath       string
+	SVG           template.HTML
+	IsToken       bool
+	SVGBytes      []byte
 }
 
 func (d *Die) updatePosition(x, y float64) {
@@ -596,7 +717,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 		}
 		drawn, err := cs.Draw(count)
 		if err != nil {
-			fmt.Printf("problem with custom draw: %v", err)
+			fmt.Errorf("problem with custom draw: %v", err)
 		}
 		customSets[deckName] = cs
 		for i, card := range drawn {
@@ -647,14 +768,22 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 }
 
 var standardDice = map[string]bool{
-	"4":  true,
-	"6":  true,
-	"6p": true,
-	"8":  true,
-	"10": true,
-	"12": true,
-	"20": true,
-	"F":  true,
+	"3":   true,
+	"4":   true,
+	"5":   true,
+	"6":   true,
+	"6p":  true,
+	"7":   true,
+	"8":   true,
+	"10":  true,
+	"12":  true,
+	"14":  true,
+	"16":  true,
+	"20":  true,
+	"24":  true,
+	"30":  true,
+	"100": true,
+	"F":   true,
 }
 
 func isFunky(d string) bool {
@@ -677,10 +806,10 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		"ct":    true,
 	}
 	for size, v := range sizes {
-		var oldSize string
+		//var oldSize string
 		if _, ok := unusual[size]; !ok {
 			if size == "6p" {
-				oldSize = "6p"
+				//oldSize = "6p"
 				size = "6"
 			}
 			if size == "xdy" {
@@ -706,24 +835,40 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 			for i := 0; i < count; i++ {
 				if size == "tokens" {
 					r = 0
-					rs = "token"
+					rs = "0"
 				} else {
 					r, rs = getNewResult(size)
 				}
 				if size != "F" {
 					total += r
 				}
+
+				// SVG here
+				var svg []byte
+				var err error
+				if !isFunky(size) {
+					if size == "tokens" {
+						svg, err = createSVG(c, "token", rs, color)
+					} else {
+						svg, err = createSVG(c, fmt.Sprintf("d%s", size), rs, color)
+					}
+					if err != nil {
+						log.Printf("svg creating issue: %v", err)
+						continue
+					}
+				}
+
 				var diu string
-				if oldSize == "6p" {
-					diu, err = getDieImageURL(c, oldSize, rs, color)
-				} else if isFunky(size) {
-					diu = ""
-				} else {
-					diu, err = getDieImageURL(c, size, rs, color)
-				}
-				if err != nil {
-					log.Printf("could not get die image: %v", err)
-				}
+				//if oldSize == "6p" {
+				//	diu, err = getDieImageURL(c, oldSize, rs, color)
+				//} else if isFunky(size) {
+				//	diu = ""
+				//} else {
+				//	diu, err = getDieImageURL(c, size, rs, color)
+				//}
+				//if err != nil {
+				//	log.Printf("could not get die image: %v", err)
+				//}
 				dk := dieKey(c, roomKey, int64(i))
 				d := Die{
 					Size:      size,
@@ -734,17 +879,24 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					Timestamp: ts,
 					Image:     diu,
 					New:       true,
+					Color:     color,
+					SVGBytes:  svg,
+				}
+				if color == "clear" {
+					d.Color = "lightblue"
 				}
 				if isFunky(size) {
 					d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, size)
 					d.IsLabel = true
 					d.IsFunky = true
-				}
-				if d.ResultStr == "token" {
-					d.FlippedImage, err = getDieImageURL(c, "0", "token", "white")
+				} else {
+					svgPath, err := getSVGPath(c, rs, size)
 					if err != nil {
-						log.Printf("couldn't find flipped image: %v", err)
+						log.Printf("could not get SVGPath: %v", err)
+						continue
 					}
+					d.SVGPath = svgPath
+					d.Version = 1
 				}
 				dice = append(dice, &d)
 				keys = append(keys, dk)
@@ -874,6 +1026,11 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 	if _, err = q.GetAll(c, &dice); err != nil {
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
 	}
+	for _, d := range dice {
+		//log.Printf("%s", d.SVGBytes)
+		d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
+		//log.Printf("%s", d.SVG)
+	}
 	return dice, nil
 }
 
@@ -934,6 +1091,26 @@ func getDieImageURL(c context.Context, size, result, color string) (string, erro
 	return p, nil
 }
 
+func getSVGPath(c context.Context, result, size string) (string, error) {
+	// Fate dice silliness
+	d := fmt.Sprintf("d%s.svg", size)
+	if size == "0" || result == "token" {
+		d = "token.svg"
+	}
+	// Should this have a mutex?
+	if u, ok := diceURLs[d]; ok {
+		return u, nil
+	}
+	//bucket, err := file.DefaultBucketName(c)
+	//if err != nil {
+	//	return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
+	//}
+	p := fmt.Sprintf("/js/%s", d)
+	//p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
+	diceURLs[d] = p
+	return p, nil
+}
+
 func updateDieLocation(c context.Context, encodedDieKey, fp string, x, y float64) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
@@ -971,7 +1148,7 @@ func deleteDieHelper(c context.Context, encodedDieKey string) error {
 }
 
 func fateReplace(in string) string {
-	ft := map[string]string{"-": "minus", "+": "plus", " ": "zero"}
+	ft := map[string]string{"-": "1", "+": "3", " ": "2"}
 	if r, ok := ft[in]; ok {
 		return r
 	}
@@ -1025,6 +1202,25 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 	return fmt.Errorf("Only cards and custom items can be hidden.")
 }
 
+func getOldColor(u string) string {
+	// https://storage.googleapis.com/dice-roller-174222.appspot.com/die_images/blue-d8/1.png
+	chunk := strings.Split(u, "/")[5]
+	var c string
+	if chunk == "tokens" {
+		c = strings.Split(strings.Split(u, "/")[6], "_")[0]
+		if c == "clear" {
+			return "lightblue"
+		}
+		return c
+	} else {
+		c = strings.Split(chunk, "-")[0]
+		if c == "clear" {
+			return "lightblue"
+		}
+		return c
+	}
+}
+
 func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
@@ -1041,11 +1237,6 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	if d.IsFunky {
 		d.Result, d.ResultStr = getNewResult(d.Size)
 		d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
-		d.Timestamp = time.Now().Unix()
-	} else if d.ResultStr == "token" {
-		old := d.Image
-		d.Image = d.FlippedImage
-		d.FlippedImage = old
 		d.Timestamp = time.Now().Unix()
 	} else if d.IsCustomItem {
 		// Do a single draw.
@@ -1073,10 +1264,50 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		d.Result = (d.Result + 1) % sep[d.Size]
 		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
 	} else {
+		if d.SVGPath == "" {
+			svgPath, err := getSVGPath(c, d.ResultStr, d.Size)
+			if err != nil {
+				log.Printf("could not get SVGPath: %v", err)
+			} else {
+				d.SVGPath = svgPath
+				d.Version = 1
+			}
+		}
 		oldResultStr := fateReplace(d.ResultStr)
-		d.Result, d.ResultStr = getNewResult(d.Size)
+		if d.Color == "" {
+			d.Color = getOldColor(d.Image)
+		}
+		if d.Size == "tokens" {
+			if d.Result == 0 {
+				d.Result = 1
+				d.ResultStr = "1"
+			} else {
+				d.Result = 0
+				d.ResultStr = "0"
+			}
+		} else {
+			d.Result, d.ResultStr = getNewResult(d.Size)
+			log.Printf("result: %v; resultstr: %v", d.Result, d.ResultStr)
+		}
+		// SVG here
+		var svg []byte
+		var err error
+		if !isFunky(d.Size) {
+			if d.Size == "tokens" {
+				svg, err = createSVG(c, "token", d.ResultStr, d.Color)
+			} else {
+				svg, err = createSVG(c, fmt.Sprintf("d%s", d.Size), d.ResultStr, d.Color)
+			}
+			if err != nil {
+				log.Printf("svg creating issue: %v", err)
+			} else {
+				d.SVGBytes = svg
+			}
+		}
 		d.Timestamp = time.Now().Unix()
-		d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
+		if d.Image != "" {
+			d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
+		}
 	}
 	_, err = datastore.Put(c, k, &d)
 	if err != nil {
@@ -1136,13 +1367,14 @@ func getNewResult(kind string) (int, string) {
 		if err != nil {
 			// Assume fate die
 			r := rand.Intn(3)
-			if r == 0 {
-				return math.MaxInt16 - 2, "-"
-			}
-			if r == 1 {
-				return math.MaxInt16, "+"
-			}
-			return math.MaxInt16 - 1, " "
+			//if r == 0 {
+			//	return math.MaxInt16 - 2, "-"
+			//}
+			//if r == 1 {
+			//	return math.MaxInt16, "+"
+			//}
+			//return math.MaxInt16 - 1, " "
+			return r + 1, fmt.Sprintf("%d", r+1)
 		}
 	}
 	r := rand.Intn(s) + 1
@@ -1546,7 +1778,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 				rollCount++
 			}
 		}
-		if d.ResultStr == "token" {
+		if d.Size == "tokens" {
 			tokenCount++
 		}
 	}
@@ -1586,6 +1818,11 @@ func room(w http.ResponseWriter, r *http.Request) {
 			filteredDice = append(filteredDice, tf)
 		}
 	}
+	//for _, d := range filteredDice {
+	//	log.Printf("%s", d.SVGBytes)
+	//	d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
+	//	log.Printf("%s", d.SVG)
+	//}
 	p := Passer{
 		Dice:              filteredDice,
 		RoomTotal:         roomTotal,
@@ -1624,10 +1861,21 @@ func room(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	roomTemplate := template.Must(template.New("room").Parse(string(content[:])))
+	roomTemplate := template.Must(template.New("room").Funcs(template.FuncMap{
+		//"noescape": func(value interface{}) template.HTML {
+		//	return template.HTML(fmt.Sprint(value))
+		//},
+		"noescape": noescape,
+	}).Parse(string(content[:])))
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func noescape(b []byte) template.HTML {
+	//re := regexp.MustCompile("(?m)[\r\n]+^.*utf-8.*$")
+	//str = re.ReplaceAllString(str, "")
+	return template.HTML(fmt.Sprintf("%s", b))
 }
 
 func about(w http.ResponseWriter, _ *http.Request) {
