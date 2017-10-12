@@ -1198,7 +1198,7 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsCard || d.IsCustomItem || d.IsClock {
+	if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
 		d.IsHidden = true
 		d.HiddenBy = hiddenBy
 		_, err = datastore.Put(c, k, &d)
@@ -1876,6 +1876,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		//	return template.HTML(fmt.Sprint(value))
 		//},
 		"noescape": noescape,
+		"hidden":   hidden,
 	}).Parse(string(content[:])))
 	if err := roomTemplate.Execute(w, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1886,6 +1887,13 @@ func noescape(b []byte) template.HTML {
 	//re := regexp.MustCompile("(?m)[\r\n]+^.*utf-8.*$")
 	//str = re.ReplaceAllString(str, "")
 	return template.HTML(fmt.Sprintf("%s", b))
+}
+
+func hidden(h bool) string {
+	if h {
+		return "hidden "
+	}
+	return ""
 }
 
 func about(w http.ResponseWriter, _ *http.Request) {
