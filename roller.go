@@ -21,7 +21,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	//"cloud.google.com/go/storage"
 	"github.com/adamclerk/deck"
 	"github.com/beevik/etree"
 	"github.com/dustinkirkland/golang-petname"
@@ -34,7 +33,6 @@ import (
 	"html/template"
 	"io/ioutil"
 	"log"
-	//"math"
 	"math/rand"
 	"net/http"
 	"path"
@@ -42,13 +40,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	// Maybe use this later?
-	//"appengine/user"
-	//"golang.org/x/tools/go/gcimporter15/testdata"
-	//"regexp"
-	//"bytes"
-	//"golang.org/x/tools/go/gcimporter15/testdata"
-	//"golang.org/x/text"
 )
 
 var (
@@ -219,7 +210,6 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 	if found, ok := previousSVGs[key]; ok {
 		return found, nil
 	}
-	//fileName := fmt.Sprintf("%s.svg", die)
 	bucket, err := file.DefaultBucketName(c)
 	if err != nil {
 		log.Printf("failed to get default GCS bucket name: %v", err)
@@ -238,26 +228,6 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		log.Printf("issue reading svg: %v", err)
 		return nil, err
 	}
-	//client, err := storage.NewClient(c)
-	//if err != nil {
-	//	log.Printf("failed to create client: %v", err)
-	//	return "", err
-	//}
-	//defer client.Close()
-	//bucketHandle := client.Bucket(bucket)
-	//rc, err := bucketHandle.Object(fileName).NewReader(c)
-	//if err != nil {
-	//	log.Printf("readFile: unable to open file from bucket %q, file %q: %v", bucket, fileName, err)
-	//	return "", err
-	//}
-	//defer rc.Close()
-	//slurp, err := ioutil.ReadAll(rc)
-	//if err != nil {
-	//	log.Printf("readFile: unable to read data from bucket %q, file %q: %v", bucket, fileName, err)
-	//	return "", err
-	//}
-
-	//	p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
 	colors := map[string]string{
 		"clear":  "rgb(173, 216, 230)",
 		"green":  "rgb(0, 204, 0)",
@@ -273,19 +243,12 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		clr = colors["clear"]
 	}
 	doc := etree.NewDocument()
-	// This needs to instead pull from the bucket and we also need to stuff already made ones in a map
-	// so we don't have to *always* be pulling.
 	if err := doc.ReadFromBytes(slurp); err != nil {
 		log.Printf("read failed: %v", err)
 		return nil, err
 	}
 	root := doc.SelectElement("svg")
 	opt := fmt.Sprintf("opt opt-%s", result)
-	// polygon
-	//polygon := root.FindElement("//polygon")
-	//if polygon != nil {
-	//	polygon.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
-	//}
 	for _, each := range root.SelectElements("g") {
 		gclass := each.SelectAttrValue("class", "")
 		if gclass == opt {
@@ -303,7 +266,6 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 			}
 		}
 		for _, path := range each.ChildElements() {
-			//path := each.SelectElement("path")
 			if path != nil {
 				class := path.SelectAttrValue("class", "")
 				if class == "stroke" {
@@ -320,7 +282,6 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 	}
 	doc.Indent(2)
 	out, err := doc.WriteToBytes()
-	log.Printf("%s", out)
 	if err == nil {
 		previousSVGs[key] = out
 	}
@@ -816,12 +777,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		"ct":    true,
 	}
 	for size, v := range sizes {
-		//var oldSize string
 		if _, ok := unusual[size]; !ok {
-			//if size == "6p" {
-			//	//oldSize = "6p"
-			//	size = "6"
-			//}
 			if size == "xdy" {
 				chunks := strings.Split(v, "d")
 				if len(chunks) != 2 {
@@ -869,16 +825,6 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				}
 
 				var diu string
-				//if oldSize == "6p" {
-				//	diu, err = getDieImageURL(c, oldSize, rs, color)
-				//} else if isFunky(size) {
-				//	diu = ""
-				//} else {
-				//	diu, err = getDieImageURL(c, size, rs, color)
-				//}
-				//if err != nil {
-				//	log.Printf("could not get die image: %v", err)
-				//}
 				dk := dieKey(c, roomKey, int64(i))
 				d := Die{
 					Size:      size,
@@ -1037,9 +983,7 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 		return nil, fmt.Errorf("problem executing dice query: %v", err)
 	}
 	for _, d := range dice {
-		//log.Printf("%s", d.SVGBytes)
 		d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
-		//log.Printf("%s", d.SVG)
 	}
 	return dice, nil
 }
@@ -1111,12 +1055,7 @@ func getSVGPath(c context.Context, result, size string) (string, error) {
 	if u, ok := diceURLs[d]; ok {
 		return u, nil
 	}
-	//bucket, err := file.DefaultBucketName(c)
-	//if err != nil {
-	//	return "", fmt.Errorf("failed to get default GCS bucket name: %v", err)
-	//}
 	p := fmt.Sprintf("/js/%s", d)
-	//p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s", bucket, d)
 	diceURLs[d] = p
 	return p, nil
 }
@@ -1213,7 +1152,6 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 }
 
 func getOldColor(u string) string {
-	// https://storage.googleapis.com/dice-roller-174222.appspot.com/die_images/blue-d8/1.png
 	chunk := strings.Split(u, "/")[5]
 	var c string
 	if chunk == "tokens" {
@@ -1375,15 +1313,7 @@ func getNewResult(kind string) (int, string) {
 	} else {
 		s, err = strconv.Atoi(kind)
 		if err != nil {
-			// Assume fate die
 			r := rand.Intn(3)
-			//if r == 0 {
-			//	return math.MaxInt16 - 2, "-"
-			//}
-			//if r == 1 {
-			//	return math.MaxInt16, "+"
-			//}
-			//return math.MaxInt16 - 1, " "
 			return r + 1, fmt.Sprintf("%d", r+1)
 		}
 	}
@@ -1828,11 +1758,6 @@ func room(w http.ResponseWriter, r *http.Request) {
 			filteredDice = append(filteredDice, tf)
 		}
 	}
-	//for _, d := range filteredDice {
-	//	log.Printf("%s", d.SVGBytes)
-	//	d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
-	//	log.Printf("%s", d.SVG)
-	//}
 	p := Passer{
 		Dice:              filteredDice,
 		RoomTotal:         roomTotal,
@@ -1872,9 +1797,6 @@ func room(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	roomTemplate := template.Must(template.New("room").Funcs(template.FuncMap{
-		//"noescape": func(value interface{}) template.HTML {
-		//	return template.HTML(fmt.Sprint(value))
-		//},
 		"noescape": noescape,
 		"hidden":   hidden,
 	}).Parse(string(content[:])))
@@ -1884,8 +1806,6 @@ func room(w http.ResponseWriter, r *http.Request) {
 }
 
 func noescape(b []byte) template.HTML {
-	//re := regexp.MustCompile("(?m)[\r\n]+^.*utf-8.*$")
-	//str = re.ReplaceAllString(str, "")
 	return template.HTML(fmt.Sprintf("%s", b))
 }
 
