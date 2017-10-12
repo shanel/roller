@@ -48,6 +48,7 @@ import (
 	//"regexp"
 	//"bytes"
 	//"golang.org/x/tools/go/gcimporter15/testdata"
+	//"golang.org/x/text"
 )
 
 var (
@@ -280,27 +281,36 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 	}
 	root := doc.SelectElement("svg")
 	opt := fmt.Sprintf("opt opt-%s", result)
+	// polygon
+	//polygon := root.FindElement("//polygon")
+	//if polygon != nil {
+	//	polygon.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
+	//}
 	for _, each := range root.SelectElements("g") {
-		path := each.SelectElement("path")
-		if path != nil {
-			class := path.SelectAttrValue("class", "")
-			if class == "stroke" {
-				path.CreateAttr("style", "fill: rgb(0, 0, 0);")
-			} else if class == "fill" {
-				path.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
-			}
-		}
 		gclass := each.SelectAttrValue("class", "")
 		if gclass == opt {
 			c := each.ChildElements()
-			if len(c) != 0 {
+			if len(c) != 0 && die != "d6p" {
 				c[0].CreateAttr("style", "visibility: visible;")
+			} else {
+				each.CreateAttr("style", "visibility: visible;")
 			}
 		} else if gclass == "opt" { // token?
 			if result == "1" {
 				each.CreateAttr("style", "visibility: visible;")
 			} else {
 				each.CreateAttr("style", "visibility: hidden;")
+			}
+		}
+		for _, path := range each.ChildElements() {
+			//path := each.SelectElement("path")
+			if path != nil {
+				class := path.SelectAttrValue("class", "")
+				if class == "stroke" {
+					path.CreateAttr("style", "fill: rgb(0, 0, 0);")
+				} else if class == "fill" {
+					path.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
+				}
 			}
 		}
 		text := each.SelectElement("text")
@@ -808,10 +818,10 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	for size, v := range sizes {
 		//var oldSize string
 		if _, ok := unusual[size]; !ok {
-			if size == "6p" {
-				//oldSize = "6p"
-				size = "6"
-			}
+			//if size == "6p" {
+			//	//oldSize = "6p"
+			//	size = "6"
+			//}
 			if size == "xdy" {
 				chunks := strings.Split(v, "d")
 				if len(chunks) != 2 {
