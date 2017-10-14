@@ -161,26 +161,26 @@ type PassedCustomSet struct {
 	Width     template.JS
 }
 
-func newCustomSetFromURL(u string) (CustomSet, error) {
-	resp, err := http.Get(u)
-	defer resp.Body.Close()
-
-	if err != nil {
-		return CustomSet{}, err
-	}
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return CustomSet{}, err
-	}
-	pieces := strings.Split(string(bytes), "\n")
-	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
-	for i, p := range pieces {
-		si := strconv.Itoa(i)
-		cs.Template[si] = p
-		cs.Instance[si] = p
-	}
-	return cs, nil
-}
+//func newCustomSetFromURL(u string) (CustomSet, error) {
+//	resp, err := http.Get(u)
+//	defer resp.Body.Close()
+//
+//	if err != nil {
+//		return CustomSet{}, err
+//	}
+//	bytes, err := ioutil.ReadAll(resp.Body)
+//	if err != nil {
+//		return CustomSet{}, err
+//	}
+//	pieces := strings.Split(string(bytes), "\n")
+//	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
+//	for i, p := range pieces {
+//		si := strconv.Itoa(i)
+//		cs.Template[si] = p
+//		cs.Instance[si] = p
+//	}
+//	return cs, nil
+//}
 
 func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet, error) {
 	// Get rid of random space at front or end
@@ -256,6 +256,10 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		return nil, err
 	}
 	root := doc.SelectElement("svg")
+	title := doc.CreateElement("title")
+	title.SetText(fmt.Sprintf("%s %s: %s", color, die, result))
+	rch := root.ChildElements()
+	root.InsertChild(rch[0], title)
 	opt := fmt.Sprintf("opt opt-%s", result)
 	for _, each := range root.SelectElements("g") {
 		gclass := each.SelectAttrValue("class", "")
@@ -273,13 +277,13 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 				each.CreateAttr("style", "visibility: hidden;")
 			}
 		}
-		for _, path := range each.ChildElements() {
-			if path != nil {
-				class := path.SelectAttrValue("class", "")
+		for _, pth := range each.ChildElements() {
+			if pth != nil {
+				class := pth.SelectAttrValue("class", "")
 				if class == "stroke" {
-					path.CreateAttr("style", "fill: rgb(0, 0, 0);")
+					pth.CreateAttr("style", "fill: rgb(0, 0, 0);")
 				} else if class == "fill" {
-					path.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
+					pth.CreateAttr("style", fmt.Sprintf("fill: %s;", clr))
 				}
 			}
 		}
@@ -854,7 +858,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					d.IsLabel = true
 					d.IsFunky = true
 				} else {
-					svgPath, err := getSVGPath(c, rs, size)
+					svgPath, err := getSVGPath(rs, size)
 					if err != nil {
 						log.Printf("could not get SVGPath: %v", err)
 						continue
@@ -1053,7 +1057,7 @@ func getDieImageURL(c context.Context, size, result, color string) (string, erro
 	return p, nil
 }
 
-func getSVGPath(c context.Context, result, size string) (string, error) {
+func getSVGPath(result, size string) (string, error) {
 	// Fate dice silliness
 	d := fmt.Sprintf("d%s.svg", size)
 	if size == "0" || result == "token" {
@@ -1221,7 +1225,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
 	} else {
 		if d.SVGPath == "" {
-			svgPath, err := getSVGPath(c, d.ResultStr, d.Size)
+			svgPath, err := getSVGPath(d.ResultStr, d.Size)
 			if err != nil {
 				log.Printf("could not get SVGPath: %v", err)
 			} else {
@@ -1281,7 +1285,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 	return nil
 }
 
-func decrementClock(c context.Context, encodedDieKey, room string) error {
+func decrementClock(c context.Context, encodedDieKey string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -1642,7 +1646,7 @@ func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
-	err := decrementClock(c, keyStr, room)
+	err := decrementClock(c, keyStr)
 	if err != nil {
 		log.Printf("error in decrementClock: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
