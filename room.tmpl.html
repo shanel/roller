@@ -951,6 +951,15 @@
 
     {{end}}
 
+    {{range .Dice}}
+    {{if .IsImage}}
+    #{{.KeyStr}}-img {
+    max-width: {{.CustomWidth}}px;
+    max-height: {{.CustomHeight}}px;
+    }
+    {{end}}
+    {{end}}
+
     .dark-tooltip.dark a { color: lightgray; }
     .dark-tooltip.dark a.visited { color: lightgray; }
 
@@ -1451,14 +1460,22 @@
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
+            {{if .IsImage}}
+            <img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">
+            {{else}}
             <img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else if .IsCard}}
             <img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             {{if (eq .Image "")}}
             {{noescape .SVGBytes}}
             {{else}}
+            {{if .IsImage}}
+            <img id="{{.KeyStr}}-img" src="{{.Image}}">
+            {{else}}
             <img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{end}}
             {{end}}
         </div>
@@ -1488,14 +1505,22 @@
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             {{if .IsCustomItem}}
+            {{if .IsImage}}
+            <img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">
+            {{else}}
             <img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{else if .IsCard}}
             <img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">
             {{else}}
             {{if (eq .Image "")}}
             {{noescape .SVGBytes}}
             {{else}}
+            {{if .IsImage}}
+            <img id="{{.KeyStr}}-img" src="{{.Image}}">
+            {{else}}
             <img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">
+            {{end}}
             {{end}}
             {{end}}
         </div>
