@@ -230,20 +230,20 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 	}
 	colors := map[string]string{
 		//"clear":  "rgb(173, 216, 230)",
-		"clear": "rgb(228, 242, 247)",
-		"green": "rgb(131, 245, 108)",
+		"clear": "rgb(228, 242, 247)", // #e4f2f7
+		"green": "rgb(131, 245, 108)", // #83f56c
 		//"green":  "rgb(0, 204, 0)",
-		"red": "rgb(228, 79, 79)",
+		"red": "rgb(228, 79, 79)", // #e44f4f
 		//"red":    "rgb(255, 0, 0)",
-		"blue": "rgb(88, 181, 243)",
+		"blue": "rgb(88, 181, 243)", // #58b5f3
 		//"blue":   "rgb(0, 153, 255)",
-		"orange": "rgb(255, 158, 12)",
+		"orange": "rgb(255, 158, 12)", // #ff9e0c
 		//"orange": "rgb(255, 153, 0)",
 		//"purple": "rgb(153, 0, 255)",
 		//"violet": "rgb(153, 0, 255)",
-		"purple": "rgb(142, 119, 218)",
-		"violet": "rgb(142, 119, 218)",
-		"gold":   "rgb(254, 248, 78)",
+		"purple": "rgb(142, 119, 218)", // #8e77da
+		"violet": "rgb(142, 119, 218)", // #8e77da
+		"gold":   "rgb(254, 248, 78)",  // #fef84e
 		//"gold":   "rgb(255, 255, 77)",
 	}
 	clr, ok := colors[color]

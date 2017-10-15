@@ -989,6 +989,70 @@
         /*transform: translate(0px, 0px);*/
     }
 
+    .funky-lightblue {
+        margin: 1%;
+        background-color: #e4f2f7;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-green {
+        margin: 1%;
+        background-color: #83f56c;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-red {
+        margin: 1%;
+        background-color: #e44f4f;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-blue {
+        margin: 1%;
+        background-color: #58b5f3;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-violet {
+        margin: 1%;
+        background-color: #8e77da;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-gold {
+        margin: 1%;
+        background-color: #fef84e;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-orange {
+        margin: 1%;
+        background-color: #ff9e0c;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+
     .clock {
         /*margin: 5%;*/
         background-color: white;
@@ -1438,7 +1502,7 @@
         {{if .New}}
         {{if .IsLabel}}
         {{if .IsFunky}}
-        <div id="{{.KeyStr}}" class="draggable tap-target new funky" data-x="{{.X}}" data-y="{{.Y}}"
+        <div id="{{.KeyStr}}" class="draggable tap-target new funky-{{.Color}}" data-x="{{.X}}" data-y="{{.Y}}"
              style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
         </div>
@@ -1483,7 +1547,7 @@
         {{else}}
         {{if .IsLabel}}
         {{if .IsFunky}}
-        <div id="{{.KeyStr}}" class="draggable tap-target funky" data-x="{{.X}}" data-y="{{.Y}}"
+        <div id="{{.KeyStr}}" class="draggable tap-target funky-{{.Color}}" data-x="{{.X}}" data-y="{{.Y}}"
              style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-result="{{.ResultStr}}" die-color="{{.Color}}" die-version="{{.Version}}" die-flipped="{{.IsFlipped}}" svg-path="{{.SVGPath}}" die-custom="{{.IsCustomItem}}">
             <h4>&nbsp; {{.ResultStr}} &nbsp;</h4>
         </div>
