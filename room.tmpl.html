@@ -25,6 +25,7 @@
         var showFunkyDice = false;
         var sortDice = true;
         var saveRolls = false;
+        var whiteFlips = false;
 
         var fp = "";
         new Fingerprint2().get(function (result, components) {
@@ -242,7 +243,8 @@
             for (var i = 0; i < toReroll.length; i++) {
                 $.post("/reroll", {
                     id: toReroll[i].id,
-                    'fp': fp
+                    'fp': fp,
+                    'white': whiteFlips
                 }).done(function (data) {
                 });
             }
@@ -543,6 +545,17 @@
             }
             location.reload();
         }
+
+        function flipToWhite() {
+            if (document.getElementById('flipToWhiteTokens').checked) {
+                whiteFlips = true;
+                Cookies.set('white_flips', 'true', { path: '' });
+            } else {
+                whiteFlips = false;
+                Cookies.set('white_flips', 'false', { path: '' });
+            }
+        }
+
 
 
         interact('.label-tap-target')
@@ -1270,6 +1283,9 @@
     &nbsp;&nbsp;&nbsp;
     <label id="funkyDiceLabel" for="funkyDice">Funky dice: </label>
     <input form="rollem" type="checkbox" name="funkyDice" id="funkyDice" onclick="funkierDice()"/>
+    &nbsp;&nbsp;&nbsp;
+    <label id="flipToWhiteLabel" for="flipToWhiteTokens">Flip tokens to white: </label>
+    <input form="rollem" type="checkbox" name="flipToWhiteTokens" id="flipToWhiteTokens" onclick="flipToWhite()"/>
 </div>
 <script>
     // Dark tool tips
@@ -1426,11 +1442,21 @@
         content: 'Check this if you want d3, d5, d7, d14, d16, d24, d30, and d100 in addition to other dice.',
         hoverDelay: 1000
     });
+    $("#flipToWhiteLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want tokens to change to a white color when rerolled instead of getting a black circle on them.',
+        hoverDelay: 1000
+    });
 
     if (Cookies.get('hide_draws') === 'true') {
         hideDraws = true;
     }
     document.getElementById('hiddenDraw').checked = hideDraws;
+
+    if (Cookies.get('white_flips') === 'true') {
+        whiteFlips = true;
+    }
+    document.getElementById('flipToWhiteTokens').checked = whiteFlips;
 
     if (Cookies.get('funky_dice') === 'true') {
         showFunkyDice = true;

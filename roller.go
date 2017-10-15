@@ -245,6 +245,7 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		"violet": "rgb(142, 119, 218)", // #8e77da
 		"gold":   "rgb(254, 248, 78)",  // #fef84e
 		//"gold":   "rgb(255, 255, 77)",
+		"white": "rgb(255, 255, 255)",
 	}
 	clr, ok := colors[color]
 	if !ok {
@@ -324,6 +325,7 @@ type Die struct {
 	IsImage       bool
 	IsClock       bool
 	Color         string
+	OldColor      string
 	IsFlipped     bool
 	Version       int // Use this to determine whether to use old display logic or new
 	SVGPath       string
@@ -1181,7 +1183,7 @@ func getOldColor(u string) string {
 	}
 }
 
-func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
+func rerollDieHelper(c context.Context, encodedDieKey, room string, white bool) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -1244,6 +1246,17 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string) error {
 			} else {
 				d.Result = 0
 				d.ResultStr = "0"
+			}
+			if white {
+				d.Result = 0
+				d.ResultStr = "0"
+				if d.OldColor == "" {
+					d.OldColor = d.Color
+					d.Color = "white"
+				} else {
+					d.Color = d.OldColor
+					d.OldColor = ""
+				}
 			}
 		} else {
 			d.Result, d.ResultStr = getNewResult(d.Size)
@@ -1629,10 +1642,16 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
+	var white bool
+	var err error
+	white, err = strconv.ParseBool(r.Form.Get("white"))
+	if err != nil {
+		log.Printf("issue with flipping token: %v", err)
+	}
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
 	// Do we need to be worried dice will be rerolled from other rooms?
-	err := rerollDieHelper(c, keyStr, room)
+	err = rerollDieHelper(c, keyStr, room, white)
 	if err != nil {
 		log.Printf("error in rerollDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
