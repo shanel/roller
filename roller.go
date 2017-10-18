@@ -1128,7 +1128,7 @@ func revealDieHelper(c context.Context, encodedDieKey string) error {
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 	}
-	if d.IsCard || d.IsCustomItem || d.IsClock {
+	if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
 		d.IsHidden = false
 		d.HiddenBy = ""
 		_, err = datastore.Put(c, k, &d)
