@@ -582,7 +582,9 @@
         interact('.tap-target')
             .on('doubletap', function (event) {
                 if (!event.shiftKey) {
-                    event.currentTarget.classList.toggle('selected');
+                    if (!event.currentTarget.classList.contains('selected')) {
+                        event.currentTarget.classList.toggle('selected');
+                    }
                     rerollMarked();
                     $("#refreshable").load(window.location.href + " #refreshable");
                 }
