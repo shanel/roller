@@ -1335,6 +1335,8 @@ func getNewResult(kind string) (int, string) {
 	var err error
 	if kind == "10p" { // TODO(shanel): this can probably go away due to d100
 		s = 10
+	} else if kind == "6p" {
+		s = 6
 	} else {
 		s, err = strconv.Atoi(kind)
 		if err != nil {
