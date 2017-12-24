@@ -829,7 +829,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				} else {
 					r, rs = getNewResult(size)
 				}
-				if size != "F" || size != "H"{
+				if size != "F" && size != "H"{
 					total += r
 				}
 
@@ -1297,7 +1297,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string, white bool) 
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 	}
 	if lastRoll[room] == 0 || lastAction[room] == "reroll" {
-		if d.Size != "F" || d.Size != "H"|| !d.IsCard {
+		if d.Size != "F" && d.Size != "H" && !d.IsCard {
 			lastRoll[room] += d.Result
 		}
 	}
