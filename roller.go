@@ -711,7 +711,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 		}
 		drawn, err := cs.Draw(count)
 		if err != nil {
-			fmt.Errorf("problem with custom draw: %v", err)
+			log.Printf("problem with custom draw: %v", err)
 		}
 		customSets[deckName] = cs
 		for i, card := range drawn {
