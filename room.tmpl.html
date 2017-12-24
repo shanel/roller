@@ -1212,6 +1212,8 @@
     <label id="d100Label" for="d100" class="label-tap-target">d100</label>
     <input type="text" name="dF" id="dF" style="width: 19px"/>
     <label id="dFLabel" id="fateLabel" for="dF" class="label-tap-target">dF </label>
+    <input type="text" name="dH" id="dH" style="width: 19px"/>
+    <label id="dHLabel" id="HLabel" for="dH" class="label-tap-target">dH </label>
     &nbsp; (&#7508;&#7461;&#7508;) &nbsp;
     <label id="tokensLabel" for="tokens" class="label-tap-target">tokens: </label>
     <input type="text" name="tokens" id="tokens" style="width: 19px"/>
@@ -1357,6 +1359,11 @@
         content: 'Fate/Fudge dice',
         hoverDelay: 1000
     });
+    $("#fateLabel").darkTooltip({
+        gravity: 'south',
+        content: 'blank/X dice',
+        hoverDelay: 1000
+    });
     $("#tokensLabel").darkTooltip({
         gravity: 'south',
         content: 'colored blank tokens',
@@ -1441,7 +1448,7 @@
     });
     $("#funkyDiceLabel").darkTooltip({
         gravity: 'north',
-        content: 'Check this if you want d3, d5, d7, d14, d16, d24, d30, and d100 in addition to other dice.',
+        content: 'Check this if you want d3, d5, d7, d14, d16, d24, d30, d100, and dH in addition to other dice.',
         hoverDelay: 1000
     });
     $("#flipToWhiteLabel").darkTooltip({
@@ -1466,7 +1473,7 @@
     document.getElementById('funkyDice').checked = showFunkyDice;
 
     if (showFunkyDice !== true) {
-        var funk = ["d3", "d5", "d7", "d14", "d16", "d24", "d30", "d100"];
+        var funk = ["d3", "d5", "d7", "d14", "d16", "d24", "d30", "d100", "dH"];
 //        var funk = ["d3", "d5", "d7", "d10p", "d14", "d16", "d24", "d30", "d100"];
         var funkLen = funk.length;
         for (var i = 0; i < funkLen; i++) {

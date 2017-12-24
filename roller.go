@@ -215,7 +215,16 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		log.Printf("failed to get default GCS bucket name: %v", err)
 		return nil, err
 	}
-	p := fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s.svg", bucket, die)
+	var p string
+	if die == "dH" {
+		if result == "0" {
+			p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/dH-blank.svg", bucket)
+		} else {
+			p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/dH-x.svg", bucket)
+		}
+	} else {
+		p = fmt.Sprintf("https://storage.googleapis.com/%v/die_images/%s.svg", bucket, die)
+	}
 	client := urlfetch.Client(c)
 	res, err := client.Get(p)
 	if err != nil {
@@ -769,6 +778,7 @@ var standardDice = map[string]bool{
 	"30":  true,
 	"100": true,
 	"F":   true,
+	"H":   true,
 }
 
 func isFunky(d string) bool {
@@ -819,7 +829,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				} else {
 					r, rs = getNewResult(size)
 				}
-				if size != "F" {
+				if size != "F" || size != "H"{
 					total += r
 				}
 
@@ -1287,7 +1297,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string, white bool) 
 		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 	}
 	if lastRoll[room] == 0 || lastAction[room] == "reroll" {
-		if d.Size != "F" || !d.IsCard {
+		if d.Size != "F" || d.Size != "H"|| !d.IsCard {
 			lastRoll[room] += d.Result
 		}
 	}
@@ -1340,8 +1350,13 @@ func getNewResult(kind string) (int, string) {
 	} else {
 		s, err = strconv.Atoi(kind)
 		if err != nil {
-			r := rand.Intn(3)
-			return r + 1, fmt.Sprintf("%d", r+1)
+			if kind == "F" {
+				r := rand.Intn(3)
+				return r + 1, fmt.Sprintf("%d", r+1)
+			} else {
+				r := rand.Intn(2)
+				return r , fmt.Sprintf("%d", r)
+			}
 		}
 	}
 	r := rand.Intn(s) + 1
@@ -1564,6 +1579,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 		"30":     r.FormValue("d30"),
 		"100":    r.FormValue("d100"),
 		"F":      r.FormValue("dF"),
+		"H":      r.FormValue("dH"),
 		"label":  r.FormValue("label"),
 		"card":   r.FormValue("cards"),
 		"tokens": r.FormValue("tokens"),
