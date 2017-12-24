@@ -1173,8 +1173,8 @@
         </fieldset>
     </form>
 </div>
-
-<h3>Roll For Your Party: A multi-user dice roller.</h3>
+<div id="hideable">
+    <h3>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h3>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
@@ -1511,8 +1511,23 @@
         }
     }
 </script>
+
+<script>
+    $(document).ready(function(){
+        $("#hide").click(function(){
+            $("#hideable").hide();
+        });
+        $("#show").click(function(){
+            $("#hideable").show();
+        });
+    });
+</script>
 <br>
-<div class="about"><a href="/about">about</a></div>
+</div>
+<div class="buttons">
+<button class="button" id="hide">Hide controls</button>
+<button class="button" id="show">Show controls</button>
+</div>
 <hr>
 <div class="refreshable" id="refreshable">
 
