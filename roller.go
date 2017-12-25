@@ -685,7 +685,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				New:       true,
 				IsCard:    true,
 			}
-			log.Printf("hidden: %v", hidden)
 			if hidden != "" && hidden != "false" {
 				d.HiddenBy = fp
 				d.IsHidden = true
@@ -737,7 +736,6 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				CustomHeight:  cs.MaxHeight,
 				CustomWidth:   cs.MaxWidth,
 			}
-			log.Printf("hidden: %v", hidden)
 			if hidden != "" && hidden != "false" {
 				d.HiddenBy = fp
 				d.IsHidden = true
@@ -1129,7 +1127,7 @@ func fateReplace(in string) string {
 }
 
 // TODO(shanel): This will need to handle new cards
-func revealDieHelper(c context.Context, encodedDieKey string) error {
+func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -1137,6 +1135,9 @@ func revealDieHelper(c context.Context, encodedDieKey string) error {
 	var d Die
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	if d.HiddenBy != fp {
+		return fmt.Errorf("item with key %v was not hidden by %v", encodedDieKey, fp)
 	}
 	if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
 		d.IsHidden = false
@@ -1193,7 +1194,7 @@ func getOldColor(u string) string {
 	}
 }
 
-func rerollDieHelper(c context.Context, encodedDieKey, room string, white bool) error {
+func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bool) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
 	if err != nil {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
@@ -1201,6 +1202,9 @@ func rerollDieHelper(c context.Context, encodedDieKey, room string, white bool) 
 	var d Die
 	if err = datastore.Get(c, k, &d); err != nil {
 		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+	}
+	if d.IsHidden && d.HiddenBy != fp {
+		return fmt.Errorf("wont reroll die with key %v - not hidden by %v", encodedDieKey, fp)
 	}
 	if (d.IsLabel || d.IsImage) && !d.IsFunky {
 		return fmt.Errorf("label")
@@ -1629,10 +1633,11 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
+	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
 	// Do we need to be worried dice will be revealed from other rooms?
-	err := revealDieHelper(c, keyStr)
+	err := revealDieHelper(c, keyStr, fp)
 	if err != nil {
 		log.Printf("error in revealDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1660,6 +1665,7 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
+	fp := r.Form.Get("fp")
 	var white bool
 	var err error
 	white, err = strconv.ParseBool(r.Form.Get("white"))
@@ -1669,7 +1675,7 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
 	// Do we need to be worried dice will be rerolled from other rooms?
-	err = rerollDieHelper(c, keyStr, room, white)
+	err = rerollDieHelper(c, keyStr, room, fp, white)
 	if err != nil {
 		log.Printf("error in rerollDie: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
@@ -1804,6 +1810,17 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, tf := range dice {
 		if tf.HiddenBy == fp || tf.HiddenBy == "" {
+			filteredDice = append(filteredDice, tf)
+			continue
+		}
+		if tf.HiddenBy != "" && tf.IsCard {
+			bucket, err := file.DefaultBucketName(c)
+			if err != nil {
+				log.Printf("failed to get default GCS bucket name: %v", err)
+				continue
+			}
+			tf.Image = fmt.Sprintf("https://storage.googleapis.com/%v/playing_cards/back.png", bucket)
+			tf.IsHidden = false
 			filteredDice = append(filteredDice, tf)
 		}
 	}
