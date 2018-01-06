@@ -115,11 +115,12 @@ func (cs *CustomSet) Draw(c int) (map[string]string, error) {
 		return out, fmt.Errorf("the deck is empty")
 	}
 	if left <= c {
-		for i, j := range cs.Instance {
-			out[i] = j
-		}
-		cs.Instance = map[string]string{}
-		return out, fmt.Errorf("could not draw full %v entries, only %v left in set", c, left)
+		//for i, j := range cs.Instance {
+		//	out[i] = j
+		//}
+		//cs.Instance = map[string]string{}
+		//return out, fmt.Errorf("could not draw full %v entries, only %v left in set", c, left)
+		c = left
 	}
 	remove := []string{}
 	keys := []string{}
@@ -405,43 +406,49 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) error {
 	}
 	var r Room
 	t := time.Now().Unix()
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		// Couldn't find it, so create it
-		log.Printf("couldn't find room %v, so going to create it", rk)
-		up, err := json.Marshal([]Update{})
-		if err != nil {
-			return fmt.Errorf("could not marshal update: %v", err)
-		}
+	return datastore.RunInTransaction(c, func(ctx context.Context) error {
+		err = datastore.Get(c, roomKey, &r)
+		if err == datastore.ErrNoSuchEntity {
+			// Couldn't find it, so create it
+			log.Printf("couldn't find room %v, so going to create it", rk)
+			up, err := json.Marshal([]Update{})
+			if err != nil {
+				return fmt.Errorf("could not marshal update: %v", err)
+			}
 
-		deck.Seed()
-		d, err := deck.New(deck.Unshuffled)
-		if err != nil {
-			log.Printf("could not create deck: %v", err)
+			deck.Seed()
+			d, err := deck.New(deck.Unshuffled)
+			if err != nil {
+				log.Printf("could not create deck: %v", err)
+			}
+			d.Shuffle()
+			r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
+			_, err = datastore.Put(c, roomKey, &r)
+			if err != nil {
+				return fmt.Errorf("could not create updated room %v: %v", rk, err)
+			}
 		}
-		d.Shuffle()
-		r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
+		if err != nil {
+			return fmt.Errorf("issue updating room: %v", err)
+		}
+		var umUpdates []Update
+		err = json.Unmarshal(r.Updates, &umUpdates)
+		if err != nil {
+			return fmt.Errorf("could not unmarshal updates in updateRoom: %v", err)
+		}
+		umUpdates = append(umUpdates, u)
+		r.Updates, err = json.Marshal(umUpdates)
+		if err != nil {
+			return fmt.Errorf("could not marshal updates in updateRoom: %v", err)
+		}
+		r.Timestamp = t
+		r.Modifier = modifier
 		_, err = datastore.Put(c, roomKey, &r)
 		if err != nil {
-			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+			return fmt.Errorf("could not update room %v: %v", rk, err)
 		}
-	}
-	var umUpdates []Update
-	err = json.Unmarshal(r.Updates, &umUpdates)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal updates in updateRoom: %v", err)
-	}
-	umUpdates = append(umUpdates, u)
-	r.Updates, err = json.Marshal(umUpdates)
-	if err != nil {
-		return fmt.Errorf("could not marshal updates in updateRoom: %v", err)
-	}
-	r.Timestamp = t
-	r.Modifier = modifier
-	_, err = datastore.Put(c, roomKey, &r)
-	if err != nil {
-		return fmt.Errorf("could not update room %v: %v", rk, err)
-	}
-	return nil
+		return nil
+	}, nil)
 }
 
 func setBackground(c context.Context, rk, url string) {
@@ -456,25 +463,27 @@ func setBackground(c context.Context, rk, url string) {
 		return
 	}
 	var r Room
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		log.Printf("could not find room %v for setting background: %v", rk, err)
-		return
-	}
-	r.BgURL = url
-	_, err = datastore.Put(c, roomKey, &r)
-	if err != nil {
-		log.Printf("could not create updated room %v: %v", rk, err)
-		return
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return fmt.Errorf("could not find room %v for setting background: %v", rk, err)
+		}
+		r.BgURL = url
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+		}
 
-	var testRoom Room
-	if err = datastore.Get(c, roomKey, &testRoom); err != nil {
-		log.Printf("couldn't find the new entry: %v", err)
-		return
-	}
-	if testRoom.BgURL != url {
-		log.Printf("url is wrong")
-		return
+		var testRoom Room
+		if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+			return fmt.Errorf("couldn't find the new entry: %v", err)
+		}
+		if testRoom.BgURL != url {
+			return fmt.Errorf("url is wrong")
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		log.Printf("%v", err)
 	}
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
@@ -491,38 +500,35 @@ func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 		return
 	}
 	var r Room
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		log.Printf("could not find room %v for adding custom set: %v", rk, err)
-		return
-	}
-	cs, err := newCustomSetFromNewlineSeparatedString(lines, height, width)
-	//cs, err := newCustomSet(url)
-	if err != nil {
-		log.Printf("issue with custom set: %v", err)
-		return
-	}
-	rcs, err := r.GetCustomSets()
-	if err != nil {
-		log.Printf("error in addCustomSet%v", err)
-		return
-	}
-	rcs[name] = cs
-	err = r.SetCustomSets(rcs)
-	if err != nil {
-		log.Printf("other error in addCustomSet: %v", err)
-		return
-	}
-	_, err = datastore.Put(c, roomKey, &r)
-	if err != nil {
-		log.Printf("could not create updated room %v: %v", rk, err)
-		return
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return fmt.Errorf("could not find room %v for adding custom set: %v", rk, err)
+		}
+		cs, err := newCustomSetFromNewlineSeparatedString(lines, height, width)
+		//cs, err := newCustomSet(url)
+		if err != nil {
+			return fmt.Errorf("issue with custom set: %v", err)
+		}
+		rcs, err := r.GetCustomSets()
+		if err != nil {
+			return fmt.Errorf("error in addCustomSet%v", err)
+		}
+		rcs[name] = cs
+		err = r.SetCustomSets(rcs)
+		if err != nil {
+			return fmt.Errorf("other error in addCustomSet: %v", err)
+		}
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+		}
 
-	var testRoom Room
-	if err = datastore.Get(c, roomKey, &testRoom); err != nil {
-		log.Printf("couldn't find the new entry: %v", err)
-		return
-	}
+		var testRoom Room
+		if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+			return fmt.Errorf("couldn't find the new entry: %v", err)
+		}
+		return nil
+	}, nil)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
@@ -534,37 +540,42 @@ func refreshRoom(c context.Context, rk, fp string) string {
 		return out
 	}
 	var r Room
-	if err = datastore.Get(c, roomKey, &r); err != nil {
-		log.Printf("could not find room %v for refresh: %v", rk, err)
-		return out
-	}
-	keep := []Update{}
-	now := time.Now().Unix()
-	var umUpdates []Update
 	var send []Update
-	err = json.Unmarshal(r.Updates, &umUpdates)
-	if err != nil {
-		log.Printf("could not unmarshal updates in refreshRoom: %v", err)
-		return ""
-	}
-	for _, u := range umUpdates {
-		q := now - u.Timestamp
-		if q > refreshDelta {
-			continue
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return fmt.Errorf("could not find room %v for refresh: %v", rk, err)
 		}
-		keep = append(keep, u)
-		if u.Updater != fp || u.UpdateAll {
-			send = append(send, u)
+		keep := []Update{}
+		now := time.Now().Unix()
+		var umUpdates []Update
+		err = json.Unmarshal(r.Updates, &umUpdates)
+		if err != nil {
+			return fmt.Errorf("could not unmarshal updates in refreshRoom: %v", err)
 		}
-	}
-	r.Updates, err = json.Marshal(keep)
+		for _, u := range umUpdates {
+			q := now - u.Timestamp
+			if q > refreshDelta {
+				continue
+			}
+			keep = append(keep, u)
+			if u.Updater != fp || u.UpdateAll {
+				send = append(send, u)
+			}
+		}
+		r.Updates, err = json.Marshal(keep)
+		if err != nil {
+			out = ""
+			return fmt.Errorf("could not marshal updates in refreshRoom: %v", err)
+		}
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+		}
+		return nil
+	}, nil)
 	if err != nil {
-		log.Printf("could not marshal updates in refreshRoom: %v", err)
-		return ""
-	}
-	_, err = datastore.Put(c, roomKey, &r)
-	if err != nil {
-		log.Printf("could not create updated room %v: %v", rk, err)
+		log.Printf("%v", err)
+		return out
 	}
 	if len(send) > 0 {
 		toHash, err := json.Marshal(send)
@@ -608,16 +619,21 @@ func newRoom(c context.Context) (string, error) {
 	}
 	d.Shuffle()
 	var k *datastore.Key
-	k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName, Deck: d.GetSignature()})
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		k, err = datastore.Put(c, roomKey(c), &Room{Updates: up, Timestamp: time.Now().Unix(), Slug: roomName, Deck: d.GetSignature()})
+		if err != nil {
+			return fmt.Errorf("could not create new room: %v", err)
+		}
+		var testRoom Room
+		if err = datastore.Get(c, k, &testRoom); err != nil {
+			return fmt.Errorf("couldn't find the new entry: %v", err)
+		}
+		// TODO(shanel): why does it seem I need the above three lines? Race condition?
+		return nil
+	}, nil)
 	if err != nil {
-		return "", fmt.Errorf("could not create new room: %v", err)
+		return "", err
 	}
-	var testRoom Room
-	if err = datastore.Get(c, k, &testRoom); err != nil {
-		return "", fmt.Errorf("couldn't find the new entry: %v", err)
-	}
-	// TODO(shanel): why does it seem I need the above three lines? Race condition?
-
 	return roomName, nil
 }
 
@@ -625,136 +641,137 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 	dice := []*Die{}
 	keys := []*datastore.Key{}
 	var room Room
-	if err := datastore.Get(c, roomKey, &room); err != nil {
-		log.Printf("issue getting room in drawCards: %v", err)
-		return dice, keys
-	}
-	ts := time.Now().Unix()
-	if deckName == "" {
-		hand, err := deck.New(deck.Empty)
-		if err != nil {
-			log.Printf("problem creating hand: %v", err)
-			return dice, keys
+	err := datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err := datastore.Get(c, roomKey, &room); err != nil {
+			return fmt.Errorf("issue getting room in drawCards: %v", err)
 		}
-		deck.Seed()
-		roomDeck, err := deck.New(deck.FromSignature(room.Deck))
-		if err != nil {
-			log.Printf("problem with deck signature: %v", err)
-			return dice, keys
-		}
-		roomDeck.Shuffle()
-		deckSize := roomDeck.NumberOfCards()
-		// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
-		if deckSize == 0 || room.Deck == "" {
-			log.Print("room deck is empty")
-			// TODO(shanel): Figure out what it appears that the number of cards for an empty deck is 52
-			// Below might be useless...
-			var empty *deck.Deck
-			empty, err = deck.New(deck.Empty)
+		ts := time.Now().Unix()
+		if deckName == "" {
+			hand, err := deck.New(deck.Empty)
 			if err != nil {
-				log.Printf("issue creating empty deck: %v", err)
-				return dice, keys
+				return fmt.Errorf("problem creating hand: %v", err)
 			}
-			room.Deck = empty.GetSignature()
+			deck.Seed()
+			roomDeck, err := deck.New(deck.FromSignature(room.Deck))
+			if err != nil {
+				return fmt.Errorf("problem with deck signature: %v", err)
+			}
+			roomDeck.Shuffle()
+			deckSize := roomDeck.NumberOfCards()
+			// TODO(shanel): We *might* want to surface the need to shuffle the deck once there are no cards left.
+			if deckSize == 0 || room.Deck == "" {
+				log.Print("room deck is empty")
+				// TODO(shanel): Figure out what it appears that the number of cards for an empty deck is 52
+				// Below might be useless...
+				var empty *deck.Deck
+				empty, err = deck.New(deck.Empty)
+				if err != nil {
+					return fmt.Errorf("issue creating empty deck: %v", err)
+				}
+				room.Deck = empty.GetSignature()
+				if _, err := datastore.Put(c, roomKey, &room); err != nil {
+					return fmt.Errorf("issue updating deck in drawCards: %v", err)
+				}
+				return nil
+			}
+			if deckSize < count {
+				roomDeck.Deal(deckSize, hand)
+				log.Printf("not enough cards in room deck, only dealt %v", deckSize)
+			} else {
+				roomDeck.Deal(count, hand)
+			}
+			cards := strings.Split(strings.TrimSuffix(hand.String(), "\n"), "\n")
+			for i, card := range cards {
+				diu, err := getDieImageURL(c, "card", card, "")
+				if err != nil {
+					log.Printf("could not get die image: %v", err)
+				}
+				dk := dieKey(c, roomKey, int64(i))
+				d := Die{
+					Size:      "card",
+					Result:    0,
+					ResultStr: card,
+					Key:       dk,
+					KeyStr:    dk.Encode(),
+					Timestamp: ts,
+					Image:     diu,
+					New:       true,
+					IsCard:    true,
+				}
+				if hidden != "" && hidden != "false" {
+					d.HiddenBy = fp
+					d.IsHidden = true
+				}
+				dice = append(dice, &d)
+				keys = append(keys, dk)
+			}
+			room.Deck = roomDeck.GetSignature()
 			if _, err := datastore.Put(c, roomKey, &room); err != nil {
-				log.Printf("issue updating deck in drawCards: %v", err)
+				log.Printf("issue updating room in drawCards: %v", err)
 			}
-			return dice, keys
-		}
-		if deckSize < count {
-			roomDeck.Deal(deckSize, hand)
-			log.Printf("not enough cards in room deck, only dealt %v", deckSize)
 		} else {
-			roomDeck.Deal(count, hand)
-		}
-		cards := strings.Split(strings.TrimSuffix(hand.String(), "\n"), "\n")
-		for i, card := range cards {
-			diu, err := getDieImageURL(c, "card", card, "")
+			// do the custom set stuff here...
+			customSets, err := room.GetCustomSets()
 			if err != nil {
-				log.Printf("could not get die image: %v", err)
+				return fmt.Errorf("issue getting custom sets in drawCards: %v", err)
 			}
-			dk := dieKey(c, roomKey, int64(i))
-			d := Die{
-				Size:      "card",
-				Result:    0,
-				ResultStr: card,
-				Key:       dk,
-				KeyStr:    dk.Encode(),
-				Timestamp: ts,
-				Image:     diu,
-				New:       true,
-				IsCard:    true,
+			cs, ok := customSets[deckName]
+			if !ok {
+				return fmt.Errorf("no custom set with name %v", deckName)
 			}
-			if hidden != "" && hidden != "false" {
-				d.HiddenBy = fp
-				d.IsHidden = true
-			}
-			dice = append(dice, &d)
-			keys = append(keys, dk)
-		}
-		room.Deck = roomDeck.GetSignature()
-		if _, err := datastore.Put(c, roomKey, &room); err != nil {
-			log.Printf("issue updating room in drawCards: %v", err)
-		}
-	} else {
-		// do the custom set stuff here...
-		customSets, err := room.GetCustomSets()
-		if err != nil {
-			log.Printf("issue getting custom sets in drawCards: %v", err)
-			return dice, keys
-		}
-		cs, ok := customSets[deckName]
-		if !ok {
-			log.Printf("no custom set with name %v", deckName)
-			return dice, keys
-		}
-		drawn, err := cs.Draw(count)
-		if err != nil {
-			log.Printf("problem with custom draw: %v", err)
-		}
-		customSets[deckName] = cs
-		for i, card := range drawn {
-			ii, err := strconv.Atoi(i)
+			log.Printf("%v\n", cs.Instance)
+			drawn, err := cs.Draw(count)
 			if err != nil {
-				log.Printf("error in drawCards: %v", err)
-				continue
+				log.Printf("problem with custom draw: %v", err)
 			}
-			diu := card
-			dk := dieKey(c, roomKey, int64(ii))
-			d := Die{
-				Size:          "card", // should this be "custom" ???
-				Result:        ii,
-				ResultStr:     "",
-				Key:           dk,
-				KeyStr:        dk.Encode(),
-				Timestamp:     ts,
-				Image:         diu,
-				New:           true,
-				IsCustomItem:  true,
-				IsCard:        true,
-				CustomSetName: deckName,
-				CustomHeight:  cs.MaxHeight,
-				CustomWidth:   cs.MaxWidth,
+			log.Printf("%v\n", cs.Instance)
+			for i, card := range drawn {
+				ii, err := strconv.Atoi(i)
+				if err != nil {
+					log.Printf("error in drawCards: %v", err)
+					continue
+				}
+				diu := card
+				dk := dieKey(c, roomKey, int64(ii))
+				d := Die{
+					Size:          "card", // should this be "custom" ???
+					Result:        ii,
+					ResultStr:     "",
+					Key:           dk,
+					KeyStr:        dk.Encode(),
+					Timestamp:     ts,
+					Image:         diu,
+					New:           true,
+					IsCustomItem:  true,
+					IsCard:        true,
+					CustomSetName: deckName,
+					CustomHeight:  cs.MaxHeight,
+					CustomWidth:   cs.MaxWidth,
+				}
+				if hidden != "" && hidden != "false" {
+					d.HiddenBy = fp
+					d.IsHidden = true
+				}
+				dice = append(dice, &d)
+				keys = append(keys, dk)
 			}
-			if hidden != "" && hidden != "false" {
-				d.HiddenBy = fp
-				d.IsHidden = true
+			customSets[deckName] = cs
+			err = room.SetCustomSets(customSets)
+			if err != nil {
+				return fmt.Errorf("issue setting custom sets in drawCards: %v", err)
 			}
-			dice = append(dice, &d)
-			keys = append(keys, dk)
+			if _, err := datastore.Put(c, roomKey, &room); err != nil {
+				log.Printf("issue updating room in drawCards: %v", err)
+			}
+			var testRoom Room
+			if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+				log.Printf("couldn't find the new entry: %v", err)
+			}
 		}
-		err = room.SetCustomSets(customSets)
-		if err != nil {
-			log.Printf("issue setting custom sets in drawCards: %v", err)
-			return dice, keys
-		}
-		if _, err := datastore.Put(c, roomKey, &room); err != nil {
-			log.Printf("issue updating room in drawCards: %v", err)
-		}
-		var testRoom Room
-		if err = datastore.Get(c, roomKey, &testRoom); err != nil {
-			log.Printf("couldn't find the new entry: %v", err)
-		}
+		return nil
+	}, nil)
+	if err != nil {
+		log.Printf("%v", err)
 	}
 	return dice, keys
 }
@@ -827,7 +844,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				} else {
 					r, rs = getNewResult(size)
 				}
-				if size != "F" && size != "H"{
+				if size != "F" && size != "H" {
 					total += r
 				}
 
@@ -951,11 +968,14 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 	for _, k := range keys {
 		keyStrings = append(keyStrings, k.Encode())
 	}
-	_, err := datastore.PutMulti(c, keys, dice)
-	if err != nil {
-		return total, fmt.Errorf("could not create new dice: %v", err)
-	}
-	return total, nil
+	err := datastore.RunInTransaction(c, func(ctx context.Context) error {
+		_, err := datastore.PutMulti(c, keys, dice)
+		if err != nil {
+			return fmt.Errorf("could not create new dice: %v", err)
+		}
+		return nil
+	}, nil)
+	return total, err
 }
 
 func getRoomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
@@ -965,10 +985,13 @@ func getRoomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).Filter("Size =", "card") //.Limit(10)
 	dice := []Die{}
-	if _, err = q.GetAll(c, &dice); err != nil {
-		return nil, fmt.Errorf("problem executing card query: %v", err)
-	}
-	return dice, nil
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if _, err = q.GetAll(c, &dice); err != nil {
+			return fmt.Errorf("problem executing card query: %v", err)
+		}
+		return nil
+	}, nil)
+	return dice, err
 }
 
 func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
@@ -978,10 +1001,13 @@ func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error)
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).Filter("IsCustomItem =", true) //.Limit(10)
 	dice := []Die{}
-	if _, err = q.GetAll(c, &dice); err != nil {
-		return nil, fmt.Errorf("problem executing custom card query: %v", err)
-	}
-	return dice, nil
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if _, err = q.GetAll(c, &dice); err != nil {
+			return fmt.Errorf("problem executing custom card query: %v", err)
+		}
+		return nil
+	}, nil)
+	return dice, err
 }
 
 func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, error) {
@@ -1001,13 +1027,16 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 		q = datastore.NewQuery("Die").Ancestor(k)
 	}
 	dice := []Die{}
-	if _, err = q.GetAll(c, &dice); err != nil {
-		return nil, fmt.Errorf("problem executing dice query: %v", err)
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if _, err = q.GetAll(c, &dice); err != nil {
+			return fmt.Errorf("problem executing dice query: %v", err)
+		}
+		return nil
+	}, nil)
 	for _, d := range dice {
 		d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
 	}
-	return dice, nil
+	return dice, err
 }
 
 func clearRoomDice(c context.Context, encodedRoomKey string) error {
@@ -1016,22 +1045,25 @@ func clearRoomDice(c context.Context, encodedRoomKey string) error {
 		return fmt.Errorf("clearRoomDice: could not decode room key %v: %v", encodedRoomKey, err)
 	}
 	q := datastore.NewQuery("Die").Ancestor(k).KeysOnly()
-	out := q.Run(c)
-	nuke := []*datastore.Key{}
-	for {
-		d, err := out.Next(nil)
-		if err != nil {
-			break
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		out := q.Run(c)
+		nuke := []*datastore.Key{}
+		for {
+			d, err := out.Next(nil)
+			if err != nil {
+				break
+			}
+			nuke = append(nuke, d)
 		}
-		nuke = append(nuke, d)
-	}
-	err = datastore.DeleteMulti(c, nuke)
-	if err != nil {
-		return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
-	}
+		err = datastore.DeleteMulti(c, nuke)
+		if err != nil {
+			return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
+		}
+		return nil
+	}, nil)
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	return nil
+	return err
 }
 
 func getDieImageURL(c context.Context, size, result, color string) (string, error) {
@@ -1088,16 +1120,19 @@ func updateDieLocation(c context.Context, encodedDieKey, fp string, x, y float64
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	d.updatePosition(x, y)
-	_, err = datastore.Put(c, k, &d)
-	if err != nil {
-		return fmt.Errorf("could not update die %v with new position: %v", encodedDieKey, err)
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+		}
+		d.updatePosition(x, y)
+		_, err = datastore.Put(c, k, &d)
+		if err != nil {
+			return fmt.Errorf("could not update die %v with new position: %v", encodedDieKey, err)
+		}
+		return nil
+	}, nil)
 	updateRoom(c, k.Parent().Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
-	return nil
+	return err
 }
 
 func deleteDieHelper(c context.Context, encodedDieKey string) error {
@@ -1106,16 +1141,19 @@ func deleteDieHelper(c context.Context, encodedDieKey string) error {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	err = datastore.Delete(c, k)
-	if err != nil {
-		return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+		}
+		err = datastore.Delete(c, k)
+		if err != nil {
+			return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
+		}
+		return nil
+	}, nil)
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	return nil
+	return err
 }
 
 func fateReplace(in string) string {
@@ -1133,24 +1171,26 @@ func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	if d.HiddenBy != fp {
-		return fmt.Errorf("item with key %v was not hidden by %v", encodedDieKey, fp)
-	}
-	if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
-		d.IsHidden = false
-		d.HiddenBy = ""
-		_, err = datastore.Put(c, k, &d)
-		if err != nil {
-			return fmt.Errorf("problem revealing room die %v: %v", encodedDieKey, err)
+	return datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 		}
-		// Fake updater so Safari will work?
-		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-		return nil
-	}
-	return fmt.Errorf("Only cards and custom items can be revealed.")
+		if d.HiddenBy != fp && d.HiddenBy != "" {
+			return fmt.Errorf("item with key %v was not hidden by %v", encodedDieKey, fp)
+		}
+		if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
+			d.IsHidden = false
+			d.HiddenBy = ""
+			_, err = datastore.Put(c, k, &d)
+			if err != nil {
+				return fmt.Errorf("problem revealing room die %v: %v", encodedDieKey, err)
+			}
+			// Fake updater so Safari will work?
+			updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+			return nil
+		}
+		return fmt.Errorf("Only cards and custom items can be revealed.")
+	}, nil)
 }
 
 func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
@@ -1159,21 +1199,26 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
-		d.IsHidden = true
-		d.HiddenBy = hiddenBy
-		_, err = datastore.Put(c, k, &d)
-		if err != nil {
-			return fmt.Errorf("problem hiding room die %v: %v", encodedDieKey, err)
+	return datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 		}
-		// Fake updater so Safari will work?
-		updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-		return nil
-	}
-	return fmt.Errorf("Only cards and custom items can be hidden.")
+		if d.IsHidden && d.HiddenBy != "" {
+			return fmt.Errorf("item is already hidden")
+		}
+		if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
+			d.IsHidden = true
+			d.HiddenBy = hiddenBy
+			_, err = datastore.Put(c, k, &d)
+			if err != nil {
+				return fmt.Errorf("problem hiding room die %v: %v", encodedDieKey, err)
+			}
+			// Fake updater so Safari will work?
+			updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+			return nil
+		}
+		return fmt.Errorf("Only cards and custom items can be hidden.")
+	}, nil)
 }
 
 func getOldColor(u string) string {
@@ -1200,116 +1245,119 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	if d.IsHidden && d.HiddenBy != fp {
-		return fmt.Errorf("wont reroll die with key %v - not hidden by %v", encodedDieKey, fp)
-	}
-	if (d.IsLabel || d.IsImage) && !d.IsFunky {
-		return fmt.Errorf("label")
-	}
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+		}
+		if d.IsHidden && d.HiddenBy != fp {
+			return fmt.Errorf("wont reroll die with key %v - not hidden by %v", encodedDieKey, fp)
+		}
+		if (d.IsLabel || d.IsImage) && !d.IsFunky {
+			return fmt.Errorf("label")
+		}
 
-	if d.IsFunky {
-		d.Result, d.ResultStr = getNewResult(d.Size)
-		d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
-		d.Timestamp = time.Now().Unix()
-	} else if d.IsCustomItem {
-		// Do a single draw.
-		dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName, strconv.FormatBool(d.IsHidden), d.HiddenBy)
-		// Set the location to the same as the passed in die.
-		d.ResultStr = dice[0].ResultStr
-		d.Image = dice[0].Image
-		// Delete the old die.
-		deleteDieHelper(c, keys[0].Encode())
-	} else if d.IsCard {
-		dice, keys := drawCards(c, 1, k.Parent(), "", strconv.FormatBool(d.IsHidden), d.HiddenBy)
-		// Set the location to the same as the passed in die.
-		d.ResultStr = dice[0].ResultStr
-		d.Image = dice[0].Image
-		// Delete the old die.
-		deleteDieHelper(c, keys[0].Encode())
-	} else if d.IsClock {
-		sep := map[string]int{
-			"c4": 5,
-			"c6": 7,
-			"c8": 9,
-			"ct": 7,
-		}
-		oldResult := d.Result
-		d.Result = (d.Result + 1) % sep[d.Size]
-		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
-	} else {
-		if d.SVGPath == "" {
-			svgPath, err := getSVGPath(d.ResultStr, d.Size)
-			if err != nil {
-				log.Printf("could not get SVGPath: %v", err)
-			} else {
-				d.SVGPath = svgPath
-				d.Version = 1
+		if d.IsFunky {
+			d.Result, d.ResultStr = getNewResult(d.Size)
+			d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, d.Size)
+			d.Timestamp = time.Now().Unix()
+		} else if d.IsCustomItem {
+			// Do a single draw.
+			dice, keys := drawCards(c, 1, k.Parent(), d.CustomSetName, strconv.FormatBool(d.IsHidden), d.HiddenBy)
+			// Set the location to the same as the passed in die.
+			d.ResultStr = dice[0].ResultStr
+			d.Image = dice[0].Image
+			// Delete the old die.
+			deleteDieHelper(c, keys[0].Encode())
+		} else if d.IsCard {
+			dice, keys := drawCards(c, 1, k.Parent(), "", strconv.FormatBool(d.IsHidden), d.HiddenBy)
+			// Set the location to the same as the passed in die.
+			d.ResultStr = dice[0].ResultStr
+			d.Image = dice[0].Image
+			// Delete the old die.
+			deleteDieHelper(c, keys[0].Encode())
+		} else if d.IsClock {
+			sep := map[string]int{
+				"c4": 5,
+				"c6": 7,
+				"c8": 9,
+				"ct": 7,
 			}
-		}
-		oldResultStr := fateReplace(d.ResultStr)
-		if d.Color == "" {
-			d.Color = getOldColor(d.Image)
-		}
-		if d.Size == "tokens" {
-			if d.Result == 0 {
-				d.Result = 1
-				d.ResultStr = "1"
-			} else {
-				d.Result = 0
-				d.ResultStr = "0"
-			}
-			if white {
-				d.Result = 0
-				d.ResultStr = "0"
-				if d.OldColor == "" {
-					d.OldColor = d.Color
-					d.Color = "white"
+			oldResult := d.Result
+			d.Result = (d.Result + 1) % sep[d.Size]
+			d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
+		} else {
+			if d.SVGPath == "" {
+				svgPath, err := getSVGPath(d.ResultStr, d.Size)
+				if err != nil {
+					log.Printf("could not get SVGPath: %v", err)
 				} else {
-					d.Color = d.OldColor
-					d.OldColor = ""
+					d.SVGPath = svgPath
+					d.Version = 1
 				}
 			}
-		} else {
-			d.Result, d.ResultStr = getNewResult(d.Size)
-			log.Printf("result: %v; resultstr: %v", d.Result, d.ResultStr)
-		}
-		// SVG here
-		var svg []byte
-		var err error
-		if !isFunky(d.Size) {
+			oldResultStr := fateReplace(d.ResultStr)
+			if d.Color == "" {
+				d.Color = getOldColor(d.Image)
+			}
 			if d.Size == "tokens" {
-				svg, err = createSVG(c, "token", d.ResultStr, d.Color)
+				if d.Result == 0 {
+					d.Result = 1
+					d.ResultStr = "1"
+				} else {
+					d.Result = 0
+					d.ResultStr = "0"
+				}
+				if white {
+					d.Result = 0
+					d.ResultStr = "0"
+					if d.OldColor == "" {
+						d.OldColor = d.Color
+						d.Color = "white"
+					} else {
+						d.Color = d.OldColor
+						d.OldColor = ""
+					}
+				}
 			} else {
-				svg, err = createSVG(c, fmt.Sprintf("d%s", d.Size), d.ResultStr, d.Color)
+				d.Result, d.ResultStr = getNewResult(d.Size)
+				log.Printf("result: %v; resultstr: %v", d.Result, d.ResultStr)
 			}
-			if err != nil {
-				log.Printf("svg creating issue: %v", err)
-			} else {
-				d.SVGBytes = svg
+			// SVG here
+			var svg []byte
+			var err error
+			if !isFunky(d.Size) {
+				if d.Size == "tokens" {
+					svg, err = createSVG(c, "token", d.ResultStr, d.Color)
+				} else {
+					svg, err = createSVG(c, fmt.Sprintf("d%s", d.Size), d.ResultStr, d.Color)
+				}
+				if err != nil {
+					log.Printf("svg creating issue: %v", err)
+				} else {
+					d.SVGBytes = svg
+				}
+			}
+			d.Timestamp = time.Now().Unix()
+			if d.Image != "" {
+				d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
 			}
 		}
-		d.Timestamp = time.Now().Unix()
-		if d.Image != "" {
-			d.Image = strings.Replace(d.Image, fmt.Sprintf("%s.png", oldResultStr), fmt.Sprintf("%s.png", fateReplace(d.ResultStr)), 1)
+		_, err = datastore.Put(c, k, &d)
+		if err != nil {
+			return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
 		}
-	}
-	_, err = datastore.Put(c, k, &d)
-	if err != nil {
-		return fmt.Errorf("problem rerolling room die %v: %v", encodedDieKey, err)
-	}
-	if lastRoll[room] == 0 || lastAction[room] == "reroll" {
-		if d.Size != "F" && d.Size != "H" && !d.IsCard {
-			lastRoll[room] += d.Result
+		if lastRoll[room] == 0 || lastAction[room] == "reroll" {
+			if d.Size != "F" && d.Size != "H" && !d.IsCard {
+				lastRoll[room] += d.Result
+			}
 		}
-	}
+		return nil
+	}, nil)
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	return nil
+	return err
 }
 
 func decrementClock(c context.Context, encodedDieKey string) error {
@@ -1318,30 +1366,33 @@ func decrementClock(c context.Context, encodedDieKey string) error {
 		return fmt.Errorf("could not decode die key %v: %v", encodedDieKey, err)
 	}
 	var d Die
-	if err = datastore.Get(c, k, &d); err != nil {
-		return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
-	}
-	sep := map[string]int{
-		"c4": 5,
-		"c6": 7,
-		"c8": 9,
-		"ct": 7,
-	}
-	if d.Result == 0 { // No need to wrap around.
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, k, &d); err != nil {
+			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
+		}
+		sep := map[string]int{
+			"c4": 5,
+			"c6": 7,
+			"c8": 9,
+			"ct": 7,
+		}
+		if d.Result == 0 { // No need to wrap around.
+			return nil
+		}
+		oldResult := d.Result
+		d.Result = (d.Result - 1) % sep[d.Size]
+		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
+		_, err = datastore.Put(c, k, &d)
+		if err != nil {
+			return fmt.Errorf("problem decrementing clock %v: %v", encodedDieKey, err)
+		}
 		return nil
-	}
-	oldResult := d.Result
-	d.Result = (d.Result - 1) % sep[d.Size]
-	d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
-	_, err = datastore.Put(c, k, &d)
-	if err != nil {
-		return fmt.Errorf("problem decrementing clock %v: %v", encodedDieKey, err)
-	}
+	}, nil)
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent().Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	return nil
+	return err
 }
 
 func getNewResult(kind string) (int, string) {
@@ -1359,7 +1410,7 @@ func getNewResult(kind string) (int, string) {
 				return r + 1, fmt.Sprintf("%d", r+1)
 			} else {
 				r := rand.Intn(2)
-				return r , fmt.Sprintf("%d", r)
+				return r, fmt.Sprintf("%d", r)
 			}
 		}
 	}
@@ -1645,6 +1696,7 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	lastAction[room] = "reveal"
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
+
 func hideDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
@@ -1809,11 +1861,11 @@ func room(w http.ResponseWriter, r *http.Request) {
 		fp = cook.Value
 	}
 	for _, tf := range dice {
-		if tf.HiddenBy == fp || tf.HiddenBy == "" {
+		if tf.HiddenBy == fp || !tf.IsHidden {
 			filteredDice = append(filteredDice, tf)
 			continue
 		}
-		if tf.HiddenBy != "" && tf.IsCard {
+		if tf.IsHidden && tf.IsCard {
 			bucket, err := file.DefaultBucketName(c)
 			if err != nil {
 				log.Printf("failed to get default GCS bucket name: %v", err)
@@ -1891,88 +1943,90 @@ func about(w http.ResponseWriter, _ *http.Request) {
 }
 
 func shuffleDiscards(c context.Context, keyStr, deckName string) error {
-	if deckName != "" {
-		cards, err := getRoomCustomCards(c, keyStr)
-		if err != nil {
-			return err
-		}
-		stillOut := map[string]bool{}
-		for _, k := range cards {
-			stillOut[strconv.Itoa(k.Result)] = true
-		}
-		roomKey, err := datastore.DecodeKey(keyStr)
-		if err != nil {
-			return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
-		}
-		var r Room
-		t := time.Now().Unix()
-		if err = datastore.Get(c, roomKey, &r); err != nil {
-			return err
-		}
-		cs, err := r.GetCustomSets()
-		if err != nil {
-			return err
-		}
-		toShuffle, ok := cs[deckName]
-		if !ok {
-			return fmt.Errorf("could not find custom set %v", deckName)
-		}
-		toShuffle.shuffleDiscards(stillOut)
-		cs[deckName] = toShuffle
-		r.SetCustomSets(cs)
-		r.Timestamp = t
-		_, err = datastore.Put(c, roomKey, &r)
-		if err != nil {
-			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
-		}
-		if err = datastore.Get(c, roomKey, &r); err != nil {
-			return err
-		}
-	} else {
-		cards, err := getRoomCards(c, keyStr)
-		if err != nil {
-			return err
-		}
-		roomCardStrings := map[string]bool{}
-		for _, card := range cards {
-			roomCardStrings[card.ResultStr] = true
-		}
-		sig := ""
-		withCards := []deck.Card{}
-		for k := range cardToPNG {
-			if _, ok := roomCardStrings[k]; !ok {
-				pieces := strings.Split(k, "")
-				cc := deck.Card(faceMap[pieces[0]]*4 + suitMap[pieces[1]])
-				withCards = append(withCards, cc)
+	return datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if deckName != "" {
+			cards, err := getRoomCustomCards(c, keyStr)
+			if err != nil {
+				return err
+			}
+			stillOut := map[string]bool{}
+			for _, k := range cards {
+				stillOut[strconv.Itoa(k.Result)] = true
+			}
+			roomKey, err := datastore.DecodeKey(keyStr)
+			if err != nil {
+				return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
+			}
+			var r Room
+			t := time.Now().Unix()
+			if err = datastore.Get(c, roomKey, &r); err != nil {
+				return err
+			}
+			cs, err := r.GetCustomSets()
+			if err != nil {
+				return err
+			}
+			toShuffle, ok := cs[deckName]
+			if !ok {
+				return fmt.Errorf("could not find custom set %v", deckName)
+			}
+			toShuffle.shuffleDiscards(stillOut)
+			cs[deckName] = toShuffle
+			r.SetCustomSets(cs)
+			r.Timestamp = t
+			_, err = datastore.Put(c, roomKey, &r)
+			if err != nil {
+				return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+			}
+			if err = datastore.Get(c, roomKey, &r); err != nil {
+				return err
+			}
+		} else {
+			cards, err := getRoomCards(c, keyStr)
+			if err != nil {
+				return err
+			}
+			roomCardStrings := map[string]bool{}
+			for _, card := range cards {
+				roomCardStrings[card.ResultStr] = true
+			}
+			sig := ""
+			withCards := []deck.Card{}
+			for k := range cardToPNG {
+				if _, ok := roomCardStrings[k]; !ok {
+					pieces := strings.Split(k, "")
+					cc := deck.Card(faceMap[pieces[0]]*4 + suitMap[pieces[1]])
+					withCards = append(withCards, cc)
+				}
+			}
+			deck.Seed()
+			d, err := deck.New(deck.WithCards(withCards...))
+			if err != nil {
+				return err
+			}
+			d.Shuffle()
+			sig = d.GetSignature()
+			roomKey, err := datastore.DecodeKey(keyStr)
+			if err != nil {
+				return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
+			}
+			var r Room
+			t := time.Now().Unix()
+			if err = datastore.Get(c, roomKey, &r); err != nil {
+				return err
+			}
+			r.Deck = sig
+			r.Timestamp = t
+			_, err = datastore.Put(c, roomKey, &r)
+			if err != nil {
+				return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
+			}
+			if err = datastore.Get(c, roomKey, &r); err != nil {
+				return err
 			}
 		}
-		deck.Seed()
-		d, err := deck.New(deck.WithCards(withCards...))
-		if err != nil {
-			return err
-		}
-		d.Shuffle()
-		sig = d.GetSignature()
-		roomKey, err := datastore.DecodeKey(keyStr)
-		if err != nil {
-			return fmt.Errorf("shuffleDeck: could not decode room key %v: %v", keyStr, err)
-		}
-		var r Room
-		t := time.Now().Unix()
-		if err = datastore.Get(c, roomKey, &r); err != nil {
-			return err
-		}
-		r.Deck = sig
-		r.Timestamp = t
-		_, err = datastore.Put(c, roomKey, &r)
-		if err != nil {
-			return fmt.Errorf("could not create updated room %v: %v", keyStr, err)
-		}
-		if err = datastore.Get(c, roomKey, &r); err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	}, nil)
 }
 
 func shuffle(w http.ResponseWriter, r *http.Request) {
@@ -2008,22 +2062,31 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	}
 	count, err := strconv.Atoi(r.Form.Get("count"))
 	if err != nil {
-		log.Printf("error in draw: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if r.Form.Get("count") == "" {
+			count = 1
+		} else {
+			log.Printf("error in draw: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 	fp := r.Form.Get("fp")
 	dice, keys := drawCards(c, count, roomKey, r.Form.Get("deck"), r.Form.Get("hidden"), fp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	_, err = datastore.PutMulti(c, keys, dice)
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		_, err = datastore.PutMulti(c, keys, dice)
+		if err != nil {
+			return fmt.Errorf("could not create new dice: %v", err)
+		}
+		if err = datastore.Get(c, roomKey, &Room{}); err != nil {
+			return fmt.Errorf("other error in draw: %v", err)
+		}
+		return nil
+	}, nil)
 	if err != nil {
-		log.Printf("could not create new dice: %v", err)
+		log.Printf("%v", err)
 	}
-	if err = datastore.Get(c, roomKey, &Room{}); err != nil {
-		log.Printf("other error in draw: %v", err)
-	}
-
 	lastAction[room] = "draw"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
