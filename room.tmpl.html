@@ -17,6 +17,7 @@
     <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
     <!--<script src="/js/jquery.postitall.js"></script>-->
     <link href="https://fonts.googleapis.com/css?family=Ubuntu+Condensed" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/push.js/1.0.5/push.min.js"></script>
 
     <script type="text/javascript" language="javascript">
 
@@ -616,7 +617,18 @@
                     if (b !== "") {
                         var chunks = b.split("||");
                         if (chunks.length === 2) {
-                            alert(chunks[1]);
+                            if (Push.Permission.has()) {
+                                Push.create("Safety tool used!", {
+                                    body: chunks[1],
+                                    timeout: 4000,
+                                    onClick: function () {
+                                        window.focus();
+                                        this.close();
+                                    }
+                                });
+                            } else {
+                                alert(chunks[1]);
+                            }
                         }
                         if (sessionStorage.lastUpdateId) {
                             if (b !== sessionStorage.lastUpdateId) {
