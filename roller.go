@@ -669,10 +669,12 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 					return fmt.Errorf("issue creating empty deck: %v", err)
 				}
 				room.Deck = empty.GetSignature()
-				if _, err := datastore.Put(c, roomKey, &room); err != nil {
-					return fmt.Errorf("issue updating deck in drawCards: %v", err)
-				}
-				return nil
+				return datastore.RunInTransaction(c, func(ctx context.Context) error {
+					if _, err := datastore.Put(c, roomKey, &room); err != nil {
+						return fmt.Errorf("issue updating deck in drawCards: %v", err)
+					}
+					return nil
+				}, nil)
 			}
 			if deckSize < count {
 				roomDeck.Deal(deckSize, hand)
@@ -706,8 +708,14 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				keys = append(keys, dk)
 			}
 			room.Deck = roomDeck.GetSignature()
-			if _, err := datastore.Put(c, roomKey, &room); err != nil {
-				log.Printf("issue updating room in drawCards: %v", err)
+			err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+				if _, err := datastore.Put(c, roomKey, &room); err != nil {
+					return fmt.Errorf("issue updating room in drawCards: %v", err)
+				}
+				return nil
+			}, nil)
+			if err != nil {
+				log.Printf("%v", err)
 			}
 		} else {
 			// do the custom set stuff here...
@@ -719,12 +727,10 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 			if !ok {
 				return fmt.Errorf("no custom set with name %v", deckName)
 			}
-			log.Printf("%v\n", cs.Instance)
 			drawn, err := cs.Draw(count)
 			if err != nil {
 				log.Printf("problem with custom draw: %v", err)
 			}
-			log.Printf("%v\n", cs.Instance)
 			for i, card := range drawn {
 				ii, err := strconv.Atoi(i)
 				if err != nil {
@@ -760,13 +766,16 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 			if err != nil {
 				return fmt.Errorf("issue setting custom sets in drawCards: %v", err)
 			}
-			if _, err := datastore.Put(c, roomKey, &room); err != nil {
-				log.Printf("issue updating room in drawCards: %v", err)
-			}
-			var testRoom Room
-			if err = datastore.Get(c, roomKey, &testRoom); err != nil {
-				log.Printf("couldn't find the new entry: %v", err)
-			}
+			err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+				if _, err := datastore.Put(c, roomKey, &room); err != nil {
+					return fmt.Errorf("issue updating room in drawCards: %v", err)
+				}
+				var testRoom Room
+				if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+					return fmt.Errorf("couldn't find the new entry: %v", err)
+				}
+				return nil
+			}, nil)
 		}
 		return nil
 	}, nil)
