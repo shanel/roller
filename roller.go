@@ -158,6 +158,7 @@ type PassedCustomSet struct {
 	SnakeName string
 	Pull      template.JS
 	Randomize template.JS
+	Remove    template.JS
 	Height    template.JS
 	Width     template.JS
 }
@@ -517,6 +518,45 @@ func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 		err = r.SetCustomSets(rcs)
 		if err != nil {
 			return fmt.Errorf("other error in addCustomSet: %v", err)
+		}
+		_, err = datastore.Put(c, roomKey, &r)
+		if err != nil {
+			return fmt.Errorf("could not create updated room %v: %v", rk, err)
+		}
+
+		var testRoom Room
+		if err = datastore.Get(c, roomKey, &testRoom); err != nil {
+			return fmt.Errorf("couldn't find the new entry: %v", err)
+		}
+		return nil
+	}, nil)
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+}
+
+func removeCustomSet(c context.Context, rk, name string) {
+	keyStr, err := getEncodedRoomKeyFromName(c, rk)
+	if err != nil {
+		log.Printf("roomname wonkiness in addCustomSet: %v", err)
+		return
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("addCustomSet: could not decode room key %v: %v", rk, err)
+		return
+	}
+	var r Room
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+		if err = datastore.Get(c, roomKey, &r); err != nil {
+			return fmt.Errorf("could not find room %v for removing custom set: %v", rk, err)
+		}
+		rcs, err := r.GetCustomSets()
+		if err != nil {
+			return fmt.Errorf("error in removeCustomSet%v", err)
+		}
+		delete(rcs, name)
+		err = r.SetCustomSets(rcs)
+		if err != nil {
+			return fmt.Errorf("other error in removeCustomSet: %v", err)
 		}
 		_, err = datastore.Put(c, roomKey, &r)
 		if err != nil {
@@ -1442,6 +1482,7 @@ func init() {
 	http.HandleFunc("/move", move)
 	http.HandleFunc("/paused", paused)
 	http.HandleFunc("/refresh", refresh)
+	http.HandleFunc("/removecustomset", handleRemovingCustomSet)
 	http.HandleFunc("/reroll", rerollDie)
 	http.HandleFunc("/reveal", revealDie)
 	http.HandleFunc("/roll", roll)
@@ -1551,13 +1592,31 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
-		log.Printf("roomname wonkiness in background: %v", err)
+		log.Printf("roomname wonkiness in handleAddingCustonSet: %v", err)
 	}
 	roomKey, err := datastore.DecodeKey(keyStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	addCustomSet(c, room, name, entries, height, width)
+	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
+	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+}
+
+func handleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.Form.Get("deck")
+	c := appengine.NewContext(r)
+	room := path.Base(r.Referer())
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		log.Printf("roomname wonkiness in handleAddingCustomSet: %v", err)
+	}
+	roomKey, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	removeCustomSet(c, room, name)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
@@ -1903,7 +1962,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	} else {
 		for i, s := range rcs {
 			sn := strings.Replace(i, " ", "_", -1)
-			pcs := PassedCustomSet{len(s.Instance), i, sn, template.JS(fmt.Sprintf("pull_from_%s()", sn)), template.JS(fmt.Sprintf("randomize_discards_from_%s()", sn)), template.JS(s.MaxHeight), template.JS(s.MaxWidth)}
+			pcs := PassedCustomSet{len(s.Instance), i, sn, template.JS(fmt.Sprintf("pull_from_%s()", sn)), template.JS(fmt.Sprintf("randomize_discards_from_%s()", sn)), template.JS(fmt.Sprintf("remove_%s()", sn)), template.JS(s.MaxHeight), template.JS(s.MaxWidth)}
 			p.CustomSets = append(p.CustomSets, pcs)
 		}
 	}

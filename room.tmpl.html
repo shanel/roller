@@ -313,12 +313,23 @@
         location.reload();
         }
 
-
         function {{.Randomize}} {
             $.post("/shuffle", {
                 fp: fp,
                 deck: {{.Name}}
-        }).done(function (data) {});
+            }).done(function (data) {});
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function {{.Remove}} {
+            var remove = confirm("Remove this custom set from room?");
+            if (remove === true) {
+                $.post("/removecustomset", {
+                    fp: fp,
+                    deck: {{.Name}}
+                }).done(function (data) {});
+            }
             $("#customButtons").load(window.location.href + " #customButtons");
             $("#refreshable").load(window.location.href + " #refreshable");
         }
@@ -1270,6 +1281,8 @@
     </button>
     <button id="randomize_discards_from_{{.SnakeName}}_button" class="button" onclick={{.Randomize}}>Randomize discards
         from {{.Name}}
+    </button>
+    <button id="remove_{{.SnakeName}}_button" class="button" onclick={{.Remove}}>Remove {{.Name}}
     </button>
     {{end}}
 </div>
