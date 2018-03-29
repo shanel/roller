@@ -614,8 +614,11 @@
                 if (event.altKey) {
                     var size = $(event.currentTarget).attr('die-size');
                     var kind = document.querySelectorAll('[die-size=\'' + size + '\']');
+                    var currently_selected = event.currentTarget.classList.contains('selected');
                     for (var i = 0; i < kind.length; i++) {
-                        kind[i].classList.toggle('selected');
+                        if (kind[i].classList.contains('selected') === currently_selected) {
+                            kind[i].classList.toggle('selected');
+                        }
                     }
                 } else {
                     event.currentTarget.classList.toggle('selected');
