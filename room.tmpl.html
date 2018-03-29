@@ -5,7 +5,7 @@
     <title>Roll For Your Party</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.5.1/fingerprint2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.6.1/fingerprint2.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/jquery.darktooltip.min.js"></script>
     <link rel="stylesheet" type="text/css"
           href="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/darktooltip.css">
@@ -611,7 +611,15 @@
                 }
             })
             .on('tap', function (event) {
-                event.currentTarget.classList.toggle('selected');
+                if (event.metaKey) {
+                    var size = $(event.currentTarget).attr('die-size');
+                    var kind = document.querySelectorAll('[die-size=\'' + size + '\']');
+                    for (var i = 0; i < kind.length; i++) {
+                        kind[i].classList.toggle('selected');
+                    }
+                } else {
+                    event.currentTarget.classList.toggle('selected');
+                }
             });
 
         var lastRealUpdate = 0;
@@ -1535,9 +1543,7 @@
             }
         }
     }
-</script>
-
-<script>
+    
     $(document).ready(function(){
         $("#hide").click(function(){
             $("#hideable").hide();
@@ -1597,7 +1603,7 @@
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-             style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}">
+             style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-color="{{.Color}}">
             {{if .IsCustomItem}}
             {{if .IsImage}}
             <img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">
@@ -1642,7 +1648,7 @@
         </div>
         {{else}}
         <div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"
-             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">
+             style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-color="{{.Color}}">
             {{if .IsCustomItem}}
             {{if .IsImage}}
             <img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">
@@ -1684,7 +1690,7 @@
         Design and functionality based on <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a
             href="//https://catchyourhare.com/diceroller/">dice roller</a> and dice designed by <a href="http://jesseross.com">Jesse Ross</a>.
         <br>
-        <b>NOTE: The site tends to work poorly in private browsing modes.</b>
+        <b>NOTE: The site tends to work poorly in private browsing modes. You'll also want to whitelist this site for your ad-blocker.</b>
     </div>
 </div>
 

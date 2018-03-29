@@ -115,11 +115,6 @@ func (cs *CustomSet) Draw(c int) (map[string]string, error) {
 		return out, fmt.Errorf("the deck is empty")
 	}
 	if left <= c {
-		//for i, j := range cs.Instance {
-		//	out[i] = j
-		//}
-		//cs.Instance = map[string]string{}
-		//return out, fmt.Errorf("could not draw full %v entries, only %v left in set", c, left)
 		c = left
 	}
 	remove := []string{}
@@ -162,27 +157,6 @@ type PassedCustomSet struct {
 	Height    template.JS
 	Width     template.JS
 }
-
-//func newCustomSetFromURL(u string) (CustomSet, error) {
-//	resp, err := http.Get(u)
-//	defer resp.Body.Close()
-//
-//	if err != nil {
-//		return CustomSet{}, err
-//	}
-//	bytes, err := ioutil.ReadAll(resp.Body)
-//	if err != nil {
-//		return CustomSet{}, err
-//	}
-//	pieces := strings.Split(string(bytes), "\n")
-//	cs := CustomSet{Template: map[string]string{}, Instance: map[string]string{}}
-//	for i, p := range pieces {
-//		si := strconv.Itoa(i)
-//		cs.Template[si] = p
-//		cs.Instance[si] = p
-//	}
-//	return cs, nil
-//}
 
 func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet, error) {
 	// Get rid of random space at front or end
@@ -240,23 +214,15 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		return nil, err
 	}
 	colors := map[string]string{
-		//"clear":  "rgb(173, 216, 230)",
-		"clear": "rgb(228, 242, 247)", // #e4f2f7
-		"green": "rgb(131, 245, 108)", // #83f56c
-		//"green":  "rgb(0, 204, 0)",
-		"red": "rgb(228, 79, 79)", // #e44f4f
-		//"red":    "rgb(255, 0, 0)",
-		"blue": "rgb(88, 181, 243)", // #58b5f3
-		//"blue":   "rgb(0, 153, 255)",
-		"orange": "rgb(255, 158, 12)", // #ff9e0c
-		//"orange": "rgb(255, 153, 0)",
-		//"purple": "rgb(153, 0, 255)",
-		//"violet": "rgb(153, 0, 255)",
+		"clear":  "rgb(228, 242, 247)", // #e4f2f7
+		"green":  "rgb(131, 245, 108)", // #83f56c
+		"red":    "rgb(228, 79, 79)",   // #e44f4f
+		"blue":   "rgb(88, 181, 243)",  // #58b5f3
+		"orange": "rgb(255, 158, 12)",  // #ff9e0c
 		"purple": "rgb(142, 119, 218)", // #8e77da
 		"violet": "rgb(142, 119, 218)", // #8e77da
 		"gold":   "rgb(254, 248, 78)",  // #fef84e
-		//"gold":   "rgb(255, 255, 77)",
-		"white": "rgb(255, 255, 255)",
+		"white":  "rgb(255, 255, 255)",
 	}
 	clr, ok := colors[color]
 	if !ok {
