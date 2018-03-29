@@ -611,7 +611,7 @@
                 }
             })
             .on('tap', function (event) {
-                if (event.metaKey) {
+                if (event.altKey) {
                     var size = $(event.currentTarget).attr('die-size');
                     var kind = document.querySelectorAll('[die-size=\'' + size + '\']');
                     for (var i = 0; i < kind.length; i++) {
@@ -1543,7 +1543,7 @@
             }
         }
     }
-    
+
     $(document).ready(function(){
         $("#hide").click(function(){
             $("#hideable").hide();
