@@ -1851,7 +1851,11 @@ func room(w http.ResponseWriter, r *http.Request) {
 		if i == 0 {
 			newestTimestamp = d.Timestamp
 		}
-		if _, err := strconv.Atoi(d.Size); err == nil {
+		realSize := d.Size
+		if realSize == "6p" {
+			realSize = "6"
+		}
+		if _, err := strconv.Atoi(realSize); err == nil {
 			roomTotal += d.Result
 			roomCount++
 			if newestTimestamp == d.Timestamp {
