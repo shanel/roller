@@ -24,19 +24,34 @@
         var DEFAULT_COLOR = "clear";
         var hideDraws = false;
         var showFunkyDice = false;
-        var sortDice = true;
+        var sortDice = false;
         var saveRolls = false;
         var whiteFlips = false;
 
-        var fp = "";
-        new Fingerprint2().get(function (result, components) {
-            fp = result; //a hash, representing your device fingerprint
-            var x = document.getElementsByName("fp");
-            x[0].value = fp;
-            Cookies.set('fp', fp);
-            Cookies.set('fp', fp, {path: '/room'});
-            Cookies.set('fp', fp, {path: ''});
-        });
+        var fp = Cookies.get('fp');
+        if (window.requestIdleCallback) {
+            requestIdleCallback(function () {
+                new Fingerprint2().get(function (result, components) {
+                    if (typeof fp === 'undefined') {
+                        fp = result; //a hash, representing your device fingerprint
+                        Cookies.set('fp', fp, {expires: 365});
+                    }
+                    var x = document.getElementsByName("fp");
+                    x[0].value = fp;
+                })
+            })
+        } else {
+            setTimeout(function () {
+                new Fingerprint2().get(function (result, components) {
+                    if (typeof fp === 'undefined') {
+                        fp = result; //a hash, representing your device fingerprint
+                        Cookies.set('fp', fp, {expires: 365});
+                    }
+                    var x = document.getElementsByName("fp");
+                    x[0].value = fp;
+                })
+            }, 500)
+        }
 
         function dragStart(target, x, y) {
             // update the position attributes
@@ -520,40 +535,40 @@
         function hiddenDraws() {
             if (document.getElementById('hiddenDraw').checked) {
                 hideDraws = true;
-                Cookies.set('hide_draws', 'true', { path: '' });
+                Cookies.set('hide_draws', 'true', { path: window.location.pathname, expires: 365});
             } else {
                 hideDraws = false;
-                Cookies.set('hide_draws', 'false', { path: '' });
+                Cookies.set('hide_draws', 'false', { path: window.location.pathname, expires: 365});
             }
         }
 
         function sortedDice() {
             if (document.getElementById('sortTheDice').checked) {
                 sortDice = true;
-                Cookies.set('sort_dice', 'true', { path: '' });
+                Cookies.set('sort_dice', 'true', { path: window.location.pathname, expires: 365});
             } else {
                 sortDice = false;
-                Cookies.set('sort_dice', 'false', { path: '' });
+                Cookies.set('sort_dice', 'false', { path: window.location.pathname, expires: 365});
             }
         }
 
         function savedRolls() {
             if (document.getElementById('savedRoll').checked) {
                 hideDraws = true;
-                Cookies.set('save_rolls', 'true', { path: '' });
+                Cookies.set('save_rolls', 'true', { path: window.location.pathname, expires: 365});
             } else {
                 hideDraws = false;
-                Cookies.set('save_rolls', 'false', { path: '' });
+                Cookies.set('save_rolls', 'false', { path: window.location.pathname, expires: 365});
             }
         }
 
         function funkierDice() {
             if (document.getElementById('funkyDice').checked) {
                 showFunkyDice = true;
-                Cookies.set('funky_dice', 'true', { path: '' });
+                Cookies.set('funky_dice', 'true', { path: window.location.pathname, expires: 365});
             } else {
                 showFunkyDice = false;
-                Cookies.set('funky_dice', 'false', { path: '' });
+                Cookies.set('funky_dice', 'false', { path: window.location.pathname, expires: 365});
             }
             location.reload();
         }
@@ -561,10 +576,10 @@
         function flipToWhite() {
             if (document.getElementById('flipToWhiteTokens').checked) {
                 whiteFlips = true;
-                Cookies.set('white_flips', 'true', { path: '' });
+                Cookies.set('white_flips', 'true', { path: window.location.pathname, expires: 365});
             } else {
                 whiteFlips = false;
-                Cookies.set('white_flips', 'false', { path: '' });
+                Cookies.set('white_flips', 'false', { path: window.location.pathname, expires: 365});
             }
         }
 
@@ -1518,8 +1533,8 @@
         }
     }
 
-    if (Cookies.get('sort_dice') === 'false') {
-        sortDice = false;
+    if (Cookies.get('sort_dice') === 'true') {
+        sortDice = true;
     }
     document.getElementById('sortTheDice').checked = sortDice;
 
