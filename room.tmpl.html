@@ -823,6 +823,10 @@
         background-color: #ffffff;
     }
 
+    summary {
+        background-color: #909090;
+    }
+
     .tap-target {
         display: inline-block;
     }
@@ -957,6 +961,12 @@
 
     p {
         text-align: center;
+    }
+
+    h2 {
+        text-align: center;
+        margin-top: 0px;
+        margin-bottom: 0px;
     }
 
     h3 {
@@ -1222,9 +1232,18 @@
         </fieldset>
     </form>
 </div>
+<details id="safety-tools">
+    <summary><span id="safetyLabel">Safety Tools (🞬 ⏪ ⏸ ⏩)</span></summary>
+    <div class="buttons">
+        <button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>
+        <button id="rewindButton" class="button button3" onclick="rewind()">⏪ Rewind</button>
+        <button id="pauseButton" class="button button3" onclick="pause()">⏸ Pause</button>
+        <button id="fastForwardButton" class="button button3" onclick="fastForward()">⏩ Fast-Forward</button>
+    </div>
+</details>
 <details id="controls" open>
 <summary>Controls</summary>
-    <h3>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h3>
+    <h2>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h2>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
@@ -1319,13 +1338,6 @@
     <button id="6ClockButton" class="button" onclick="create6Clock()">6</button>
     <button id="8ClockButton" class="button" onclick="create8Clock()">8</button>
     <button id="threatClockButton" class="button" onclick="createTClock()">Threat</button>
-</div>
-<div class="buttons">
-    <span id="safetyLabel">Safety Tools:</span>
-    <button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>
-    <button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>
-    <button id="pauseButton" class="button button3" onclick="pause()">Pause</button>
-    <button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>
 </div>
 <div id="prefs" class="buttons">
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
