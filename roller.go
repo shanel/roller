@@ -1455,6 +1455,9 @@ func init() {
 	http.HandleFunc("/room", room)
 	http.HandleFunc("/room/", room)
 	http.HandleFunc("/room/*", room)
+	http.HandleFunc("/safety", safetyRoom)
+	http.HandleFunc("/safety/", safetyRoom)
+	http.HandleFunc("/safety/*", safetyRoom)
 	http.HandleFunc("/shuffle", shuffle)
 
 	// Seed random number generator.
@@ -1957,6 +1960,60 @@ func room(w http.ResponseWriter, r *http.Request) {
 		"hidden":   hidden,
 	}).Parse(string(content[:])))
 	if err := roomTemplate.Execute(w, p); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func safetyRoom(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	room := path.Base(r.URL.Path)
+	if _, ok := repeatOffenders[room]; ok {
+		http.NotFound(w, r)
+		return
+	}
+	keyStr, err := getEncodedRoomKeyFromName(c, room)
+	if err != nil {
+		repeatOffenders[room] = true
+		log.Printf("room wonkiness in room: %v", err)
+	}
+	_, err = getRoomDice(c, keyStr, "Result", "true")
+	if err != nil {
+		newRoom, err := newRoom(c)
+		if err != nil {
+			log.Printf("no room because: %v", err)
+			// TODO(shanel): This should probably say something more...
+			http.NotFound(w, r)
+		}
+		http.SetCookie(w, &http.Cookie{Name: "safety_room", Value: newRoom})
+		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
+		repeatOffenders[room] = true
+		http.Redirect(w, r, fmt.Sprintf("/safety/%v", newRoom), http.StatusFound)
+		return
+	}
+
+
+	cookie := &http.Cookie{Name: "dice_room", Value: room}
+	http.SetCookie(w, cookie)
+
+	var rm Room
+	k, err := datastore.DecodeKey(keyStr)
+	if err != nil {
+		log.Printf("room: could not decode room key %v: %v", keyStr, err)
+	} else {
+		err := datastore.Get(c, k, &rm)
+		if err != nil {
+			log.Printf("could not find room: %v", err)
+		}
+	}
+	content, err := ioutil.ReadFile("safety.tmpl.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	roomTemplate := template.Must(template.New("safety").Funcs(template.FuncMap{
+		"noescape": noescape,
+		"hidden":   hidden,
+	}).Parse(string(content[:])))
+	if err := roomTemplate.Execute(w, Passer{}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

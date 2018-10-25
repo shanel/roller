@@ -583,6 +583,12 @@
             }
         }
 
+        function popoutSafety() {
+            var room = window.location.href.substr(window.location.href.lastIndexOf('/') + 1);
+            console.log(room);
+            window.open("/safety/" + room, "", "height=600,width=100,location=no,menubar=no,resizeable=yes,status=no,titlebar=no,toolbar=no");
+        }
+
 
 
         interact('.label-tap-target')
@@ -682,7 +688,7 @@
                         if (lastRealUpdate > 0) {
                             var delta = unix - lastRealUpdate;
                             // Stop updating after 60m
-                            if (delta > 3600) {
+                            if (delta > 10400) {
                                 window.location.replace("/paused?id=" + room);
                             }
                         }
@@ -792,9 +798,6 @@
                 dialog.dialog("open");
             });
         });
-
-
-
     </script>
 
 
@@ -1325,6 +1328,7 @@
     <button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>
     <button id="pauseButton" class="button button3" onclick="pause()">Pause</button>
     <button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>
+    <button id="moreSafetyToolsButton" class="button button3" onclick="popoutSafety()">More Tools</button>
 </div>
 <div id="prefs" class="buttons">
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
