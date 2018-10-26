@@ -823,6 +823,10 @@
         background-color: #ffffff;
     }
 
+    summary {
+        background-color: #909090;
+    }
+
     .tap-target {
         display: inline-block;
     }
@@ -957,6 +961,12 @@
 
     p {
         text-align: center;
+    }
+
+    h2 {
+        text-align: center;
+        margin-top: 0px;
+        margin-bottom: 0px;
     }
 
     h3 {
@@ -1222,8 +1232,31 @@
         </fieldset>
     </form>
 </div>
-<div id="hideable">
-    <h3>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h3>
+<details id="safety-tools">
+    <summary><span id="safetyLabel">Safety Tools (
+    &#10006;
+    <img width="11" height="11"
+    src="data:image/svg+xml;charset=UTF-8,%3csvg xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:cc='http://creativecommons.org/ns%23' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns%23' xmlns:svg='http://www.w3.org/2000/svg' xmlns='http://www.w3.org/2000/svg' xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' width='64' height='64' viewBox='0 0 64 64' version='1.1' %3e%3cpath style='opacity:1;fill:%23000000;stroke:none;' d='M 3 2 L 3 62 L 28.048828 40.5 L 28.048828 62 L 63 32 L 28.048828 2 L 28.048828 23.5 L 3 2 z ' transform='translate(64,0) scale(-1,1)' /%3e%3c/svg%3e"
+    alt="&#9194;"/>
+
+    <img width="11" height="11"
+    src="data:image/svg+xml;charset=UTF-8,%3csvg xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:cc='http://creativecommons.org/ns%23' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns%23' xmlns:svg='http://www.w3.org/2000/svg' xmlns='http://www.w3.org/2000/svg' xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' width='64' height='64' viewBox='0 0 64 64' version='1.1' %3e%3cpath style='opacity:1;fill:%23000000;fill-opacity:1;stroke:none' d='M 2,2 2,62 26.3,62 26.3,2 2,2 Z' /%3e%3cpath style='opacity:1;fill:%23000000;fill-opacity:1;stroke:none' d='m 37.69,2 0,60 L 62,62 62,2 37.69,2 Z' /%3e%3c/svg%3e"
+    alt="&#9208;" />
+
+    <img width="11" height="11"
+    src="data:image/svg+xml;charset=UTF-8,%3csvg xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:cc='http://creativecommons.org/ns%23' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns%23' xmlns:svg='http://www.w3.org/2000/svg' xmlns='http://www.w3.org/2000/svg' xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' width='64' height='64' viewBox='0 0 64 64' version='1.1' %3e%3cpath style='opacity:1;fill:%23000000;fill-opacity:1;stroke:none;stroke-width:3;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1' d='M 3 2 L 3 62 L 28.048828 40.5 L 28.048828 62 L 63 32 L 28.048828 2 L 28.048828 23.5 L 3 2 z ' id='path3' /%3e%3c/svg%3e"
+    alt="&#9193;" />
+    )</span></summary>
+    <div class="buttons">
+        <button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>
+        <button id="rewindButton" class="button button3" onclick="rewind()">&#9194; Rewind</button>
+        <button id="pauseButton" class="button button3" onclick="pause()">&#9208; Pause</button>
+        <button id="fastForwardButton" class="button button3" onclick="fastForward()">&#9193; Fast-Forward</button>
+    </div>
+</details>
+<details id="controls" open>
+<summary>Controls</summary>
+    <h2>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h2>
 <p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect
     them! Double click them to reroll them!</p>
 <form id="rollem" action="/roll" method="post">
@@ -1318,13 +1351,6 @@
     <button id="6ClockButton" class="button" onclick="create6Clock()">6</button>
     <button id="8ClockButton" class="button" onclick="create8Clock()">8</button>
     <button id="threatClockButton" class="button" onclick="createTClock()">Threat</button>
-</div>
-<div class="buttons">
-    <span id="safetyLabel">Safety Tools:</span>
-    <button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>
-    <button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>
-    <button id="pauseButton" class="button button3" onclick="pause()">Pause</button>
-    <button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>
 </div>
 <div id="prefs" class="buttons">
     <label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>
@@ -1562,21 +1588,9 @@
         }
     }
 
-    $(document).ready(function(){
-        $("#hide").click(function(){
-            $("#hideable").hide();
-        });
-        $("#show").click(function(){
-            $("#hideable").show();
-        });
-    });
 </script>
 <br>
-</div>
-<div class="buttons">
-<button class="button" id="hide">Hide controls</button>
-<button class="button" id="show">Show controls</button>
-</div>
+</details>
 <hr>
 <div class="refreshable" id="refreshable">
 
