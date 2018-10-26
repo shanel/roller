@@ -214,15 +214,21 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		return nil, err
 	}
 	colors := map[string]string{
-		"clear":  "rgb(228, 242, 247)", // #e4f2f7
-		"green":  "rgb(131, 245, 108)", // #83f56c
-		"red":    "rgb(228, 79, 79)",   // #e44f4f
-		"blue":   "rgb(88, 181, 243)",  // #58b5f3
-		"orange": "rgb(255, 158, 12)",  // #ff9e0c
-		"purple": "rgb(142, 119, 218)", // #8e77da
-		"violet": "rgb(142, 119, 218)", // #8e77da
-		"gold":   "rgb(254, 248, 78)",  // #fef84e
-		"white":  "rgb(255, 255, 255)",
+		"clear":     "rgb(228, 242, 247)", // #e4f2f7
+		"green":     "rgb(131, 245, 108)", // #83f56c
+		"red":       "rgb(228, 79, 79)",   // #e44f4f
+		"blue":      "rgb(88, 181, 243)",  // #58b5f3
+		"orange":    "rgb(255, 158, 12)",  // #ff9e0c
+		"purple":    "rgb(142, 119, 218)", // #8e77da
+		"violet":    "rgb(142, 119, 218)", // #8e77da
+		"pink":      "rgb(255, 105, 180)", //#ff69b4
+		"magenta":   "rgb(255, 0, 255)",   // #ff00ff
+		"turquoise": "rgb(64, 224, 208)",  // #40e0d0
+		"silver":    "rgb(192, 192, 192)", // #c0c0c0
+		"lavender":  "rgb(230, 230, 250)", // #e6e6fa
+		"khaki":     "rgb(240, 230, 140)", // #f0e68c
+		"gold":      "rgb(254, 248, 78)",  // #fef84e
+		"white":     "rgb(255, 255, 255)",
 	}
 	clr, ok := colors[color]
 	if !ok {

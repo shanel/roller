@@ -682,7 +682,7 @@
                         if (lastRealUpdate > 0) {
                             var delta = unix - lastRealUpdate;
                             // Stop updating after 60m
-                            if (delta > 3600) {
+                            if (delta > 10400) {
                                 window.location.replace("/paused?id=" + room);
                             }
                         }
@@ -1310,9 +1310,16 @@
         <option id="BlueColor" value="blue">Blue</option>
         <option id="GreenColor" value="green">Green</option>
         <option id="OrangeColor" value="orange">Orange</option>
+        <option id="LavenderColor" value="lavender">Lavender</option>
         <option id="RedColor" value="red">Red</option>
         <option id="PurpleColor" value="violet">Purple</option>
         <option id="YellowColor" value="gold">Yellow</option>
+        <option id="WhiteColor" value="white">White</option>
+        <option id="KhakiColor" value="khaki">Khaki</option>
+        <option id="PinkColor" value="pink">Pink</option>
+        <option id="MagentaColor" value="magenta">Magenta</option>
+        <option id="SilverColor" value="silver">Silver</option>
+        <option id="TurquoiseColor" value="turquoise">Turquoise</option>
     </select>
 
     <label id="modifierLabel" for="modifier">modifier: </label>
