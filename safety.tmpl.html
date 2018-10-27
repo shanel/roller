@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Safety For Your Party</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.2.9/interact.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/1.6.1/fingerprint2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/jquery.darktooltip.min.js"></script>
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/darktooltip/0.4.0/darktooltip.css">
+    <link rel="stylesheet" type="text/css" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.4/js.cookie.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>-->
+    <!--<link rel="stylesheet" href="/js/jquery.postitall.css">-->
+    <!--<script src="/js/jquery.postitall.js"></script>-->
+    <link href="https://fonts.googleapis.com/css?family=Ubuntu+Condensed" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/push.js/1.0.5/push.min.js"></script>
+
+    <script type="text/javascript" language="javascript">
+
+        var DEFAULT_COLOR = "clear";
+        var hideDraws = false;
+        var showFunkyDice = false;
+        var sortDice = false;
+        var saveRolls = false;
+        var whiteFlips = false;
+
+        var fp = Cookies.get('fp');
+        if (window.requestIdleCallback) {
+            requestIdleCallback(function () {
+                new Fingerprint2().get(function (result, components) {
+                    if (typeof fp === 'undefined') {
+                        fp = result; //a hash, representing your device fingerprint
+                        Cookies.set('fp', fp, {expires: 365});
+                    }
+                    var x = document.getElementsByName("fp");
+                    x[0].value = fp;
+                })
+            })
+        } else {
+            setTimeout(function () {
+                new Fingerprint2().get(function (result, components) {
+                    if (typeof fp === 'undefined') {
+                        fp = result; //a hash, representing your device fingerprint
+                        Cookies.set('fp', fp, {expires: 365});
+                    }
+                    var x = document.getElementsByName("fp");
+                    x[0].value = fp;
+                })
+            }, 500)
+        }
+
+        function dragStart(target, x, y) {
+            // update the position attributes
+            target.setAttribute('start-x', x);
+            target.setAttribute('start-y', y);
+        }
+
+        // target elements with the "draggable" class
+        interact('.draggable')
+            .draggable({
+                // enable inertial throwing
+                inertia: true,
+                // enable autoScroll
+                autoScroll: true,
+
+                onstart: function (event) {
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            // This is a hack explicity to make life easier for GMs prepping to run
+                            // The Clay That Woke.
+                            if (t.classList.contains('stack')) {
+                                var rect = t.getBoundingClientRect();
+                            } else {
+                                var rect = as[i].getBoundingClientRect();
+                            }
+                            dragStart(as[i], rect.left, rect.top);
+                        }
+                    } else {
+                        var rect = t.getBoundingClientRect();
+                        dragStart(t, rect.left, rect.top);
+                    }
+
+                },
+                // call this function on every dragmove event
+                onmove: function (event) {
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            dragMoveListener(as[i], event.dx, event.dy);
+                        }
+                    } else {
+                        dragMoveListener(t, event.dx, event.dy);
+                    }
+                },
+//                onend: dragMoveEnd
+                onend: function (event) {
+                    var t = event.target;
+                    if (t.classList.contains('selected')) {
+                        var as = document.getElementsByClassName('selected');
+                        for (var i = 0; i < as.length; i++) {
+                            dragMoveEnd(as[i]);
+                        }
+                    } else {
+                        dragMoveEnd(t);
+                    }
+//                    dragMoveEnd(t);
+                }
+                // call this function on every dragend event
+            });
+
+
+        function dragMoveEnd(target) {
+                // keep the dragged position in the data-x/data-y attributes
+                var x = (parseFloat(target.getAttribute('data-x')) || 0),
+                y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+
+            // TODO(shanel): This is janky and annoying...
+            var transformer = target.style.transform;
+            if (transformer.search("px") !== -1) {
+                x += parseFloat(target.getAttribute('start-x'));
+                y += parseFloat(target.getAttribute('start-y'));
+            }
+
+
+            // translate the element
+            target.removeAttribute("style");
+            target.style.position = 'absolute';
+            target.style.top = y + 'px';
+            target.style.left = x + 'px';
+
+            // update the position attributes
+            target.setAttribute('data-x', x);
+            target.setAttribute('data-y', y);
+
+            target.classList.remove('stack');
+
+            $.post('/move', {
+                'id': target.id,
+                'x': x,
+                'y': y,
+                'fp': fp
+            });
+
+        }
+
+        var delete_cookie = function (name) {
+            document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/';
+            document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/room';
+        };
+
+        var getNewRoom = function () {
+            delete_cookie("dice_room");
+            window.open("/", "_blank");
+        };
+
+
+        function dragMoveListener(target, dx, dy) {
+                // keep the dragged position in the data-x/data-y attributes
+                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx,
+                y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
+
+
+            // translate the element
+            var transformer = target.style.transform;
+            if (transformer.search("px") !== -1) {
+                target.style.mstransform =
+                    target.style.webkittransform =
+                        target.style.transform =
+                            'translate(' + x + 'px, ' + y + 'px)';
+            } else {
+                target.style = null;
+                target.style.position = 'absolute';
+                target.style.top = y + 'px';
+                target.style.left = x + 'px';
+            }
+
+
+            // update the posiion attributes
+            target.setAttribute('data-x', x);
+            target.setAttribute('data-y', y);
+        }
+
+        function rollEm() {
+            $('#rollem').submit(function() {
+                // get all the inputs into an array.
+                var $inputs = $('#rollem :input');
+
+                // not sure if you wanted this, but I thought I'd add it.
+                // get an associative array of just the values.
+                var values = {};
+                $inputs.each(function() {
+                    values[this.name] = $(this).val();
+                });
+                if ((values["color"] === "") || (values["color"] === null) || (values["color"] === "null")) {
+                    values["color"] = DEFAULT_COLOR;
+                }
+                    localStorage.setItem("lastRoll", JSON.stringify(values));
+                    localStorage.setItem("selectedColor", values["color"]);
+            });
+            $("#rollem").submit();
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function deleteMarked() {
+            var toDelete = document.getElementsByClassName("selected");
+            for (var i = 0; i < toDelete.length; i++) {
+                $.post("/delete", {
+                    id: toDelete[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toDelete.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function hideMarked() {
+            var toHide = document.getElementsByClassName("selected");
+            for (var i = 0; i < toHide.length; i++) {
+                $.post("/hide", {
+                    id: toHide[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toHide.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function revealMarked() {
+            var toReveal = document.getElementsByClassName("selected");
+            for (var i = 0; i < toReveal.length; i++) {
+                $.post("/reveal", {
+                    id: toReveal[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toReveal.length > 0) {
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function rerollMarked() {
+            var toReroll = document.getElementsByClassName("selected");
+            for (var i = 0; i < toReroll.length; i++) {
+                $.post("/reroll", {
+                    id: toReroll[i].id,
+                    'fp': fp,
+                    'white': whiteFlips
+                }).done(function (data) {
+                });
+            }
+            if (toReroll.length > 0) {
+                $("#customButtons").load(window.location.href + " #customButtons");
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function decrementMarkedClock() {
+            var toDecrement = document.getElementsByClassName("decrement");
+            for (var i = 0; i < toDecrement.length; i++) {
+                if (!toDecrement[i].classList.contains("clock")) {
+                    continue
+                }
+                $.post("/decrementclock", {
+                    id: toDecrement[i].id,
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            if (toDecrement.length > 0) {
+                $("#customButtons").load(window.location.href + " #customButtons");
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function clearAllDice() {
+            var clear = confirm("Clear all dice from room?");
+            if (clear === true) {
+                $.post("/clear", {
+                    'fp': fp
+                }).done(function (data) {
+                });
+            }
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function shuffleDiscards() {
+            $.post("/shuffle", {
+                'fp': fp
+            }).done(function (data) {
+            });
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        {{range .CustomSets}}
+        function {{.Pull}} {
+            var count = prompt("How many items would you like to pull from {{.Name}}?");
+            if (count === null) {
+                count = "1";
+            }
+            $.post("/draw", {
+                fp: fp,
+                deck: {{.Name}},
+                hidden: hideDraws,
+                count: count
+        }).done(function (data) {});
+        $("#customButtons").load(window.location.href + " #customButtons");
+        $("#refreshable").load(window.location.href + " #refreshable");
+        location.reload();
+        }
+
+        function {{.Randomize}} {
+            $.post("/shuffle", {
+                fp: fp,
+                deck: {{.Name}}
+            }).done(function (data) {});
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+
+        function {{.Remove}} {
+            var remove = confirm("Remove this custom set from room?");
+            if (remove === true) {
+                $.post("/removecustomset", {
+                    fp: fp,
+                    deck: {{.Name}}
+                }).done(function (data) {});
+            }
+            $("#customButtons").load(window.location.href + " #customButtons");
+            $("#refreshable").load(window.location.href + " #refreshable");
+        }
+        {{end}}
+
+        function xCard() {
+            var message = prompt("If you would like to be specific about the content requiring your use of this safety tool, you may do so here. If not, you may leave it blank.");
+            if (message !== null) {
+                if (message !== "") {
+                    message = "Someone Played The X-Card: " + message;
+                } else {
+                    message = "Someone Played The X-Card";
+                }
+                $.post("/alert", {
+                    'message': message
+                }).done(function (data) {
+                });
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function rewind() {
+            var message = prompt("If you would like to be specific about the content requiring your use of this safety tool, you may do so here. If not, you may leave it blank.");
+            if (message !== null) {
+                if (message !== "") {
+                    message = "Someone Called For A Script Change - Rewind: " + message;
+                } else {
+                    message = "Someone Called For A Script Change: Rewind";
+                }
+                $.post("/alert", {
+                    'message': message
+                }).done(function (data) {
+                });
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function pause() {
+            var message = prompt("If you would like to be specific about the content requiring your use of this safety tool, you may do so here. If not, you may leave it blank.");
+            if (message !== null) {
+                if (message !== "") {
+                    message = "Someone Called For A Script Change - Pause: " + message;
+                } else {
+                    message = "Someone Called For A Script Change: Pause";
+                }
+                $.post("/alert", {
+                    'message': message
+                }).done(function (data) {
+                });
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function fastForward() {
+            var message = prompt("If you would like to be specific about the content requiring your use of this safety tool, you may do so here. If not, you may leave it blank.");
+            if (message !== null) {
+                if (message !== "") {
+                    message = "Someone Called For A Script Change - Fast-Forward: " + message;
+                } else {
+                    message = "Someone Called For A Script Change: Fast-Forward";
+                }
+                $.post("/alert", {
+                    'message': message
+                }).done(function (data) {
+                });
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function rollXdY() {
+            var message = prompt("Enter a single arbitrary roll of the form XdY (eg 3d23).");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'xdy',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function create4Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c4',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function create6Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c6',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function create8Clock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'c8',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function createTClock() {
+            var message = prompt("Enter a title for your clock:");
+            if (message !== null) {
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': 'ct',
+                    'value': message.trim(),
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            }
+        }
+
+        function fixedEncodeURIComponent(str) {
+            return encodeURIComponent(str).replace(/[!'()*]/g, function (c) {
+                return '%' + c.charCodeAt(0).toString(16);
+            });
+        }
+
+        function setBackground() {
+            var url = prompt("Please enter the URL to the image you would like used as the background for the room. (To remove the current background leave this blank and submit.)");
+            if (url !== null) {
+                $.post("/background", {
+                    'bg': url
+                }).done(function (data) {
+                });
+                location.reload();
+            }
+        }
+
+
+        function hiddenDraws() {
+            if (document.getElementById('hiddenDraw').checked) {
+                hideDraws = true;
+                Cookies.set('hide_draws', 'true', { path: window.location.pathname, expires: 365});
+            } else {
+                hideDraws = false;
+                Cookies.set('hide_draws', 'false', { path: window.location.pathname, expires: 365});
+            }
+        }
+
+        function sortedDice() {
+            if (document.getElementById('sortTheDice').checked) {
+                sortDice = true;
+                Cookies.set('sort_dice', 'true', { path: window.location.pathname, expires: 365});
+            } else {
+                sortDice = false;
+                Cookies.set('sort_dice', 'false', { path: window.location.pathname, expires: 365});
+            }
+        }
+
+        function savedRolls() {
+            if (document.getElementById('savedRoll').checked) {
+                hideDraws = true;
+                Cookies.set('save_rolls', 'true', { path: window.location.pathname, expires: 365});
+            } else {
+                hideDraws = false;
+                Cookies.set('save_rolls', 'false', { path: window.location.pathname, expires: 365});
+            }
+        }
+
+        function funkierDice() {
+            if (document.getElementById('funkyDice').checked) {
+                showFunkyDice = true;
+                Cookies.set('funky_dice', 'true', { path: window.location.pathname, expires: 365});
+            } else {
+                showFunkyDice = false;
+                Cookies.set('funky_dice', 'false', { path: window.location.pathname, expires: 365});
+            }
+            location.reload();
+        }
+
+        function flipToWhite() {
+            if (document.getElementById('flipToWhiteTokens').checked) {
+                whiteFlips = true;
+                Cookies.set('white_flips', 'true', { path: window.location.pathname, expires: 365});
+            } else {
+                whiteFlips = false;
+                Cookies.set('white_flips', 'false', { path: window.location.pathname, expires: 365});
+            }
+        }
+
+
+
+        interact('.label-tap-target')
+            .on('doubletap', function (event) {
+                var theId = event.currentTarget.id;
+                var chunks = theId.split("L");
+                var die = chunks[0];
+                var newForm = jQuery('<form>', {
+                    'action': '/roll'
+                }).append(jQuery('<input>', {
+                    'name': die,
+                    'value': '1',
+                    'type': 'hidden'
+                })).append(jQuery('<input>', {
+                    'name': 'color',
+                    'value': document.getElementById('selectColor').value,
+                    'type': 'hidden'
+                }));
+                $(document.body).append(newForm);
+                newForm.submit();
+                $("#refreshable").load(window.location.href + " #refreshable");
+            });
+
+        interact('.tap-target')
+            .on('doubletap', function (event) {
+                if (!event.shiftKey) {
+                    if (!event.currentTarget.classList.contains('selected')) {
+                        event.currentTarget.classList.toggle('selected');
+                    }
+                    rerollMarked();
+                    $("#refreshable").load(window.location.href + " #refreshable");
+                }
+            })
+            .on('hold', function (event) {
+                if (event.currentTarget.classList.contains("clock")) {
+                    event.currentTarget.classList.toggle('decrement');
+                    decrementMarkedClock();
+                    $("#refreshable").load(window.location.href + " #refreshable");
+                } else {
+                    event.currentTarget.classList.toggle('stack');
+                }
+            })
+            .on('tap', function (event) {
+                if (event.altKey) {
+                    var size = $(event.currentTarget).attr('die-size');
+                    var kind = document.querySelectorAll('[die-size=\'' + size + '\']');
+                    var currently_selected = event.currentTarget.classList.contains('selected');
+                    for (var i = 0; i < kind.length; i++) {
+                        if (kind[i].classList.contains('selected') === currently_selected) {
+                            kind[i].classList.toggle('selected');
+                        }
+                    }
+                } else {
+                    event.currentTarget.classList.toggle('selected');
+                }
+            });
+
+        var lastRealUpdate = 0;
+
+        function autoRefresh_div() {
+            var room = (window.location.pathname).split("/")[2];
+            $.post("/refresh", {
+                id: room,
+                fp: fp
+            })
+                .done(function (data) {
+                    var b = data;
+                    var unix = Math.round(+new Date() / 1000);
+                    if (b !== "") {
+                        var chunks = b.split("||");
+                        if (chunks.length === 2) {
+                            if (Push.Permission.has()) {
+                                Push.create("Safety tool used!", {
+                                    body: chunks[1],
+                                    timeout: 4000,
+                                    onClick: function () {
+                                        window.focus();
+                                        this.close();
+                                    }
+                                });
+                            } else {
+                                alert(chunks[1]);
+                            }
+                        }
+                        if (sessionStorage.lastUpdateId) {
+                            if (b !== sessionStorage.lastUpdateId) {
+                                $("#refreshable").load(window.location.href + " #refreshable");
+                                sessionStorage.lastUpdateId = b;
+                                lastRealUpdate = unix;
+                            }
+                        } else {
+                            $("#refreshable").load(window.location.href + " #refreshable");
+                            sessionStorage.lastUpdateId = b;
+                            lastRealUpdate = unix;
+                        }
+                    } else {
+                        if (lastRealUpdate > 0) {
+                            var delta = unix - lastRealUpdate;
+                            // Stop updating after 60m
+                            if (delta > 10400) {
+                                window.location.replace("/paused?id=" + room);
+                            }
+                        }
+                    }
+                });
+        }
+
+        setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
+
+        // I don't love this code, but it gets the job done I guess.
+        $(function () {
+            var dialog, form,
+
+                name = $("#name"),
+                entry = $("#lines"),
+                height = $("#height"),
+                width = $("#width");
+
+            function addEntry() {
+                $.post("/addcustomset", {
+                    'name': name.val(),
+                    'entries': entry.val(),
+                    'height': height.val(),
+                    'width': width.val()
+                }).done(function (data) {
+                });
+                dialog.dialog("close");
+                $("#customButtons").load(window.location.href + " #customButtons");
+                location.reload();
+                return true;
+            }
+
+            dialog = $("#dialog-form").dialog({
+                autoOpen: false,
+                height: 400,
+                width: 350,
+                modal: true,
+                buttons: {
+                    "Create a set": addEntry,
+                    Cancel: function () {
+                        dialog.dialog("close");
+                    }
+                },
+                close: function () {
+                    form[0].reset();
+                    $("#customButtons").load(window.location.href + " #customButtons");
+                    location.reload();
+                }
+            });
+
+            form = dialog.find("form").on("submit", function (event) {
+                event.preventDefault();
+                addEntry();
+                location.reload();
+            });
+
+            $("#addCustomSetButton").button().on("click", function () {
+                dialog.dialog("open");
+            });
+        });
+
+        $(function () {
+            var dialog, form,
+
+                url = $("#imageUrl"),
+                height = $("#height"),
+                width = $("#width");
+
+            function addAnImage() {
+                $.post("/image", {
+                    'url': url.val(),
+                    'height': height.val(),
+                    'width': width.val()
+                }).done(function (data) {
+                });
+                dialog.dialog("close");
+                $("#customButtons").load(window.location.href + " #customButtons");
+                location.reload();
+                return true;
+            }
+
+            dialog = $("#dialog-form2").dialog({
+                autoOpen: false,
+                height: 400,
+                width: 350,
+                modal: true,
+                buttons: {
+                    "Add image": addAnImage,
+                    Cancel: function () {
+                        dialog.dialog("close");
+                    }
+                },
+                close: function () {
+                    form[0].reset();
+                    $("#customButtons").load(window.location.href + " #customButtons");
+                    location.reload();
+                }
+            });
+
+            form = dialog.find("form").on("submit", function (event) {
+                event.preventDefault();
+                addAnImage();
+                location.reload();
+            });
+
+            $("#addImageButton").button().on("click", function () {
+                dialog.dialog("open");
+            });
+        });
+    </script>
+
+
+</head>
+
+<!--TODO(shanel): This should probably be in its own file eventually.-->
+<style type="text/css">
+
+    .s-noselect {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
+    #s-rectBox {
+        position: absolute;
+        z-index: 1090;
+        border: 2px dashed #cbd3e3;
+    }
+
+    body {
+        color: #000000;
+        background-color: #ffffff;
+    }
+
+    .tap-target {
+        display: inline-block;
+    }
+
+    .funky {
+        border-style: solid;
+        border-color: black;
+    }
+
+    .tap-target.selected {
+        background-color: #f40;
+        border-style: solid;
+        border-color: red;
+    }
+
+    html {
+        height: 100%;
+        box-sizing: border-box;
+    }
+
+    *,
+    *:before,
+    *:after {
+        box-sizing: inherit;
+    }
+
+    body {
+        /*position: relative;*/
+        margin: 0;
+        padding-bottom: 6rem;
+        min-height: 100%;
+        font-family: "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .footer {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 1rem;
+        background-color: #efefef;
+        text-align: center;
+    }
+
+    .attribution {
+        font-size: x-small;
+    }
+
+    .ui-button {
+        background-color: #e7e7e7;
+        color: black;
+        padding: 5px 5px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+
+    .ui-button,
+    .ui-button:link,
+    .ui-button:visited,
+    .ui-button:hover,
+    .ui-button:active {
+    }
+
+    button {
+        background-color: #e7e7e7;
+        color: black;
+        padding: 5px 5px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+
+
+
+    .button2 {
+        background-color: #f44336;
+        color: white;
+        text-align: center;
+    }
+
+    .button3 {
+        background-color: black;
+        color: #f44336;
+        text-align: center;
+    }
+
+    .button4 {
+        background-color: green;
+        color: white;
+        text-align: center;
+    }
+
+    /* Tooltip container */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+    }
+
+    /* Tooltip text */
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 120px;
+        background-color: white;
+        color: blue;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 6px;
+
+        /* Position the tooltip text - see examples below! */
+        position: absolute;
+        z-index: 1;
+    }
+
+    /* Show the tooltip text when you mouse over the tooltip container */
+    .tooltip:hover .tooltiptext {
+        -webkit-transition-delay: 1s; /* Safari */
+        transition-delay: 1s;
+        visibility: visible;
+    }
+
+    .drawbox {
+        text-align: center;
+    }
+
+    p {
+        text-align: center;
+    }
+
+    h3 {
+        text-align: center;
+    }
+
+    form {
+        text-align: center;
+    }
+
+    .buttons {
+        text-align: center;
+    }
+
+    .about {
+        text-align: center;
+    }
+
+    img.centered {
+        display: block;
+        margin: 0 auto;
+    }
+
+    .refreshable {
+        text-align: center;
+    }
+
+    img.card {
+        display: block;
+        max-width: 120px;
+        max-height: 120px;
+        background-color: white;
+        width: auto;
+        height: auto;
+        border: 2px solid black;
+    }
+
+    .hidden {
+        border: 5px solid purple;
+    }
+
+    img.hidden {
+        border: 5px solid purple;
+    }
+
+    {{range .CustomSets}}
+    img.{{.Name}} {
+        display: block;
+        max-width: {{.Width}}px;
+        max-height: {{.Height}}px;
+        /*background-color: white;*/
+        width: auto;
+        height: auto;
+        /*border: 2px solid black;*/
+    }
+
+    {{end}}
+
+    {{range .Dice}}
+    {{if .IsImage}}
+    #{{.KeyStr}}-img {
+    max-width: {{.CustomWidth}}px;
+    max-height: {{.CustomHeight}}px;
+    }
+    {{end}}
+    {{end}}
+
+    .dark-tooltip.dark a { color: lightgray; }
+    .dark-tooltip.dark a.visited { color: lightgray; }
+
+
+    /*For the drop area of the dialog*/
+    #dropbox {
+        border: 3px dashed black;
+        width: 200px;
+        height: 100px;
+
+    }
+
+    /*TODO(shanel): Store this style stuff in the element's actual style tag.*/
+    .funky {
+        /*width: 25%;*/
+        /*height: 100%;*/
+        /*min-height: 6.5em;*/
+        /*max-height: 1%;*/
+        margin: 1%;
+        background-color: #29e;
+        color: white;
+
+        border-radius: 0.75em;
+        /*padding: 0.01%;*/
+
+        /*-webkit-transform: translate(0px, 0px);*/
+        /*transform: translate(0px, 0px);*/
+    }
+
+    .funky-lightblue {
+        margin: 1%;
+        background-color: #e4f2f7;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-green {
+        margin: 1%;
+        background-color: #83f56c;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-red {
+        margin: 1%;
+        background-color: #e44f4f;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-blue {
+        margin: 1%;
+        background-color: #58b5f3;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-violet {
+        margin: 1%;
+        background-color: #8e77da;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-gold {
+        margin: 1%;
+        background-color: #fef84e;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+    .funky-orange {
+        margin: 1%;
+        background-color: #ff9e0c;
+        color: black;
+        border-radius: 0.75em;
+        border-color: black;
+        border-style: solid;
+        border-width:1.5px;
+    }
+
+    .clock {
+        /*margin: 5%;*/
+        background-color: white;
+        color: black;
+        text-align: center;
+        border-radius: 0.75em;
+        border: 2px solid black;
+        width: 165px;
+        padding-right: 2px;
+    }
+
+    .clock.hidden {
+        border: 5px solid purple;
+    }
+
+    svg {
+        display: inline-block;
+        height: 65px;
+        width: 65px;
+    }
+    .die {
+        display: inline-block;
+        height: 65px;
+        width: 65px;
+    }
+    .flex-container {
+        padding: 0;
+        margin: 0;
+        list-style: none;
+
+
+        display: -webkit-box;
+        display: -moz-box;
+        display: -ms-flexbox;
+        display: -webkit-flex;
+        display: flex;
+
+        -webkit-flex-flow: column wrap;
+        justify-content: space-around;
+        /*align-content: right;*/
+    }
+
+    .flex-item {
+        background: tomato;
+        padding: 5px;
+        width: 50px;
+        height: 50px;
+        margin-top: 10px;
+
+        line-height: 35px;
+        color: white;
+        font-weight: bold;
+        font-size: 1em;
+        text-align: center;
+    }
+
+    .righto {
+        position: absolute;
+        right: 0;
+    }
+
+</style>
+
+<body>
+
+<!--<a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github"><svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#151513; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a><style>.github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}@keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}@media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}</style> -->
+{{/*<a href="https://github.com/shanel/roller" class="github-corner" aria-label="View source on Github">*/}}
+    {{/*<svg width="80" height="80" viewBox="0 0 250 250"*/}}
+         {{/*style="fill:#151513; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true">*/}}
+        {{/*<path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>*/}}
+        {{/*<path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2"*/}}
+              {{/*fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>*/}}
+        {{/*<path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z"*/}}
+              {{/*fill="currentColor" class="octo-body"></path>*/}}
+    {{/*</svg>*/}}
+{{/*</a>*/}}
+{{/*<style>.github-corner:hover .octo-arm {*/}}
+    {{/*animation: octocat-wave 560ms ease-in-out*/}}
+{{/*}*/}}
+
+{{/*@keyframes octocat-wave {*/}}
+    {{/*0%, 100% {*/}}
+        {{/*transform: rotate(0)*/}}
+    {{/*}*/}}
+    {{/*20%, 60% {*/}}
+        {{/*transform: rotate(-25deg)*/}}
+    {{/*}*/}}
+    {{/*40%, 80% {*/}}
+        {{/*transform: rotate(10deg)*/}}
+    {{/*}*/}}
+{{/*}*/}}
+
+{{/*@media (max-width: 500px) {*/}}
+    {{/*.github-corner:hover .octo-arm {*/}}
+        {{/*animation: none*/}}
+    {{/*}*/}}
+
+    {{/*.github-corner .octo-arm {*/}}
+        {{/*animation: octocat-wave 560ms ease-in-out*/}}
+    {{/*}*/}}
+{{/*}*/}}
+{{/*</style>*/}}
+
+{{/*<div id="dialog-form" title="Create new entry" style="display: none">*/}}
+
+    {{/*<form id="myForm">*/}}
+        {{/*<fieldset>*/}}
+            {{/*<label for="name">Name:</label>*/}}
+            {{/*<input type="text" name="name" id="name" value="SingleWordSetName"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all"><br><br>*/}}
+            {{/*<label for="height">Max Height (in pixels):</label>*/}}
+            {{/*<input type="text" name="height" id="height" value="120" size="3"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all"><br><br>*/}}
+            {{/*<label for="height">Max Width (in pixels):</label>*/}}
+            {{/*<input type="text" name="width" id="width" value="120" size="3"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all">*/}}
+            {{/*<!-- Allow form submission with keyboard without duplicating the dialog button -->*/}}
+            {{/*<input type="submit" tabindex="-1" style="position:absolute; top:-1000px">*/}}
+        {{/*</fieldset>*/}}
+    {{/*</form>*/}}
+    {{/*<textarea name="lines" id="lines" form="myForm" class="textarea ui-widget-content ui-corner-all">Enter one image url per line...</textarea>*/}}
+{{/*</div>*/}}
+
+{{/*<div id="dialog-form2" title="Add an image" style="display: none">*/}}
+
+    {{/*<form id="myForm2">*/}}
+        {{/*<fieldset>*/}}
+            {{/*<label for="imageUrl">URL</label>*/}}
+            {{/*<input type="text" name="imageUrl" id="imageUrl" value="" size="20"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all"><br><br>*/}}
+            {{/*<label for="height">Max Height (in pixels):</label>*/}}
+            {{/*<input type="text" name="height" id="height" value="auto" size="3"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all"><br><br>*/}}
+            {{/*<label for="height">Max Width (in pixels):</label>*/}}
+            {{/*<input type="text" name="width" id="width" value="auto" size="3"*/}}
+                   {{/*class="text ui-widget-content ui-corner-all">*/}}
+            {{/*<!-- Allow form submission with keyboard without duplicating the dialog button -->*/}}
+            {{/*<input type="submit" tabindex="-1" style="position:absolute; top:-1000px">*/}}
+        {{/*</fieldset>*/}}
+    {{/*</form>*/}}
+{{/*</div>*/}}
+{{/*<div id="hideable">*/}}
+    {{/*<h3>Roll For Your Party: A multi-user dice roller.<sup>[<a href="/about">?</a>]</sup></h3>*/}}
+{{/*<p>Send the URL to your friends! (They can watch what you do!) Drag the dice around! Click on dice to select/unselect*/}}
+    {{/*them! Double click them to reroll them!</p>*/}}
+{{/*<form id="rollem" action="/roll" method="post">*/}}
+    {{/*<input type="text" name="d3" id="d3" style="width: 19px"/>*/}}
+    {{/*<label id="d3Label" for="d3" class="label-tap-target">d3</label>*/}}
+    {{/*<input type="text" name="d4" id="d4" style="width: 19px"/>*/}}
+    {{/*<label id="d4Label" for="d4" class="label-tap-target">d4</label>*/}}
+    {{/*<input type="text" name="d5" id="d5" style="width: 19px"/>*/}}
+    {{/*<label id="d5Label" for="d5" class="label-tap-target">d5</label>*/}}
+    {{/*<input type="text" name="d6" id="d6" style="width: 19px"/>*/}}
+    {{/*<label id="d6Label" for="d6" class="label-tap-target">d6</label>*/}}
+    {{/*<input type="text" name="d6p" id="d6p" style="width: 19px"/>*/}}
+    {{/*<label id="d6pLabel" for="d6p" class="label-tap-target">d6(P)</label>*/}}
+    {{/*<input type="text" name="d7" id="d7" style="width: 19px"/>*/}}
+    {{/*<label id="d7Label" for="d7" class="label-tap-target">d7</label>*/}}
+    {{/*<input type="text" name="d8" id="d8" style="width: 19px"/>*/}}
+    {{/*<label id="d8Label" for="d8" class="label-tap-target">d8</label>*/}}
+    {{/*<input type="text" name="d10" id="d10" style="width: 19px"/>*/}}
+    {{/*<label id="d10Label" for="d10" class="label-tap-target">d10</label>*/}}
+    {{/*<input type="text" name="d12" id="d12" style="width: 19px"/>*/}}
+    {{/*<!--<input type="text" name="d10p" id="d10p" style="width: 19px"/>-->*/}}
+    {{/*<!--<label id="d10pLabel" for="d10p">d10p</label>-->*/}}
+    {{/*<label id="d12Label" for="d12" class="label-tap-target">d12</label>*/}}
+    {{/*<input type="text" name="d14" id="d14" style="width: 19px"/>*/}}
+    {{/*<label id="d14Label" for="d14" class="label-tap-target">d14</label>*/}}
+    {{/*<input type="text" name="d16" id="d16" style="width: 19px"/>*/}}
+    {{/*<label id="d16Label" for="d16" class="label-tap-target">d16</label>*/}}
+    {{/*<input type="text" name="d20" id="d20" style="width: 19px"/>*/}}
+    {{/*<label id="d20Label" for="d20" class="label-tap-target">d20</label>*/}}
+    {{/*<input type="text" name="d24" id="d24" style="width: 19px"/>*/}}
+    {{/*<label id="d24Label" for="d24" class="label-tap-target">d24</label>*/}}
+    {{/*<input type="text" name="d30" id="d30" style="width: 19px"/>*/}}
+    {{/*<label id="d30Label" for="d30" class="label-tap-target">d30</label>*/}}
+    {{/*<input type="text" name="d100" id="d100" style="width: 19px"/>*/}}
+    {{/*<label id="d100Label" for="d100" class="label-tap-target">d100</label>*/}}
+    {{/*<input type="text" name="dF" id="dF" style="width: 19px"/>*/}}
+    {{/*<label id="dFLabel" id="fateLabel" for="dF" class="label-tap-target">dF </label>*/}}
+    {{/*<input type="text" name="dH" id="dH" style="width: 19px"/>*/}}
+    {{/*<label id="dHLabel" id="HLabel" for="dH" class="label-tap-target">dH </label>*/}}
+    {{/*&nbsp; (&#7508;&#7461;&#7508;) &nbsp;*/}}
+    {{/*<label id="tokensLabel" for="tokens" class="label-tap-target">tokens: </label>*/}}
+    {{/*<input type="text" name="tokens" id="tokens" style="width: 19px"/>*/}}
+    {{/*<label id="cardsLabel" for="cards" class="label-tap-target">cards: </label>*/}}
+    {{/*<input type="text" name="cards" id="cards" style="width: 19px"/>*/}}
+    {{/*<label id="labelLabel" for="label">label: </label>*/}}
+    {{/*<input type="text" name="label" id="label" style="width: 100px"/>*/}}
+
+    {{/*<label id="colorLabel" for="selectColor">color: </label>*/}}
+    {{/*<select id="selectColor" name="color">*/}}
+        {{/*<option id="ClearColor" value="clear">Clear</option>*/}}
+        {{/*<option id="BlueColor" value="blue">Blue</option>*/}}
+        {{/*<option id="GreenColor" value="green">Green</option>*/}}
+        {{/*<option id="OrangeColor" value="orange">Orange</option>*/}}
+        {{/*<option id="RedColor" value="red">Red</option>*/}}
+        {{/*<option id="PurpleColor" value="violet">Purple</option>*/}}
+        {{/*<option id="YellowColor" value="gold">Yellow</option>*/}}
+    {{/*</select>*/}}
+
+    {{/*<label id="modifierLabel" for="modifier">modifier: </label>*/}}
+    {{/*<input type="text" name="modifier" id="modifier" style="width: 19px"/>*/}}
+    {{/*<input type="hidden" name="fp" value="">*/}}
+    {{/*<p></p>*/}}
+{{/*</form>*/}}
+{{/*<div class="buttons">*/}}
+    {{/*<button class="button button2" onClick="rollEm()">Submit</button>*/}}
+    {{/*<button id="clearButton" class="button" onclick="clearAllDice()">Clear</button>*/}}
+    {{/*<button id="deleteButton" class="button" onclick="deleteMarked()">Delete selected</button>*/}}
+    {{/*<button id="revealButton" class="button" onclick="revealMarked()">Reveal selected</button>*/}}
+    {{/*<button id="hideButton" class="button" onclick="hideMarked()">Hide selected</button>*/}}
+    {{/*<button id="rerollButton" class="button button4" onclick="rerollMarked()">Reroll selected</button>*/}}
+    {{/*<button id="shuffleButton" class="button" onclick="shuffleDiscards()">Shuffle discards</button>*/}}
+    {{/*<button id="backgroundButton" class="button" onclick="setBackground()">Set background</button>*/}}
+    {{/*<button id="xdyButton" class="button" onclick="rollXdY()">XdY</button>*/}}
+    {{/*<button id="newRoomButton" class="button" onclick="getNewRoom()">New room</button>*/}}
+{{/*</div>*/}}
+{{/*<div id="customButtons" class="buttons">*/}}
+    {{/*<button id="addImageButton" class="button ui-button ui-corner-all ui-widget">Add image</button>*/}}
+    {{/*<button id="addCustomSetButton" class="button ui-button ui-corner-all ui-widget">Add custom set</button>*/}}
+    {{/*{{range .CustomSets}}*/}}
+    {{/*<button id="pull_from_{{.SnakeName}}_button" class="button" onclick={{.Pull}}>Pull from {{.Name}} ({{.Remaining}})*/}}
+    {{/*</button>*/}}
+    {{/*<button id="randomize_discards_from_{{.SnakeName}}_button" class="button" onclick={{.Randomize}}>Randomize discards*/}}
+        {{/*from {{.Name}}*/}}
+    {{/*</button>*/}}
+    {{/*<button id="remove_{{.SnakeName}}_button" class="button" onclick={{.Remove}}>Remove {{.Name}}*/}}
+    {{/*</button>*/}}
+    {{/*{{end}}*/}}
+{{/*</div>*/}}
+{{/*<div class="buttons">*/}}
+    {{/*<span id="clocksLabel">Clocks:</span>*/}}
+    {{/*<button id="4ClockButton" class="button" onclick="create4Clock()">4</button>*/}}
+    {{/*<button id="6ClockButton" class="button" onclick="create6Clock()">6</button>*/}}
+    {{/*<button id="8ClockButton" class="button" onclick="create8Clock()">8</button>*/}}
+    {{/*<button id="threatClockButton" class="button" onclick="createTClock()">Threat</button>*/}}
+{{/*</div>*/}}
+{{/*<div class="righto">*/}}
+<ul class="flex-container">
+    <li class="flex-item" onclick="xCard()">X</li>
+    <li class="flex-item" onclick="rewind()">&lt;&lt;</li>
+    <li class="flex-item" onclick="pause()">| |</li>
+    <li class="flex-item" onclick="fastForward()">&gt;&gt;</li>
+    <li class="flex-item">5</li>
+    <li class="flex-item">6</li>
+</ul>
+{{/*</div>*/}}
+{{/*<div class="buttons">*/}}
+    {{/*<span id="safetyLabel">Safety Tools:</span>*/}}
+    {{/*<button id="xCardButton" class="button button3" onclick="xCard()">X-CARD</button>*/}}
+    {{/*<button id="rewindButton" class="button button3" onclick="rewind()">Rewind</button>*/}}
+    {{/*<button id="pauseButton" class="button button3" onclick="pause()">Pause</button>*/}}
+    {{/*<button id="fastForwardButton" class="button button3" onclick="fastForward()">Fast-Forward</button>*/}}
+{{/*</div>*/}}
+{{/*<div id="prefs" class="buttons">*/}}
+    {{/*<label id="hiddenDrawLabel" for="hiddenDraw">Enable hidden draws: </label>*/}}
+    {{/*<input form="rollem" type="checkbox" name="hiddenDraw" id="hiddenDraw" onclick="hiddenDraws()"/>*/}}
+    {{/*&nbsp;&nbsp;&nbsp;*/}}
+    {{/*<label id="sortDiceLabel" for="sortTheDice">Sort dice: </label>*/}}
+    {{/*<input form="rollem" type="checkbox" name="sortTheDice" id="sortTheDice" onclick="sortedDice()"/>*/}}
+    {{/*&nbsp;&nbsp;&nbsp;*/}}
+    {{/*<label id="savedRollLabel" for="savedRoll">Save last roll: </label>*/}}
+    {{/*<input form="rollem" type="checkbox" name="savedRoll" id="savedRoll" onclick="savedRolls()"/>*/}}
+    {{/*&nbsp;&nbsp;&nbsp;*/}}
+    {{/*<label id="funkyDiceLabel" for="funkyDice">Funky dice: </label>*/}}
+    {{/*<input form="rollem" type="checkbox" name="funkyDice" id="funkyDice" onclick="funkierDice()"/>*/}}
+    {{/*&nbsp;&nbsp;&nbsp;*/}}
+    {{/*<label id="flipToWhiteLabel" for="flipToWhiteTokens">Flip tokens to white: </label>*/}}
+    {{/*<input form="rollem" type="checkbox" name="flipToWhiteTokens" id="flipToWhiteTokens" onclick="flipToWhite()"/>*/}}
+{{/*</div>*/}}
+<script>
+    // Dark tool tips
+    // TODO(shanel): Add tooltips for custom sets.
+    $("#clearButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to remove everything from the room.',
+        hoverDelay: 1000
+    });
+    $("#deleteButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to delete a previously clicked (and thus highlighted in red) item.',
+        hoverDelay: 1000
+    });
+    $("#revealButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to reveal a previously hidden (purple bordered) clicked (and thus highlighted in red) card.',
+        hoverDelay: 1000
+    });
+    $("#rerollButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to reroll/redraw a previously clicked (and thus highlighted in red) item in place. (You can also double-click items to reroll them. (Holding shift down will prevent this.))',
+        hoverDelay: 1000
+    });
+    $("#hideButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to hide a clicked (and thus highlighted in red) card.',
+        hoverDelay: 1000
+    });
+    $("#shuffleButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to shuffle previously cleared/deleted cards back into the deck.',
+        hoverDelay: 1000
+    });
+    $("#backgroundButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to set a background image for the room.',
+        hoverDelay: 1000
+    });
+    $("#xdyButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to roll an arbitrary set of dice (ie 3d23 or 2d87).',
+        hoverDelay: 1000
+    });
+    $("#newRoomButton").darkTooltip({
+        gravity: 'south',
+        content: 'Use this to leave this room for a newly created one.',
+        hoverDelay: 1000
+    });
+    $("#d6pLabel").darkTooltip({
+        gravity: 'south',
+        content: 'd6 with pips',
+        hoverDelay: 1000
+    });
+    $("#dFLabel").darkTooltip({
+        gravity: 'south',
+        content: 'Fate/Fudge dice',
+        hoverDelay: 1000
+    });
+    $("#modifier").darkTooltip({
+        gravity: 'south',
+        content: 'modifies the total displayed after the roll',
+        hoverDelay: 1000
+    });
+    $("#fateLabel").darkTooltip({
+        gravity: 'south',
+        content: 'Fate/Fudge dice',
+        hoverDelay: 1000
+    });
+    $("#HLabel").darkTooltip({
+        gravity: 'south',
+        content: 'blank/X dice',
+        hoverDelay: 1000
+    });
+    $("#tokensLabel").darkTooltip({
+        gravity: 'south',
+        content: 'colored blank tokens',
+        hoverDelay: 1000
+    });
+    $("#cardsLabel").darkTooltip({
+        gravity: 'south',
+        content: 'face up playing cards (no jokers) - use "Shuffle discards" button to refill deck',
+        hoverDelay: 1000
+    });
+    $("#labelLabel").darkTooltip({
+        gravity: 'south',
+        content: 'movable pieces of text',
+        hoverDelay: 1000
+    });
+    $("#colorLabel").darkTooltip({
+        gravity: 'south',
+        content: 'choose the color of the dice/tokens you are about to generate',
+        hoverDelay: 1000
+    });
+    $("#clocksLabel").darkTooltip({
+        gravity: 'east',
+        content: 'countdown clocks (double-click (ie reroll) them to advance (holding down shift will prevent this), long pressing will decrement them)',
+        hoverDelay: 1000
+    });
+    $("#safetyButton").darkTooltip({
+        gravity: 'north',
+        theme: 'light',
+        content: '<a target="_blank" href="http://tinyurl.com/x-card-rpg">What\'s the X-Card?</a><br><br><a\n' +
+        '            target="_blank" href="http://tinyurl.com/nphed7m">What\'s Script Change? (Rewind/Pause/Fast-Forward)</a>',
+        hoverDelay: 1000
+    });
+    $("#cardButton").darkTooltip({
+        gravity: 'south',
+        content: 'face up playing cards (no jokers) - use "Shuffle discards" button to refill deck',
+        hoverDelay: 1000
+    });
+    $("#xCardButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to <a target="_blank" href="http://tinyurl.com/x-card-rpg">X-Card</a> content (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#rewindButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Rewind (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#pauseButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Pause (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#fastForwardButton").darkTooltip({
+        gravity: 'north',
+        content: 'Immediately announce to everyone that you need to call for a <a target="_blank" href="http://tinyurl.com/nphed7m">Script Change</a> Fast Forward (anonymously)',
+        hoverDelay: 1000
+    });
+    $("#addCustomSetButton").darkTooltip({
+        gravity: 'east',
+        content: 'Add custom deck or pool of tokens. You\'ll enter a single-word name, and urls to the images of the items (one to a line). You\'ll also put in max sizes for the images, the default 120 is probably fine. (Though just use "auto" if you want full size images.)  After creating it you\'ll see two buttons appear beside this. One is to draw items from the pool/deck (and the button will also tell you how many are left) and the other is to randomize/shuffle discards into the pool/deck, just like the normal playing cards. You can add as many sets as you like. Using the same name will overwrite the previous set of the same name.',
+        hoverDelay: 1000
+    });
+    $("#addImageButton").darkTooltip({
+        gravity: 'east',
+        content: 'Add an image to the table. Just paste in the url.',
+        hoverDelay: 1000
+    });
+    $("#hiddenDrawLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this so draws from playing cards and custom sets are not seen by other room users until you select them and click the "Reveal selected" button..',
+        hoverDelay: 1000
+    });
+    $("#sortDiceLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Uncheck this if you do not want dice results sorted by result.',
+        hoverDelay: 1000
+    });
+    $("#savedRollLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want to roll the same thing you rolled last time.',
+        hoverDelay: 1000
+    });
+    $("#funkyDiceLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want d3, d5, d7, d14, d16, d24, d30, d100, and dH in addition to other dice.',
+        hoverDelay: 1000
+    });
+    $("#flipToWhiteLabel").darkTooltip({
+        gravity: 'north',
+        content: 'Check this if you want tokens to change to a white color when rerolled instead of getting a black circle on them.',
+        hoverDelay: 1000
+    });
+
+//     if (Cookies.get('hide_draws') === 'true') {
+//         hideDraws = true;
+//     }
+//     document.getElementById('hiddenDraw').checked = hideDraws;
+//
+//     if (Cookies.get('white_flips') === 'true') {
+//         whiteFlips = true;
+//     }
+//     document.getElementById('flipToWhiteTokens').checked = whiteFlips;
+//
+//     if (Cookies.get('funky_dice') === 'true') {
+//         showFunkyDice = true;
+//     }
+//     document.getElementById('funkyDice').checked = showFunkyDice;
+//
+//     if (showFunkyDice !== true) {
+//         var funk = ["d3", "d5", "d7", "d14", "d16", "d24", "d30", "d100", "dH"];
+// //        var funk = ["d3", "d5", "d7", "d10p", "d14", "d16", "d24", "d30", "d100"];
+//         var funkLen = funk.length;
+//         for (var i = 0; i < funkLen; i++) {
+//             document.getElementById(funk[i] + "Label").style.display = 'none';
+//             document.getElementById(funk[i]).style.display = 'none';
+//         }
+//     }
+//
+//     if (Cookies.get('sort_dice') === 'true') {
+//         sortDice = true;
+//     }
+//     document.getElementById('sortTheDice').checked = sortDice;
+//
+//     if (Cookies.get('save_rolls') === 'true') {
+//         saveRolls = true;
+//     }
+//     document.getElementById('savedRoll').checked = saveRolls;
+//
+//     if ((localStorage.getItem("selectedColor") !== "null") && (localStorage.getItem("selectedColor") !== null) &&(typeof(localStorage.getItem("selectedColor")) !== "undefined")) {
+//         $("#selectColor").val(localStorage.getItem("selectedColor"));
+//     } else {
+//         document.getElementById("selectColor").selectedIndex = "0";
+//     }
+//
+//     if (saveRolls) {
+//         var p = JSON.parse(localStorage.getItem("lastRoll"));
+//         for (var key in p) {
+//             if ((key.search("d") !== -1) && key !== "modifier") {
+//                 if (p.hasOwnProperty(key)) {
+//                     if (document.getElementById(key) !== null) {
+//                         document.getElementById(key).value = p[key];
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//
+//     $(document).ready(function(){
+//         $("#hide").click(function(){
+//             $("#hideable").hide();
+//         });
+//         $("#show").click(function(){
+//             $("#hideable").show();
+//         });
+//     });
+</script>
+<br>
+{{/*</div>*/}}
+{{/*<div class="buttons">*/}}
+{{/*<button class="button" id="hide">Hide controls</button>*/}}
+{{/*<button class="button" id="show">Show controls</button>*/}}
+{{/*</div>*/}}
+{{/*<hr>*/}}
+{{/*<div class="refreshable" id="refreshable">*/}}
+
+    {{/*{{if .HasBgURL}}*/}}
+    {{/*<style type="text/css">*/}}
+        {{/*.imagine {*/}}
+            {{/*text-align: center;*/}}
+            {{/*min-height: 2000px;*/}}
+            {{/*background-image: url("{{.BgURL}}");*/}}
+            {{/*background-position: center 5%;*/}}
+            {{/*background-repeat: no-repeat;*/}}
+        {{/*}*/}}
+    {{/*</style>*/}}
+    {{/*{{end}}*/}}
+    {{/*{{if (eq .Modifier 0)}}*/}}
+    {{/*<p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}}</p>*/}}
+    {{/*{{else}}*/}}
+    {{/*<p>Last Roll Total: {{.ModifiedRollTotal}} ({{.RollTotal}} + {{.Modifier}}) Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}}</p>*/}}
+    {{/*{{end}}*/}}
+    {{/*<div class="imagine" id="imagine">*/}}
+        {{/*{{range .Dice}}*/}}
+        {{/*{{if .New}}*/}}
+        {{/*{{if .IsLabel}}*/}}
+        {{/*{{if .IsFunky}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="draggable tap-target new funky-{{.Color}}" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="transform: translate({{.X}}px, {{.Y}}px);">*/}}
+            {{/*<h4>&nbsp; {{.ResultStr}} &nbsp;</h4>*/}}
+        {{/*</div>*/}}
+        {{/*{{else if .IsLabel}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="draggable tap-target new label" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="transform: translate({{.X}}px, {{.Y}}px);">*/}}
+            {{/*<p>*/}}
+            {{/*<h3>{{.ResultStr}}</h3></p>*/}}
+        {{/*</div>*/}}
+        {{/*{{end}}*/}}
+        {{/*{{else if .IsClock}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target new clock" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="transform: translate({{.X}}px, {{.Y}}px);">*/}}
+            {{/*<h4>&nbsp; {{.ResultStr}} &nbsp;</h4>*/}}
+            {{/*<hr>*/}}
+            {{/*<img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">*/}}
+        {{/*</div>*/}}
+        {{/*{{else}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable new tap-target" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="transform: translate({{.X}}px, {{.Y}}px);" die-size="{{.Size}}" die-color="{{.Color}}">*/}}
+            {{/*{{if .IsCustomItem}}*/}}
+            {{/*{{if .IsImage}}*/}}
+            {{/*<img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*<img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{end}}*/}}
+            {{/*{{else if .IsCard}}*/}}
+            {{/*<img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*{{if (eq .Image "")}}*/}}
+            {{/*{{noescape .SVGBytes}}*/}}
+            {{/*{{else}}*/}}
+            {{/*{{if .IsImage}}*/}}
+            {{/*<img id="{{.KeyStr}}-img" src="{{.Image}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*<img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{end}}*/}}
+            {{/*{{end}}*/}}
+            {{/*{{end}}*/}}
+        {{/*</div>*/}}
+        {{/*{{end}}*/}}
+        {{/*{{else}}*/}}
+        {{/*{{if .IsLabel}}*/}}
+        {{/*{{if .IsFunky}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="draggable tap-target funky-{{.Color}}" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">*/}}
+            {{/*<h4>&nbsp; {{.ResultStr}} &nbsp;</h4>*/}}
+        {{/*</div>*/}}
+        {{/*{{else}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="draggable tap-target label" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">*/}}
+            {{/*<p>*/}}
+            {{/*<h3>{{.ResultStr}}</h3></p>*/}}
+        {{/*</div>*/}}
+        {{/*{{end}}*/}}
+        {{/*{{else if .IsClock}}*/}}
+            {{/*<div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target clock" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+                 {{/*style="position: absolute; left: {{.X}}px; top: {{.Y}}px;">*/}}
+            {{/*<h4>&nbsp; {{.ResultStr}} &nbsp;</h4>*/}}
+                {{/*<hr>*/}}
+            {{/*<img src="{{.Image}}" alt="{{.ResultStr}}: {{.Result}}" height="150" width="150">*/}}
+        {{/*</div>*/}}
+        {{/*{{else}}*/}}
+        {{/*<div id="{{.KeyStr}}" class="{{hidden .IsHidden}}draggable tap-target" data-x="{{.X}}" data-y="{{.Y}}"*/}}
+             {{/*style="position: absolute; left: {{.X}}px; top: {{.Y}}px;" die-size="{{.Size}}" die-color="{{.Color}}">*/}}
+            {{/*{{if .IsCustomItem}}*/}}
+            {{/*{{if .IsImage}}*/}}
+            {{/*<img id="{{.KeyStr}}-img" class="{{hidden .IsHidden}}" src="{{.Image}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*<img class="{{hidden .IsHidden}}{{.CustomSetName}}" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{end}}*/}}
+            {{/*{{else if .IsCard}}*/}}
+            {{/*<img class="{{hidden .IsHidden}}card" src="{{.Image}}" alt="{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*{{if (eq .Image "")}}*/}}
+            {{/*{{noescape .SVGBytes}}*/}}
+            {{/*{{else}}*/}}
+            {{/*{{if .IsImage}}*/}}
+            {{/*<img id="{{.KeyStr}}-img" src="{{.Image}}">*/}}
+            {{/*{{else}}*/}}
+            {{/*<img class="die" src="{{.Image}}" alt="d{{.Size}}: {{.ResultStr}}">*/}}
+            {{/*{{end}}*/}}
+            {{/*{{end}}*/}}
+            {{/*{{end}}*/}}
+        {{/*</div>*/}}
+        {{/*{{end}}*/}}
+        {{/*{{end}}*/}}
+        {{/*{{end}}*/}}
+    {{/*</div>*/}}
+{{/*</div>*/}}
+
+{{/*<script>*/}}
+    {{/*var newOnes = document.getElementsByClassName('new');*/}}
+    {{/*for (var i = 0; i < newOnes.length; i++) {*/}}
+        {{/*var rect = newOnes[i].getBoundingClientRect();*/}}
+    {{/*}*/}}
+{{/*</script>*/}}
+
+{{/*<div class="footer">*/}}
+    {{/*If you get use out of this site, please consider donating to <a href="http://www.shantibhavanchildren.org/">Shanti*/}}
+    {{/*Bhavan</a>.*/}}
+    {{/*<br>*/}}
+    {{/*<div class="attribution">*/}}
+        {{/*Design and functionality based on <a href="https://www.thievesoftime.com/">Graham Walmsley</a>'s <a*/}}
+            {{/*href="//https://catchyourhare.com/diceroller/">dice roller</a> and dice designed by <a href="http://jesseross.com">Jesse Ross</a>.*/}}
+        {{/*<br>*/}}
+        {{/*<b>NOTE: The site tends to work poorly in private browsing modes. You'll also want to whitelist this site for your ad-blocker.</b>*/}}
+    {{/*</div>*/}}
+{{/*</div>*/}}
+
+</body>
+
+</html>
