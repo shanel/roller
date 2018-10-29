@@ -1607,9 +1607,9 @@
     </style>
     {{end}}
     {{if (eq .Modifier 0)}}
-    <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}}</p>
+    <p>Last Roll Total: {{.RollTotal}} Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}} Changed: {{.LastChangeTimestamp}}</p>
     {{else}}
-    <p>Last Roll Total: {{.ModifiedRollTotal}} ({{.RollTotal}} + {{.Modifier}}) Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}}</p>
+    <p>Last Roll Total: {{.ModifiedRollTotal}} ({{.RollTotal}} + {{.Modifier}}) Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}} Changed: {{.LastChangeTimestamp}}</p>
     {{end}}
     <div class="imagine" id="imagine">
         {{range .Dice}}

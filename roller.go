@@ -328,19 +328,20 @@ func (d *Die) getPosition() (float64, float64) {
 }
 
 type Passer struct {
-	Dice              []Die
-	RoomTotal         int
-	RoomAvg           float64
-	RollTotal         int
-	RollAvg           float64
-	LastAction        string
-	CardsLeft         int
-	BgURL             string
-	HasBgURL          bool
-	CustomSets        []PassedCustomSet
-	Modifier          int
-	ModifiedRollTotal int
-	TokenCount        int
+	Dice                []Die
+	RoomTotal           int
+	RoomAvg             float64
+	RollTotal           int
+	RollAvg             float64
+	LastAction          string
+	CardsLeft           int
+	BgURL               string
+	HasBgURL            bool
+	CustomSets          []PassedCustomSet
+	Modifier            int
+	ModifiedRollTotal   int
+	TokenCount          int
+	LastChangeTimestamp string
 }
 
 func noSpaces(str string) string {
@@ -1935,6 +1936,13 @@ func room(w http.ResponseWriter, r *http.Request) {
 		ModifiedRollTotal: rollTotal + rm.Modifier,
 		TokenCount:        tokenCount,
 	}
+	var latestUpdate int64
+	for _, v := range p.Dice {
+		if v.Timestamp > latestUpdate {
+			latestUpdate = v.Timestamp
+		}
+	}
+	p.LastChangeTimestamp = time.Unix(latestUpdate, 0).Format("15:04:05")
 	rcs, err := rm.GetCustomSets()
 	if err != nil {
 		log.Printf("problem with custom sets: %v", err)
@@ -1996,7 +2004,6 @@ func safetyRoom(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, fmt.Sprintf("/safety/%v", newRoom), http.StatusFound)
 		return
 	}
-
 
 	cookie := &http.Cookie{Name: "dice_room", Value: room}
 	http.SetCookie(w, cookie)
