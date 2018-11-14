@@ -257,11 +257,14 @@
         function rerollMarked() {
             var toReroll = document.getElementsByClassName("selected");
             for (var i = 0; i < toReroll.length; i++) {
+                var selectedDiv = toReroll[i];
+                selectedDiv.classList.add('nowRolling');
                 $.post("/reroll", {
-                    id: toReroll[i].id,
+                    id: selectedDiv.id,
                     'fp': fp,
                     'white': whiteFlips
-                }).done(function (data) {
+                }).always(function () {
+                  selectedDiv.classList.remove('nowRolling');
                 });
             }
             if (toReroll.length > 0) {
@@ -1159,6 +1162,30 @@
     details {
         text-align: center;
     }
+
+    .nowRolling {
+      -webkit-animation-duration: 1s;
+      animation-duration: 1s;
+      -webkit-animation-fill-mode: both;
+      animation-fill-mode: both;
+      -webkit-animation-iteration-count: infinite;
+      animation-iteration-count: infinite;
+      -webkit-animation-name: rotateFrames;
+      animation-name: rotateFrames;
+    }
+    @keyframes rotateFrames {
+      from {
+        -webkit-transform-origin: center;
+        transform-origin: center;
+      }
+      to {
+        -webkit-transform-origin: center;
+        transform-origin: center;
+        -webkit-transform: rotate3d(0, 0, 1, 360deg);
+        transform: rotate3d(0, 0, 1, 360deg);
+      }
+    }
+
 
 </style>
 
