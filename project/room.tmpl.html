@@ -257,14 +257,18 @@
         function rerollMarked() {
             var toReroll = document.getElementsByClassName("selected");
             for (var i = 0; i < toReroll.length; i++) {
-                var selectedDiv = toReroll[i];
-                selectedDiv.classList.add('nowRolling');
+                var animElement = toReroll[i].firstElementChild;
+                if (animElement) {
+                  animElement.classList.add('nowRolling');
+                }
                 $.post("/reroll", {
-                    id: selectedDiv.id,
+                    id: toReroll[i].id,
                     'fp': fp,
                     'white': whiteFlips
                 }).always(function () {
-                  selectedDiv.classList.remove('nowRolling');
+                  if (animElement) {
+                    animElement.classList.remove('nowRolling');
+                  }
                 });
             }
             if (toReroll.length > 0) {
