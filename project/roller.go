@@ -575,6 +575,10 @@ func refreshRoom(c context.Context, rk, fp string) string {
 				send = append(send, u)
 			}
 		}
+		// Don't perform another insert if nothing has changed.
+		if len(keep) == 0 {
+			return nil
+		}
 		r.Updates, err = json.Marshal(keep)
 		if err != nil {
 			out = ""
