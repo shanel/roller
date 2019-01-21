@@ -158,6 +158,14 @@ type PassedCustomSet struct {
 	Width     template.JS
 }
 
+func smartRedirect(w http.ResponseWriter, r *http.Request, url string, code int) {
+	if !strings.Contains(r.Host, "localhost") {
+		// If this isn't localhost, always redirect to https.
+		url = fmt.Sprintf("https://%s%s", r.Host, url)
+	}
+	http.Redirect(w, r, url, code)
+}
+
 func newCustomSetFromNewlineSeparatedString(u, height, width string) (CustomSet, error) {
 	// Get rid of random space at front or end
 	u = strings.TrimSpace(u)
@@ -1480,7 +1488,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
 	if err == nil {
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", roomCookie.Value), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", roomCookie.Value), http.StatusFound)
 	}
 	// If no cookie, then create a room, set cookie, and redirect
 	room, err := newRoom(c)
@@ -1490,7 +1498,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func paused(w http.ResponseWriter, r *http.Request) {
@@ -1541,7 +1549,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	}
 	room := path.Base(r.Referer())
 	lastAction[room] = "move"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func background(w http.ResponseWriter, r *http.Request) {
@@ -1559,7 +1567,7 @@ func background(w http.ResponseWriter, r *http.Request) {
 	}
 	setBackground(c, room, bg)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
@@ -1580,7 +1588,7 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	}
 	addCustomSet(c, room, name, entries, height, width)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func handleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
@@ -1598,7 +1606,7 @@ func handleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
 	}
 	removeCustomSet(c, room, name)
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func alert(w http.ResponseWriter, r *http.Request) {
@@ -1615,7 +1623,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	updateRoom(c, roomKey.Encode(), Update{Updater: "", Timestamp: time.Now().Unix(), Message: message}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func addImage(w http.ResponseWriter, r *http.Request) {
@@ -1651,7 +1659,7 @@ func addImage(w http.ResponseWriter, r *http.Request) {
 	fp := r.Form.Get("fp")
 	lastAction[room] = "image"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func roll(w http.ResponseWriter, r *http.Request) {
@@ -1710,7 +1718,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 
 	lastAction[room] = "roll"
 	updateRoom(c, roomKey.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, modInt)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func deleteDie(w http.ResponseWriter, r *http.Request) {
@@ -1722,10 +1730,10 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	err := deleteDieHelper(c, keyStr)
 	if err != nil {
 		log.Printf("error in deleteDie: %v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "delete"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func revealDie(w http.ResponseWriter, r *http.Request) {
@@ -1739,10 +1747,10 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	err := revealDieHelper(c, keyStr, fp)
 	if err != nil {
 		log.Printf("error in revealDie: %v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "reveal"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func hideDie(w http.ResponseWriter, r *http.Request) {
@@ -1755,10 +1763,10 @@ func hideDie(w http.ResponseWriter, r *http.Request) {
 	err := hideDieHelper(c, keyStr, r.Form.Get("fp"))
 	if err != nil {
 		log.Printf("error in hideDie: %v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "hide"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func rerollDie(w http.ResponseWriter, r *http.Request) {
@@ -1778,10 +1786,10 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	err = rerollDieHelper(c, keyStr, room, fp, white)
 	if err != nil {
 		log.Printf("error in rerollDie: %v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "reroll"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
@@ -1792,10 +1800,10 @@ func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
 	err := decrementClock(c, keyStr)
 	if err != nil {
 		log.Printf("error in decrementClock: %v", err)
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 	}
 	lastAction[room] = "decrementClock"
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
@@ -1813,7 +1821,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	fp := r.Form.Get("fp")
 	lastAction[room] = "clear"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func room(w http.ResponseWriter, r *http.Request) {
@@ -1843,7 +1851,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom})
 		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		repeatOffenders[room] = true
-		http.Redirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
 		return
 	}
 
@@ -2005,7 +2013,7 @@ func safetyRoom(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: "safety_room", Value: newRoom})
 		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		repeatOffenders[room] = true
-		http.Redirect(w, r, fmt.Sprintf("/safety/%v", newRoom), http.StatusFound)
+		smartRedirect(w, r, fmt.Sprintf("/safety/%v", newRoom), http.StatusFound)
 		return
 	}
 
@@ -2156,7 +2164,7 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	fp := r.Form.Get("fp")
 	lastAction[room] = "shuffle"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
 func draw(w http.ResponseWriter, r *http.Request) {
@@ -2201,5 +2209,5 @@ func draw(w http.ResponseWriter, r *http.Request) {
 	}
 	lastAction[room] = "draw"
 	updateRoom(c, keyStr, Update{Updater: fp, Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	http.Redirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
+	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
