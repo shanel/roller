@@ -381,14 +381,15 @@ func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 	return name, fmt.Errorf("couldn't find a room key for %v", name)
 }
 
-func updateRoom(c context.Context, rk string, u Update, modifier int) error {
+func updateRoom(c context.Context, rk string, u Update, modifier int) {
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
-		return fmt.Errorf("updateRoom: could not decode room key %v: %v", rk, err)
+		log.Printf("updateRoom: could not decode room key %v: %v", rk, err)
+		return
 	}
 	var r Room
 	t := time.Now().Unix()
-	return datastore.RunInTransaction(c, func(ctx context.Context) error {
+	err = datastore.RunInTransaction(c, func(ctx context.Context) error {
 		err = datastore.Get(c, roomKey, &r)
 		if err == datastore.ErrNoSuchEntity {
 			// Couldn't find it, so create it
@@ -431,6 +432,9 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) error {
 		}
 		return nil
 	}, nil)
+	if err != nil {
+		log.Printf("issue updating room: %v", err)
+	}
 }
 
 func setBackground(c context.Context, rk, url string) {
