@@ -215,7 +215,12 @@ func createSVG(c context.Context, die, result, color string) ([]byte, error) {
 		log.Printf("could not get svg: %v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			log.Printf("error closing body: %v", err)
+		}
+	}()
 	slurp, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("issue reading svg: %v", err)
@@ -1305,14 +1310,20 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 			d.ResultStr = dice[0].ResultStr
 			d.Image = dice[0].Image
 			// Delete the old die.
-			deleteDieHelper(c, keys[0].Encode())
+			err := deleteDieHelper(c, keys[0].Encode())
+			if err != nil {
+				log.Printf("error in deleteDieHelper: %v", err)
+			}
 		} else if d.IsCard {
 			dice, keys := drawCards(c, 1, k.Parent(), "", strconv.FormatBool(d.IsHidden), d.HiddenBy)
 			// Set the location to the same as the passed in die.
 			d.ResultStr = dice[0].ResultStr
 			d.Image = dice[0].Image
 			// Delete the old die.
-			deleteDieHelper(c, keys[0].Encode())
+			err := deleteDieHelper(c, keys[0].Encode())
+			if err != nil {
+				log.Printf("error in deleteDieHelper: %v", err)
+			}
 		} else if d.IsClock {
 			sep := map[string]int{
 				"c4": 5,
@@ -2096,7 +2107,10 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 			}
 			toShuffle.shuffleDiscards(stillOut)
 			cs[deckName] = toShuffle
-			r.SetCustomSets(cs)
+			err = r.SetCustomSets(cs)
+			if err != nil {
+				return fmt.Errorf("issue in SetCustomSets: %v", err)
+			}
 			r.Timestamp = t
 			_, err = datastore.Put(c, roomKey, &r)
 			if err != nil {
