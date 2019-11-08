@@ -1513,7 +1513,7 @@ func Root(w http.ResponseWriter, r *http.Request) {
 	room, err := newRoom(c)
 	if err != nil {
 		// TODO(shanel): This should probably say something more...
-//		log.Printf("no room from root: %v", err)
+		log.Printf("no room from root: %v", err)
 		http.NotFound(w, r)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room})
@@ -1862,7 +1862,7 @@ func GetRoom(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		newRoom, err := newRoom(c)
 		if err != nil {
-//			log.Printf("no room because: %v", err)
+			log.Printf("no room because: %v", err)
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}
