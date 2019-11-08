@@ -15,7 +15,8 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // TODO(shanel): Need to clean up the order of this file, move the js into its own file, nuke useless comments, write tests...
-package roller
+//package roller
+package main
 
 import (
 	"crypto/md5"
@@ -1221,7 +1222,7 @@ func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 		if d.HiddenBy != fp && d.HiddenBy != "" {
 			return fmt.Errorf("item with key %v was not hidden by %v", encodedDieKey, fp)
 		}
-		if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
+		if d.IsCard || d.IsCustomItem || d.IsImage || d.IsClock || d.Size == "tokens" {
 			d.IsHidden = false
 			d.HiddenBy = ""
 			_, err = datastore.Put(c, k, &d)
@@ -1249,7 +1250,7 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 		if d.IsHidden && d.HiddenBy != "" {
 			return fmt.Errorf("item is already hidden")
 		}
-		if d.IsCard || d.IsCustomItem || d.IsClock || d.Size == "tokens" {
+		if d.IsCard || d.IsCustomItem || d.IsClock || d.IsImage || d.Size == "tokens" {
 			d.IsHidden = true
 			d.HiddenBy = hiddenBy
 			_, err = datastore.Put(c, k, &d)
@@ -1467,38 +1468,41 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
-func init() {
-	http.HandleFunc("/", root)
-	http.HandleFunc("/about", about)
-	http.HandleFunc("/addcustomset", handleAddingCustomSet)
-	http.HandleFunc("/alert", alert)
-	http.HandleFunc("/background", background)
-	http.HandleFunc("/clear", clear)
-	http.HandleFunc("/delete", deleteDie)
-	http.HandleFunc("/decrementclock", handleDecrementClock)
-	http.HandleFunc("/draw", draw)
-	http.HandleFunc("/hide", hideDie)
-	http.HandleFunc("/image", addImage)
-	http.HandleFunc("/move", move)
-	http.HandleFunc("/paused", paused)
-	http.HandleFunc("/refresh", refresh)
-	http.HandleFunc("/removecustomset", handleRemovingCustomSet)
-	http.HandleFunc("/reroll", rerollDie)
-	http.HandleFunc("/reveal", revealDie)
-	http.HandleFunc("/roll", roll)
-	http.HandleFunc("/room", room)
-	http.HandleFunc("/room/", room)
-	http.HandleFunc("/room/*", room)
-	http.HandleFunc("/safety", safetyRoom)
-	http.HandleFunc("/safety/", safetyRoom)
-	http.HandleFunc("/safety/*", safetyRoom)
-	http.HandleFunc("/shuffle", shuffle)
+func main() {
+//	func init() {
+	http.HandleFunc("/", Root)
+	http.HandleFunc("/about", About)
+	http.HandleFunc("/addcustomset", HandleAddingCustomSet)
+	http.HandleFunc("/alert", Alert)
+	http.HandleFunc("/background", Background)
+	http.HandleFunc("/clear", Clear)
+	http.HandleFunc("/delete", DeleteDie)
+	http.HandleFunc("/decrementclock", HandleDecrementClock)
+	http.HandleFunc("/draw", Draw)
+	http.HandleFunc("/hide", HideDie)
+	http.HandleFunc("/image", AddImage)
+	http.HandleFunc("/move", Move)
+	http.HandleFunc("/paused", Paused)
+	http.HandleFunc("/refresh", Refresh)
+	http.HandleFunc("/removecustomset", HandleRemovingCustomSet)
+	http.HandleFunc("/reroll", RerollDie)
+	http.HandleFunc("/reveal", RevealDie)
+	http.HandleFunc("/roll", Roll)
+	http.HandleFunc("/room", GetRoom)
+	http.HandleFunc("/room/", GetRoom)
+	http.HandleFunc("/room/*", GetRoom)
+	http.HandleFunc("/safety", SafetyRoom)
+	http.HandleFunc("/safety/", SafetyRoom)
+	http.HandleFunc("/safety/*", SafetyRoom)
+	http.HandleFunc("/shuffle", Shuffle)
 
 	// Seed random number generator.
 	rand.Seed(int64(time.Now().Unix()))
+
+	appengine.Main()
 }
 
-func root(w http.ResponseWriter, r *http.Request) {
+func Root(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// Check for cookie based room
 	roomCookie, err := r.Cookie("dice_room")
@@ -1516,7 +1520,7 @@ func root(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func paused(w http.ResponseWriter, r *http.Request) {
+func Paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
 	room := r.Form.Get("id")
@@ -1524,7 +1528,7 @@ func paused(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, out, room)
 }
 
-func refresh(w http.ResponseWriter, r *http.Request) {
+func Refresh(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	if _, ok := repeatOffenders[r.Form.Get("id")]; ok {
@@ -1552,7 +1556,7 @@ func getXY(keyStr string, r *http.Request) (float64, float64) {
 	return x, y
 }
 
-func move(w http.ResponseWriter, r *http.Request) {
+func Move(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1567,7 +1571,7 @@ func move(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func background(w http.ResponseWriter, r *http.Request) {
+func Background(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	bg := r.Form.Get("bg")
 	c := appengine.NewContext(r)
@@ -1585,7 +1589,7 @@ func background(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
+func HandleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	name := r.Form.Get("name")
 	entries := r.Form.Get("entries")
@@ -1606,7 +1610,7 @@ func handleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func handleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
+func HandleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	name := r.Form.Get("deck")
 	c := appengine.NewContext(r)
@@ -1624,7 +1628,7 @@ func handleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func alert(w http.ResponseWriter, r *http.Request) {
+func Alert(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	message := r.Form.Get("message")
 	c := appengine.NewContext(r)
@@ -1641,7 +1645,7 @@ func alert(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func addImage(w http.ResponseWriter, r *http.Request) {
+func AddImage(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1663,7 +1667,6 @@ func addImage(w http.ResponseWriter, r *http.Request) {
 		New:          true,
 		IsImage:      true,
 		Image:        r.Form.Get("url"),
-		IsCustomItem: true,
 		CustomHeight: r.Form.Get("height"),
 		CustomWidth:  r.Form.Get("width"),
 	}
@@ -1677,7 +1680,7 @@ func addImage(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func roll(w http.ResponseWriter, r *http.Request) {
+func Roll(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1736,7 +1739,7 @@ func roll(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func deleteDie(w http.ResponseWriter, r *http.Request) {
+func DeleteDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1751,7 +1754,7 @@ func deleteDie(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func revealDie(w http.ResponseWriter, r *http.Request) {
+func RevealDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1768,7 +1771,7 @@ func revealDie(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func hideDie(w http.ResponseWriter, r *http.Request) {
+func HideDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1784,7 +1787,7 @@ func hideDie(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func rerollDie(w http.ResponseWriter, r *http.Request) {
+func RerollDie(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1807,7 +1810,7 @@ func rerollDie(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
+func HandleDecrementClock(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	keyStr := r.Form.Get("id")
@@ -1821,7 +1824,7 @@ func handleDecrementClock(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func clear(w http.ResponseWriter, r *http.Request) {
+func Clear(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	room := path.Base(r.Referer())
@@ -1839,7 +1842,7 @@ func clear(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func room(w http.ResponseWriter, r *http.Request) {
+func GetRoom(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.URL.Path)
 	if _, ok := repeatOffenders[room]; ok {
@@ -2005,7 +2008,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func safetyRoom(w http.ResponseWriter, r *http.Request) {
+func SafetyRoom(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	room := path.Base(r.URL.Path)
 	if _, ok := repeatOffenders[room]; ok {
@@ -2069,7 +2072,7 @@ func hidden(h bool) string {
 	return ""
 }
 
-func about(w http.ResponseWriter, _ *http.Request) {
+func About(w http.ResponseWriter, _ *http.Request) {
 	if out, err := ioutil.ReadFile("about.html"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
@@ -2167,7 +2170,7 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 	}, nil)
 }
 
-func shuffle(w http.ResponseWriter, r *http.Request) {
+func Shuffle(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	r.ParseForm()
 	room := path.Base(r.Referer())
@@ -2185,7 +2188,7 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
-func draw(w http.ResponseWriter, r *http.Request) {
+func Draw(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	c := appengine.NewContext(r)
 	room := path.Base(r.Referer())

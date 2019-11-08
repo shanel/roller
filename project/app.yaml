@@ -1,5 +1,4 @@
-runtime: go
-api_version: go1
+runtime: go111
 
 handlers:
 - url: /.well-known
@@ -9,4 +8,4 @@ handlers:
   static_dir: js
 
 - url: /.*
-  script: _go_app
+  script: auto
