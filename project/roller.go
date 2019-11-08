@@ -1468,6 +1468,37 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
+func init() {
+	http.HandleFunc("/", Root)
+	http.HandleFunc("/about", About)
+	http.HandleFunc("/addcustomset", HandleAddingCustomSet)
+	http.HandleFunc("/alert", Alert)
+	http.HandleFunc("/background", Background)
+	http.HandleFunc("/clear", Clear)
+	http.HandleFunc("/delete", DeleteDie)
+	http.HandleFunc("/decrementclock", HandleDecrementClock)
+	http.HandleFunc("/draw", Draw)
+	http.HandleFunc("/hide", HideDie)
+	http.HandleFunc("/image", AddImage)
+	http.HandleFunc("/move", Move)
+	http.HandleFunc("/paused", Paused)
+	http.HandleFunc("/refresh", Refresh)
+	http.HandleFunc("/removecustomset", HandleRemovingCustomSet)
+	http.HandleFunc("/reroll", RerollDie)
+	http.HandleFunc("/reveal", RevealDie)
+	http.HandleFunc("/roll", Roll)
+	http.HandleFunc("/room", GetRoom)
+	http.HandleFunc("/room/", GetRoom)
+	http.HandleFunc("/room/*", GetRoom)
+	http.HandleFunc("/safety", SafetyRoom)
+	http.HandleFunc("/safety/", SafetyRoom)
+	http.HandleFunc("/safety/*", SafetyRoom)
+	http.HandleFunc("/shuffle", Shuffle)
+
+	// Seed random number generator.
+	rand.Seed(int64(time.Now().Unix()))
+}
+
 func main() {
 //	func init() {
 	http.HandleFunc("/", Root)
