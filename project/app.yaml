@@ -1,4 +1,9 @@
 runtime: go111
+instance_class: F1
+automatic_scaling:
+  max_instances: 2
+  max_idle_instances: 1
+  max_concurent_requests: 50
 
 handlers:
 - url: /.well-known
