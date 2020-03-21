@@ -1469,7 +1469,7 @@ func getNewResult(kind string) (int, string) {
 }
 
 func main() {
-//	func init() {
+	//	func init() {
 	http.HandleFunc("/", Root)
 	http.HandleFunc("/about", About)
 	http.HandleFunc("/addcustomset", HandleAddingCustomSet)
@@ -1522,7 +1522,7 @@ func Root(w http.ResponseWriter, r *http.Request) {
 
 func Paused(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
+	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for half an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
 	room := r.Form.Get("id")
 	lastAction[room] = "paused"
 	fmt.Fprintf(w, out, room)
