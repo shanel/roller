@@ -694,8 +694,8 @@
                     } else {
                         if (lastRealUpdate > 0) {
                             var delta = unix - lastRealUpdate;
-                            // Stop updating after 60m
-                            if (delta > 10400) {
+                            // Stop updating after 30m
+                            if (delta > 5200) {
                                 window.location.replace("/paused?id=" + room);
                             }
                         }
