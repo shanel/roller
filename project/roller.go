@@ -1102,6 +1102,7 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 	return dice, err
 }
 
+// TODO(shanel): There appears to be an issue where if there are a large number of items in the room this method will fail.
 func clearRoomDice(c context.Context, encodedRoomKey string) error {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
@@ -1894,6 +1895,7 @@ func Clear(w http.ResponseWriter, r *http.Request) {
 	}
 	err = clearRoomDice(c, keyStr)
 	if err != nil {
+		log.Printf("clear failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	fp := r.Form.Get("fp")
