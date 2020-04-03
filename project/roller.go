@@ -445,7 +445,7 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 			return fmt.Errorf("could not update room %v: %v", rk, err)
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		log.Printf("issue updating room: %v", err)
 	}
@@ -482,7 +482,7 @@ func setBackground(c context.Context, rk, url string) {
 			return fmt.Errorf("url is wrong")
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		log.Printf("%v", err)
 	}
@@ -530,7 +530,7 @@ func addCustomSet(c context.Context, rk, name, lines, height, width string) {
 			return fmt.Errorf("couldn't find the new entry: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
@@ -570,7 +570,7 @@ func removeCustomSet(c context.Context, rk, name string) {
 			return fmt.Errorf("couldn't find the new entry: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
@@ -619,7 +619,7 @@ func refreshRoom(c context.Context, rk, fp string) string {
 			return fmt.Errorf("could not create updated room %v: %v", rk, err)
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		log.Printf("%v", err)
 		return out
@@ -678,7 +678,7 @@ func newRoom(c context.Context) (string, error) {
 		//}
 		// TODO(shanel): why does it seem I need the above three lines? Race condition?
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -767,7 +767,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 					return fmt.Errorf("issue updating room in drawCards: %v", err)
 				}
 				return nil
-			}, nil)
+			})
 			if err != nil {
 				log.Printf("%v", err)
 			}
@@ -830,7 +830,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 					return fmt.Errorf("couldn't find the new entry: %v", err)
 				}
 				return nil
-			}, nil)
+			})
 		}
 		return nil
 	}, nil)
@@ -1034,7 +1034,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 			return fmt.Errorf("could not create new dice: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	return total, err
 }
 
@@ -1051,7 +1051,7 @@ func getRoomCards(c context.Context, encodedRoomKey string) ([]Die, error) {
 			return fmt.Errorf("problem executing card query: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	return dice, err
 }
 
@@ -1068,7 +1068,7 @@ func getRoomCustomCards(c context.Context, encodedRoomKey string) ([]Die, error)
 			return fmt.Errorf("problem executing custom card query: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	return dice, err
 }
 
@@ -1095,7 +1095,7 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 			return fmt.Errorf("problem executing dice query: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	for _, d := range dice {
 		d.SVG = template.HTML(fmt.Sprintf("%s", d.SVGBytes))
 	}
@@ -1124,7 +1124,7 @@ func clearRoomDice(c context.Context, encodedRoomKey string) error {
 			return fmt.Errorf("problem deleting room dice from room %v: %v", encodedRoomKey, err)
 		}
 		return nil
-	}, nil)
+	})
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return err
@@ -1191,7 +1191,7 @@ func updateDieLocation(c context.Context, encodedDieKey, fp string, x, y float64
 			return fmt.Errorf("could not update die %v with new position: %v", encodedDieKey, err)
 		}
 		return nil
-	}, nil)
+	})
 	updateRoom(c, k.Parent.Encode(), Update{Updater: fp, Timestamp: time.Now().Unix()}, 0)
 	return err
 }
@@ -1212,7 +1212,7 @@ func deleteDieHelper(c context.Context, encodedDieKey string) error {
 			return fmt.Errorf("problem deleting room die %v: %v", encodedDieKey, err)
 		}
 		return nil
-	}, nil)
+	})
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return err
@@ -1253,7 +1253,7 @@ func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 			return nil
 		}
 		return fmt.Errorf("only cards and custom items can be revealed.")
-	}, nil)
+	})
 	return err
 }
 
@@ -1283,7 +1283,7 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 			return nil
 		}
 		return fmt.Errorf("Only cards and custom items can be hidden.")
-	}, nil)
+	})
 	return err
 }
 
@@ -1425,7 +1425,7 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 			}
 		}
 		return nil
-	}, nil)
+	})
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
@@ -1461,7 +1461,7 @@ func decrementClock(c context.Context, encodedDieKey string) error {
 			return fmt.Errorf("problem decrementing clock %v: %v", encodedDieKey, err)
 		}
 		return nil
-	}, nil)
+	})
 	// Fake updater so Safari will work?
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
@@ -2224,7 +2224,7 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 			}
 		}
 		return nil
-	}, nil)
+	})
 	return err
 }
 
@@ -2285,7 +2285,7 @@ func Draw(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("other error in draw: %v", err)
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		log.Printf("%v", err)
 	}
