@@ -724,7 +724,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 						return fmt.Errorf("issue updating deck in drawCards: %v", err)
 					}
 					return nil
-				}, nil)
+				})
 				if err != nil {
 					return fmt.Errorf("issue updating deck in drawCards: %v", err)
 				}
@@ -833,7 +833,7 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 			})
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		log.Printf("%v", err)
 	}
