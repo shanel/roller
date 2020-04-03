@@ -332,9 +332,9 @@ type Die struct {
 	IsFlipped     bool
 	Version       int // Use this to determine whether to use old display logic or new
 	SVGPath       string
-	SVG           template.HTML
+	SVG           template.HTML `datastore:",noindex"`
 	IsToken       bool
-	SVGBytes      []byte
+	SVGBytes      []byte `datastore:",noindex"`
 }
 
 func (d *Die) updatePosition(x, y float64) {
