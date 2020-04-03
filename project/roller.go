@@ -719,15 +719,15 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				}
 				room.Deck = empty.GetSignature()
 				//return datastore.RunInTransaction(c, func(ctx context.Context) error {
-				_, err := dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
-					if _, err := tx.Put(roomKey, &room); err != nil {
-						return fmt.Errorf("issue updating deck in drawCards: %v", err)
-					}
-					return nil
-				})
-				if err != nil {
+				//_, err := dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
+				if _, err := tx.Put(roomKey, &room); err != nil {
 					return fmt.Errorf("issue updating deck in drawCards: %v", err)
 				}
+				//	return nil
+				//})
+				//if err != nil {
+				//	return fmt.Errorf("issue updating deck in drawCards: %v", err)
+				//}
 			}
 			if deckSize < count {
 				roomDeck.Deal(deckSize, hand)
@@ -761,16 +761,16 @@ func drawCards(c context.Context, count int, roomKey *datastore.Key, deckName, h
 				keys = append(keys, dk)
 			}
 			room.Deck = roomDeck.GetSignature()
-			_, err = dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
-				//err = datastore.RunInTransaction(c, func(ctx context.Context) error {
-				if _, err := tx.Put(roomKey, &room); err != nil {
-					return fmt.Errorf("issue updating room in drawCards: %v", err)
-				}
-				return nil
-			})
-			if err != nil {
-				log.Printf("%v", err)
+			//_, err = dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
+			//err = datastore.RunInTransaction(c, func(ctx context.Context) error {
+			if _, err := tx.Put(roomKey, &room); err != nil {
+				return fmt.Errorf("issue updating room in drawCards: %v", err)
 			}
+			//	return nil
+			//})
+			//if err != nil {
+			//	log.Printf("%v", err)
+			//}
 		} else {
 			// do the custom set stuff here...
 			customSets, err := room.GetCustomSets()
