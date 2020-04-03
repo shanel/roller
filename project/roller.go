@@ -1102,7 +1102,7 @@ func getRoomDice(c context.Context, encodedRoomKey, order, sort string) ([]Die, 
 	return dice, err
 }
 
-// TODO(shanel): There appears to be an issue where if there are a large number of items in the room this method will fail.
+// TODO(shanel): If more than 500 things are altered RPC will fail. Need to batch in that case.
 func clearRoomDice(c context.Context, encodedRoomKey string) error {
 	k, err := datastore.DecodeKey(encodedRoomKey)
 	if err != nil {
