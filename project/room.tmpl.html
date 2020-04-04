@@ -32,9 +32,13 @@
         var fp = Cookies.get('fp');
         if (window.requestIdleCallback) {
             requestIdleCallback(function () {
-                new Fingerprint2().get(function (result, components) {
+                var fpOptions = {};
+                Fingerprint2.get(fpOptions, function (components) {
                     if (typeof fp === 'undefined') {
-                        fp = result; //a hash, representing your device fingerprint
+                        var values = components.map(function (component) { return component.value });
+                        fp = Fingerprint2.x64hash128(values.join(''), 31);
+                        console.log("fp: " + fp);
+                        // fp = result; //a hash, representing your device fingerprint
                         Cookies.set('fp', fp, {expires: 365});
                     }
                     var x = document.getElementsByName("fp");
@@ -43,9 +47,13 @@
             })
         } else {
             setTimeout(function () {
-                new Fingerprint2().get(function (result, components) {
+                var fpOptions = {};
+                Fingerprint2.get(fpOptions, function (components) {
                     if (typeof fp === 'undefined') {
-                        fp = result; //a hash, representing your device fingerprint
+                        var values = components.map(function (component) { return component.value });
+                        fp = Fingerprint2.x64hash128(values.join(''), 31);
+                        console.log("fp: " + fp);
+                        // fp = result; //a hash, representing your device fingerprint
                         Cookies.set('fp', fp, {expires: 365});
                     }
                     var x = document.getElementsByName("fp");
