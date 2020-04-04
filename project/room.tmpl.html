@@ -678,9 +678,6 @@
                     if (b !== "") {
                         var chunks = b.split("||");
                         if (chunks.length === 2) {
-                            console.log("saw something: " + chunks[1])
-                            if (Push.Permission.has()) {
-                                console.log("have permission")
                                 Push.create("Safety tool used!", {
                                     body: chunks[1],
                                     timeout: 4000,
@@ -689,8 +686,7 @@
                                         this.close();
                                     }
                                 });
-                            } else {
-                                console.log("no permission")
+                            if (!Push.Permission.has()) {
                                 alert(chunks[1]);
                             }
                         }
