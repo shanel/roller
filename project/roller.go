@@ -1,5 +1,5 @@
 //    AppEngine based Dice Roller
-//    Copyright (C) 2017  Shane Liebling
+//    Copyright (C) 2017 Shane Liebling
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -1516,17 +1516,16 @@ func Root(w http.ResponseWriter, r *http.Request) {
 }
 
 func Paused(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	out := "<html><center>To save on bandwidth we have stopped updating you since you have been idle for half an hour. To get back to your room, click <a href=\"/room/%v\">here</a>.</center></html>"
 	room := r.Form.Get("id")
 	lastAction[room] = "paused"
-	fmt.Fprintf(w, out, room)
+	_, _ = fmt.Fprintf(w, out, room)
 }
 
 func Refresh(w http.ResponseWriter, r *http.Request) {
-	//c := appengine.NewContext(r)
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	if _, ok := repeatOffenders[r.Form.Get("id")]; ok {
 		http.NotFound(w, r)
 		return
@@ -1537,7 +1536,7 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	fp := r.Form.Get("fp")
 	ref := refreshRoom(c, keyStr, fp)
-	fmt.Fprintf(w, "%v", ref)
+	_, _ = fmt.Fprintf(w, "%v", ref)
 }
 
 func getXY(keyStr string, r *http.Request) (float64, float64) {
@@ -1553,9 +1552,8 @@ func getXY(keyStr string, r *http.Request) (float64, float64) {
 }
 
 func Move(w http.ResponseWriter, r *http.Request) {
-	//c := appengine.NewContext(r)
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
 	x, y := getXY(keyStr, r)
@@ -1569,9 +1567,8 @@ func Move(w http.ResponseWriter, r *http.Request) {
 }
 
 func Background(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	bg := r.Form.Get("bg")
-	//c := appengine.NewContext(r)
 	c := r.Context()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1588,12 +1585,11 @@ func Background(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := r.Form.Get("name")
 	entries := r.Form.Get("entries")
 	height := r.Form.Get("height")
 	width := r.Form.Get("width")
-	//c := appengine.NewContext(r)
 	c := r.Context()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
@@ -1610,7 +1606,7 @@ func HandleAddingCustomSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := r.Form.Get("deck")
 	c := r.Context()
 	room := path.Base(r.Referer())
@@ -1628,7 +1624,7 @@ func HandleRemovingCustomSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func Alert(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	message := r.Form.Get("message")
 	c := r.Context()
 	room := path.Base(r.Referer())
@@ -1655,7 +1651,7 @@ func AddImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	r.ParseForm()
+	_ = r.ParseForm()
 	ts := time.Now().Unix()
 	lk := dieKey(roomKey, int64(ts))
 	l := Die{
@@ -1740,7 +1736,7 @@ func Roll(w http.ResponseWriter, r *http.Request) {
 
 func DeleteDie(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
 	// Do we need to be worried dice will be deleted from other rooms?
@@ -1755,7 +1751,7 @@ func DeleteDie(w http.ResponseWriter, r *http.Request) {
 
 func RevealDie(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
 	room := path.Base(r.Referer())
@@ -1772,7 +1768,7 @@ func RevealDie(w http.ResponseWriter, r *http.Request) {
 
 func HideDie(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
 	lastRoll[room] = 0
@@ -1788,7 +1784,7 @@ func HideDie(w http.ResponseWriter, r *http.Request) {
 
 func RerollDie(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	fp := r.Form.Get("fp")
 	var white bool
@@ -1811,7 +1807,7 @@ func RerollDie(w http.ResponseWriter, r *http.Request) {
 
 func HandleDecrementClock(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	keyStr := r.Form.Get("id")
 	room := path.Base(r.Referer())
 	err := decrementClock(c, keyStr)
@@ -1825,7 +1821,7 @@ func HandleDecrementClock(w http.ResponseWriter, r *http.Request) {
 
 func Clear(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
@@ -2071,7 +2067,7 @@ func About(w http.ResponseWriter, _ *http.Request) {
 	if out, err := ioutil.ReadFile("about.html"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
-		fmt.Fprintf(w, "%s", out)
+		_, _ = fmt.Fprintf(w, "%s", out)
 	}
 }
 
@@ -2168,7 +2164,7 @@ func shuffleDiscards(c context.Context, keyStr, deckName string) error {
 
 func Shuffle(w http.ResponseWriter, r *http.Request) {
 	c := r.Context()
-	r.ParseForm()
+	_ = r.ParseForm()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
 	if err != nil {
@@ -2185,7 +2181,7 @@ func Shuffle(w http.ResponseWriter, r *http.Request) {
 }
 
 func Draw(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	c := r.Context()
 	room := path.Base(r.Referer())
 	keyStr, err := getEncodedRoomKeyFromName(c, room)
