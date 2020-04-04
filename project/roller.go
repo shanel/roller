@@ -1563,7 +1563,7 @@ func Root(w http.ResponseWriter, r *http.Request) {
 		log.Printf("no room from root: %v", err)
 		http.NotFound(w, r)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteLaxMode})
 	smartRedirect(w, r, fmt.Sprintf("/room/%v", room), http.StatusFound)
 }
 
@@ -1929,7 +1929,7 @@ func GetRoom(w http.ResponseWriter, r *http.Request) {
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}
-		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom, SameSite: http.SameSiteStrictMode})
+		http.SetCookie(w, &http.Cookie{Name: "dice_room", Value: newRoom, SameSite: http.SameSiteLaxMode})
 		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		repeatOffenders[room] = true
 		smartRedirect(w, r, fmt.Sprintf("/room/%v", newRoom), http.StatusFound)
@@ -1974,7 +1974,7 @@ func GetRoom(w http.ResponseWriter, r *http.Request) {
 	rollAvg = float64(rollTotal) / float64(rollCount)
 	roomAvg = float64(roomTotal) / float64(roomCount)
 
-	cookie := &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteStrictMode}
+	cookie := &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteLaxMode}
 	http.SetCookie(w, cookie)
 
 	var rm Room
@@ -2087,14 +2087,14 @@ func SafetyRoom(w http.ResponseWriter, r *http.Request) {
 			// TODO(shanel): This should probably say something more...
 			http.NotFound(w, r)
 		}
-		http.SetCookie(w, &http.Cookie{Name: "safety_room", Value: newRoom, SameSite: http.SameSiteStrictMode})
+		http.SetCookie(w, &http.Cookie{Name: "safety_room", Value: newRoom, SameSite: http.SameSiteLaxMode})
 		time.Sleep(100 * time.Nanosecond) // Getting into a race I think...
 		repeatOffenders[room] = true
 		smartRedirect(w, r, fmt.Sprintf("/safety/%v", newRoom), http.StatusFound)
 		return
 	}
 
-	cookie := &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteStrictMode}
+	cookie := &http.Cookie{Name: "dice_room", Value: room, SameSite: http.SameSiteLaxMode}
 	http.SetCookie(w, cookie)
 
 	var rm Room
