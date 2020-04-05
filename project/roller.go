@@ -1502,8 +1502,8 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	//	dsClient, err = datastore.NewClient(ctx, "just-another-dice-roller")
-	dsClient, err = datastore.NewClient(ctx, "dice-roller-174222")
+	dsClient, err = datastore.NewClient(ctx, "just-another-dice-roller")
+	//dsClient, err = datastore.NewClient(ctx, "dice-roller-174222")
 	if err != nil {
 		log.Fatal(err)
 	}
