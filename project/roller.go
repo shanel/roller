@@ -25,6 +25,7 @@ import (
 	"github.com/adamclerk/deck"
 	"github.com/beevik/etree"
 	"github.com/dustinkirkland/golang-petname"
+	"github.com/karlseguin/ccache"
 	"os"
 
 	"cloud.google.com/go/datastore"
@@ -62,6 +63,7 @@ var (
 	suitMap      = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
 	previousSVGs = map[string][]byte{}
 	dsClient     *datastore.Client
+	updateCache  *ccache.Cache
 )
 
 type Update struct {
@@ -560,7 +562,27 @@ func removeCustomSet(c context.Context, rk, name string) {
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
-func refreshRoom(c context.Context, rk, fp string) string {
+func refreshRoom(c context.Context, rk, fp, ts string) string {
+	var clientLastUpdate, serverLastUpdate int64
+	if ts != "" {
+		lu, err := strconv.Atoi(ts)
+		if err == nil {
+			clientLastUpdate = int64(lu)
+		}
+	}
+	cacheItem := updateCache.Get(rk)
+	if cacheItem != nil {
+		serverLastUpdate = cacheItem.Value().(int64)
+	}
+	if clientLastUpdate > serverLastUpdate {
+		return ""
+	}
+	// From here we will check the cache to see if the room has had any updates (that this server knows about).
+	// If not then we'll just return nothing. If so (or there is no record) we'll do a query...
+	//
+	// Is there a chicken egg issue here?
+	//
+	// TODO(shanel) At the end of this if there was a real update, update the cache with a new timestamp.
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
@@ -569,12 +591,12 @@ func refreshRoom(c context.Context, rk, fp string) string {
 	}
 	var r Room
 	var send []Update
+	now := time.Now().Unix()
 	_, err = dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
 		if err = tx.Get(roomKey, &r); err != nil {
 			return fmt.Errorf("could not find room %v for refresh: %v", rk, err)
 		}
 		keep := []Update{}
-		now := time.Now().Unix()
 		var umUpdates []Update
 		err = json.Unmarshal(r.Updates, &umUpdates)
 		if err != nil {
@@ -624,6 +646,9 @@ func refreshRoom(c context.Context, rk, fp string) string {
 		if out == "" {
 			out = fmt.Sprintf("%x", md5.Sum(toHash))
 		}
+	}
+	if out != "" {
+		updateCache.Set(rk, now, time.Hour*5)
 	}
 	return out
 }
@@ -1483,6 +1508,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	updateCache = ccache.New(ccache.Configure())
+
 	// [START setting_port]
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -1536,7 +1563,8 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		log.Printf("roomname wonkiness in refresh: %v", err)
 	}
 	fp := r.Form.Get("fp")
-	ref := refreshRoom(c, keyStr, fp)
+	ts := r.Form.Get("ts")
+	ref := refreshRoom(c, keyStr, fp, ts)
 	_, _ = fmt.Fprintf(w, "%v", ref)
 }
 

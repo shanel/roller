@@ -27,7 +27,7 @@
         var sortDice = false;
         var saveRolls = false;
         var whiteFlips = false;
-
+        // TODO(shanel): Need to use new Fingerprint and will needt to update to send timestamp on refresh.
         var fp = Cookies.get('fp');
         if (window.requestIdleCallback) {
             requestIdleCallback(function () {
