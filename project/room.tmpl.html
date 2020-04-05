@@ -675,6 +675,7 @@
             })
                 .done(function (data) {
                     var b = data;
+                    var unix = Math.round(+new Date() / 1000);
                     if (b !== "") {
                         var chunks = b.split("||");
                         if (chunks.length === 2) {
