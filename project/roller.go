@@ -387,6 +387,7 @@ func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 }
 
 func updateRoom(c context.Context, rk string, u Update, modifier int) {
+	// TODO(shanel): This should probably update the updateCache based on the Update's timestamp.
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
 		log.Printf("updateRoom: could not decode room key %v: %v", rk, err)
@@ -1508,6 +1509,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// TODO(shanel): Add a simple pubsub setup - topic messages will be rooms and their update timestamps.
+	// One subscriber per instance. A single topic. Subscriber will just dump the info into the local ccache instance.
+	// Messages will be published by any method that isn't just reading from the datastore (so datastore.Put()s or UpdateRoom calls).
+	// Ideally use ordered subscriber? Though might just make sense to - if get unordered - only use the newest (ie compare
+	// what has already been put in the cache before updating the cache - doing that would minimize the reads)
+	// Make sure to defer unsubscribing or shutting down the subscriber - don't want messages being saved if the instance dies off.
 	updateCache = ccache.New(ccache.Configure())
 
 	// [START setting_port]
@@ -1868,6 +1875,8 @@ func Clear(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetRoom(w http.ResponseWriter, r *http.Request) {
+	// Somehow check if the most current version is cached?
+	// Would it actually be at this point - could be if this is first load?
 	c := r.Context()
 	room := path.Base(r.URL.Path)
 	if _, ok := repeatOffenders[room]; ok {
