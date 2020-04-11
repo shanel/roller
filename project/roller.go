@@ -1546,8 +1546,6 @@ func main() {
 
 	updateCache = ccache.New(ccache.Configure())
 
-	log.Println("ABOUT TO DO PUBSUB STUFF")
-
 	// pubsub topic
 	it := pubsubClient.Topics(ctx)
 	for {
@@ -1562,7 +1560,7 @@ func main() {
 		log.Printf("found topic: %v", t)
 	}
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
-	//defer pubsubTopic.Stop()
+	defer pubsubTopic.Stop()
 
 	id := os.Getenv("GAE_SERVICE") + "-" + os.Getenv("GAE_VERSION") + "-" + os.Getenv("GAE_INSTANCE")
 
