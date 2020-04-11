@@ -1546,7 +1546,7 @@ func main() {
 	sub, err := pubsubClient.CreateSubscription(ctx, id, pubsub.SubscriptionConfig{
 		Topic:            pubsubTopic,
 		AckDeadline:      10 * time.Second,
-		ExpirationPolicy: time.Hour,
+		ExpirationPolicy: 24 * time.Hour,
 	})
 	if err != nil {
 		log.Printf("issue creating pubsub subscriber, caching will not be working well: %v", err)
