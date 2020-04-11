@@ -1538,6 +1538,20 @@ func main() {
 	}
 
 	updateCache = ccache.New(ccache.Configure())
+
+	// [START setting_port]
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("Defaulting to port %s", port)
+	}
+
+	log.Printf("Listening on port %s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatal(err)
+	}
+	// [END setting_port]
+
 	// pubsub topic
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
 	defer pubsubTopic.Stop()
@@ -1606,19 +1620,6 @@ func main() {
 			log.Printf("got unexpected error via Pubsub.Receive: %v", err)
 		}
 	}
-
-	// [START setting_port]
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-		log.Printf("Defaulting to port %s", port)
-	}
-
-	log.Printf("Listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
-	}
-	// [END setting_port]
 
 }
 
