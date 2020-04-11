@@ -1558,6 +1558,9 @@ func main() {
 	// [END setting_port]
 
 	// pubsub topic
+	for top := range pubsubClient.Topics(ctx) {
+		log.Printf("Found topic: %v", top)
+	}
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
 	//defer pubsubTopic.Stop()
 
