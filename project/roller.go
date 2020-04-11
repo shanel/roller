@@ -1558,6 +1558,8 @@ func main() {
 	}
 	// [END setting_port]
 
+	log.Println("ABOUT TO DO PUBSUB STUFF")
+
 	// pubsub topic
 	it := pubsubClient.Topics(ctx)
 	for {
