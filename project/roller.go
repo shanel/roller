@@ -26,7 +26,6 @@ import (
 	"github.com/beevik/etree"
 	"github.com/dustinkirkland/golang-petname"
 	"github.com/karlseguin/ccache"
-	"google.golang.org/api/iterator"
 	"os"
 
 	"cloud.google.com/go/datastore"
@@ -591,7 +590,6 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 		serverLastUpdate = cacheItem.Value().(int64)
 	}
 	if clientLastUpdate > serverLastUpdate {
-		log.Println("NO UPDATE FOUND!!!")
 		return ""
 	}
 	// From here we will check the cache to see if the room has had any updates (that this server knows about).
@@ -1547,18 +1545,6 @@ func main() {
 	updateCache = ccache.New(ccache.Configure())
 
 	// pubsub topic
-	it := pubsubClient.Topics(ctx)
-	for {
-		t, err := it.Next()
-		if err == iterator.Done {
-			log.Println("hit end of iteration")
-			break
-		}
-		if err != nil {
-			log.Printf("iteration error: %v", err)
-		}
-		log.Printf("found topic: %v", t)
-	}
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
 	defer pubsubTopic.Stop()
 
