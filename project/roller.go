@@ -29,6 +29,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/datastore"
+	"cloud.google.com/go/pubsub"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -45,6 +46,7 @@ import (
 
 // If you have forked this and are running it yourself you might need to change this.
 const bucket = "dice-roller-174222.appspot.com"
+const pubsubTopicName = "room-updates"
 
 var (
 	// As we create urls for the die images, store them here so we don't keep making them
@@ -64,6 +66,8 @@ var (
 	previousSVGs = map[string][]byte{}
 	dsClient     *datastore.Client
 	updateCache  *ccache.Cache
+	//	roomCache    *ccache.Cache
+	pubsubTopic *pubsub.Topic
 )
 
 type Update struct {
@@ -409,8 +413,9 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 			d, err := deck.New(deck.Unshuffled)
 			if err != nil {
 				log.Printf("could not create deck: %v", err)
+			} else {
+				d.Shuffle()
 			}
-			d.Shuffle()
 			r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
 			_, err = tx.Put(roomKey, &r)
 			if err != nil {
@@ -440,7 +445,10 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 	})
 	if err != nil {
 		log.Printf("issue updating room: %v", err)
+		return
 	}
+	// Publish to the pubsub topic the room and the timestamp
+	pubsubTopic.Publish(c, &pubsub.Message{Data: []byte(rk + "|" + strconv.Itoa(int(t)))})
 }
 
 func setBackground(c context.Context, rk, url string) {
@@ -564,6 +572,7 @@ func removeCustomSet(c context.Context, rk, name string) {
 }
 
 func refreshRoom(c context.Context, rk, fp, ts string) string {
+	// TODO(shanel): For the stuff below - it should  instead store the Passer object in a second cache
 	var clientLastUpdate, serverLastUpdate int64
 	if ts != "" {
 		lu, err := strconv.Atoi(ts)
@@ -583,7 +592,6 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 	//
 	// Is there a chicken egg issue here?
 	//
-	// TODO(shanel) At the end of this if there was a real update, update the cache with a new timestamp.
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
@@ -648,9 +656,9 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 			out = fmt.Sprintf("%x", md5.Sum(toHash))
 		}
 	}
-	if out != "" {
-		updateCache.Set(rk, now, time.Hour*5)
-	}
+	//	if out != "" {
+	//		updateCache.Set(rk, now, time.Hour*5)
+	//	}
 	return out
 }
 
@@ -1470,6 +1478,15 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
+func onlyLetters(s string) bool {
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
 func main() {
 	//	func init() {
 	http.HandleFunc("/", Root)
@@ -1503,10 +1520,36 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	dsClient, err = datastore.NewClient(ctx, "just-another-dice-roller")
-	//dsClient, err = datastore.NewClient(ctx, "dice-roller-174222")
+	projectID := "just-another-dice-roller"
+	//	projectID := "dice-roller-174222"
+	dsClient, err = datastore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// pubsub client
+	pubsubClient, err := pubsub.NewClient(ctx, projectID)
+	if err != nil {
+		log.Printf("issue creating pubsub client, caching will not be working well: %v", err)
+	} else {
+		defer func() {
+			_ = pubsubClient.Close()
+		}()
+	}
+
+	// pubsub topic
+	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
+	defer pubsubTopic.Stop()
+
+	id := os.Getenv("GAE_SERVICE") + "-" + os.Getenv("GAE_VERSION") + "-" + os.Getenv("GAE_INSTANCE")
+
+	sub, err := pubsubClient.CreateSubscription(ctx, id, pubsub.SubscriptionConfig{
+		Topic:            pubsubTopic,
+		AckDeadline:      10 * time.Second,
+		ExpirationPolicy: time.Hour,
+	})
+	if err != nil {
+		log.Printf("issue creating pubsub subscriber, caching will not be working well: %v", err)
 	}
 
 	// TODO(shanel): Add a simple pubsub setup - topic messages will be rooms and their update timestamps.
@@ -1516,6 +1559,52 @@ func main() {
 	// what has already been put in the cache before updating the cache - doing that would minimize the reads)
 	// Make sure to defer unsubscribing or shutting down the subscriber - don't want messages being saved if the instance dies off.
 	updateCache = ccache.New(ccache.Configure())
+
+	// roomCache will have the most up to date Passer objects so we can generate rooms without making remote reads more than once
+	//	roomCache = ccache.New(ccache.Configure())
+
+	err = sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
+		// TODO: Handle message.
+		// NOTE: May be called concurrently; synchronize access to shared memory.
+
+		// Get the room and timestamp out of the message
+		messageData := string(m.Data)
+		// assumed structure is "MyRoomName|123456789"
+		messagePieces := strings.Split(messageData, "|")
+		switch count := len(messagePieces); count {
+		case 1:
+			// Check if it is a room name. If it is just insert with current timestamp;
+			if onlyLetters(messagePieces[0]) {
+				updateCache.Set(messagePieces[0], time.Now().Unix(), 5*time.Hour)
+			}
+		case 2:
+			var cacheTimestamp, messageTimestamp int64
+
+			// Do a Get of the room name, if it exists convert the value and the message timestamp to int64 and compare
+			// If message timestamp is newer, replace the current entry
+			got := updateCache.Get(messagePieces[0])
+			if got != nil {
+				cacheTimestamp = got.Value().(int64)
+			}
+			tempTS, err := strconv.Atoi(messagePieces[1])
+			if err == nil {
+				messageTimestamp = int64(tempTS)
+			} else {
+				log.Printf("problem converting message timestamp to int: %v", err)
+				messageTimestamp = time.Now().Unix()
+			}
+			if messageTimestamp > cacheTimestamp {
+				updateCache.Set(messagePieces[0], messageTimestamp, 5*time.Hour)
+			}
+		default:
+			// log an error
+			log.Printf("don't know what to do with this message: %v", messageData)
+		}
+		m.Ack()
+	})
+	if err != context.Canceled {
+		log.Printf("got unexpected error via Pubsub.Receive: %v", err)
+	}
 
 	// [START setting_port]
 	port := os.Getenv("PORT")
