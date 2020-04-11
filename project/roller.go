@@ -22,24 +22,24 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/adamclerk/deck"
-	"github.com/beevik/etree"
-	"github.com/dustinkirkland/golang-petname"
-	"github.com/karlseguin/ccache"
-	"os"
-
-	"cloud.google.com/go/datastore"
-	"cloud.google.com/go/pubsub"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"cloud.google.com/go/datastore"
+	"cloud.google.com/go/pubsub"
+	"github.com/adamclerk/deck"
+	"github.com/beevik/etree"
+	"github.com/dustinkirkland/golang-petname"
+	"github.com/karlseguin/ccache"
 )
 
 // TODO(shanel): Audit all the RunInTransaction calls and pass ReadOnly if only Get or GetMulti are happening.
@@ -392,7 +392,6 @@ func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 }
 
 func updateRoom(c context.Context, rk string, u Update, modifier int) {
-	// TODO(shanel): This should probably update the updateCache based on the Update's timestamp.
 	roomKey, err := datastore.DecodeKey(rk)
 	if err != nil {
 		log.Printf("updateRoom: could not decode room key %v: %v", rk, err)
@@ -592,11 +591,7 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 	if clientLastUpdate > serverLastUpdate {
 		return ""
 	}
-	// From here we will check the cache to see if the room has had any updates (that this server knows about).
-	// If not then we'll just return nothing. If so (or there is no record) we'll do a query...
-	//
-	// Is there a chicken egg issue here?
-	//
+
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
@@ -661,9 +656,6 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 			out = fmt.Sprintf("%x", md5.Sum(toHash))
 		}
 	}
-	//	if out != "" {
-	//		updateCache.Set(rk, now, time.Hour*5)
-	//	}
 	return out
 }
 
