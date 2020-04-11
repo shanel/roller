@@ -1537,6 +1537,7 @@ func main() {
 		}()
 	}
 
+	updateCache = ccache.New(ccache.Configure())
 	// pubsub topic
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
 	defer pubsubTopic.Stop()
@@ -1550,60 +1551,60 @@ func main() {
 	})
 	if err != nil {
 		log.Printf("issue creating pubsub subscriber, caching will not be working well: %v", err)
-	}
+	} else {
 
-	// TODO(shanel): Add a simple pubsub setup - topic messages will be rooms and their update timestamps.
-	// One subscriber per instance. A single topic. Subscriber will just dump the info into the local ccache instance.
-	// Messages will be published by any method that isn't just reading from the datastore (so datastore.Put()s or UpdateRoom calls).
-	// Ideally use ordered subscriber? Though might just make sense to - if get unordered - only use the newest (ie compare
-	// what has already been put in the cache before updating the cache - doing that would minimize the reads)
-	// Make sure to defer unsubscribing or shutting down the subscriber - don't want messages being saved if the instance dies off.
-	updateCache = ccache.New(ccache.Configure())
+		// TODO(shanel): Add a simple pubsub setup - topic messages will be rooms and their update timestamps.
+		// One subscriber per instance. A single topic. Subscriber will just dump the info into the local ccache instance.
+		// Messages will be published by any method that isn't just reading from the datastore (so datastore.Put()s or UpdateRoom calls).
+		// Ideally use ordered subscriber? Though might just make sense to - if get unordered - only use the newest (ie compare
+		// what has already been put in the cache before updating the cache - doing that would minimize the reads)
+		// Make sure to defer unsubscribing or shutting down the subscriber - don't want messages being saved if the instance dies off.
 
-	// roomCache will have the most up to date Passer objects so we can generate rooms without making remote reads more than once
-	//	roomCache = ccache.New(ccache.Configure())
+		// roomCache will have the most up to date Passer objects so we can generate rooms without making remote reads more than once
+		//	roomCache = ccache.New(ccache.Configure())
 
-	err = sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
-		// TODO: Handle message.
-		// NOTE: May be called concurrently; synchronize access to shared memory.
+		err = sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
+			// TODO: Handle message.
+			// NOTE: May be called concurrently; synchronize access to shared memory.
 
-		// Get the room and timestamp out of the message
-		messageData := string(m.Data)
-		// assumed structure is "MyRoomName|123456789"
-		messagePieces := strings.Split(messageData, "|")
-		switch count := len(messagePieces); count {
-		case 1:
-			// Check if it is a room name. If it is just insert with current timestamp;
-			if onlyLetters(messagePieces[0]) {
-				updateCache.Set(messagePieces[0], time.Now().Unix(), 5*time.Hour)
+			// Get the room and timestamp out of the message
+			messageData := string(m.Data)
+			// assumed structure is "MyRoomName|123456789"
+			messagePieces := strings.Split(messageData, "|")
+			switch count := len(messagePieces); count {
+			case 1:
+				// Check if it is a room name. If it is just insert with current timestamp;
+				if onlyLetters(messagePieces[0]) {
+					updateCache.Set(messagePieces[0], time.Now().Unix(), 5*time.Hour)
+				}
+			case 2:
+				var cacheTimestamp, messageTimestamp int64
+
+				// Do a Get of the room name, if it exists convert the value and the message timestamp to int64 and compare
+				// If message timestamp is newer, replace the current entry
+				got := updateCache.Get(messagePieces[0])
+				if got != nil {
+					cacheTimestamp = got.Value().(int64)
+				}
+				tempTS, err := strconv.Atoi(messagePieces[1])
+				if err == nil {
+					messageTimestamp = int64(tempTS)
+				} else {
+					log.Printf("problem converting message timestamp to int: %v", err)
+					messageTimestamp = time.Now().Unix()
+				}
+				if messageTimestamp > cacheTimestamp {
+					updateCache.Set(messagePieces[0], messageTimestamp, 5*time.Hour)
+				}
+			default:
+				// log an error
+				log.Printf("don't know what to do with this message: %v", messageData)
 			}
-		case 2:
-			var cacheTimestamp, messageTimestamp int64
-
-			// Do a Get of the room name, if it exists convert the value and the message timestamp to int64 and compare
-			// If message timestamp is newer, replace the current entry
-			got := updateCache.Get(messagePieces[0])
-			if got != nil {
-				cacheTimestamp = got.Value().(int64)
-			}
-			tempTS, err := strconv.Atoi(messagePieces[1])
-			if err == nil {
-				messageTimestamp = int64(tempTS)
-			} else {
-				log.Printf("problem converting message timestamp to int: %v", err)
-				messageTimestamp = time.Now().Unix()
-			}
-			if messageTimestamp > cacheTimestamp {
-				updateCache.Set(messagePieces[0], messageTimestamp, 5*time.Hour)
-			}
-		default:
-			// log an error
-			log.Printf("don't know what to do with this message: %v", messageData)
+			m.Ack()
+		})
+		if err != context.Canceled {
+			log.Printf("got unexpected error via Pubsub.Receive: %v", err)
 		}
-		m.Ack()
-	})
-	if err != context.Canceled {
-		log.Printf("got unexpected error via Pubsub.Receive: %v", err)
 	}
 
 	// [START setting_port]
