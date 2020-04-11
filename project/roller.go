@@ -448,7 +448,11 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 		return
 	}
 	// Publish to the pubsub topic the room and the timestamp
-	pubsubTopic.Publish(c, &pubsub.Message{Data: []byte(rk + "|" + strconv.Itoa(int(t)))})
+	if pubsubTopic != nil {
+		pubsubTopic.Publish(c, &pubsub.Message{Data: []byte(rk + "|" + strconv.Itoa(int(t)))})
+	} else {
+		log.Printf("PUBSUB TOPIC IS NIL!!")
+	}
 }
 
 func setBackground(c context.Context, rk, url string) {
