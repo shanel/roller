@@ -26,6 +26,7 @@ import (
 	"github.com/beevik/etree"
 	"github.com/dustinkirkland/golang-petname"
 	"github.com/karlseguin/ccache"
+	"google.golang.org/api/iterator"
 	"os"
 
 	"cloud.google.com/go/datastore"
@@ -1558,8 +1559,16 @@ func main() {
 	// [END setting_port]
 
 	// pubsub topic
-	for top := range pubsubClient.Topics(ctx) {
-		log.Printf("Found topic: %v", top)
+	it := pubsubClient.Topics(ctx)
+	for {
+		t, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Printf("iteration error: %v", err)
+		}
+		log.Printf("found topic: %v", t)
 	}
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
 	//defer pubsubTopic.Stop()
