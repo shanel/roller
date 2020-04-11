@@ -1385,7 +1385,6 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 				}
 			} else {
 				d.Result, d.ResultStr = getNewResult(d.Size)
-				log.Printf("result: %v; resultstr: %v", d.Result, d.ResultStr)
 			}
 			// SVG here
 			var svg []byte
