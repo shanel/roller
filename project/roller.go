@@ -591,6 +591,7 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 		serverLastUpdate = cacheItem.Value().(int64)
 	}
 	if clientLastUpdate > serverLastUpdate {
+		log.Println("NO UPDATE FOUND!!!")
 		return ""
 	}
 	// From here we will check the cache to see if the room has had any updates (that this server knows about).
