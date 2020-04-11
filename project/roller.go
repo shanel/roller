@@ -1563,6 +1563,7 @@ func main() {
 	for {
 		t, err := it.Next()
 		if err == iterator.Done {
+			log.Println("hit end of iteration")
 			break
 		}
 		if err != nil {
