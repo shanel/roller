@@ -67,7 +67,8 @@ var (
 	dsClient     *datastore.Client
 	updateCache  *ccache.Cache
 	//	roomCache    *ccache.Cache
-	pubsubTopic *pubsub.Topic
+	pubsubTopic        *pubsub.Topic
+	pubsubSubscription *pubsub.Subscription
 )
 
 type Update struct {
@@ -1558,11 +1559,11 @@ func main() {
 
 	// pubsub topic
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
-	defer pubsubTopic.Stop()
+	//defer pubsubTopic.Stop()
 
 	id := os.Getenv("GAE_SERVICE") + "-" + os.Getenv("GAE_VERSION") + "-" + os.Getenv("GAE_INSTANCE")
 
-	sub, err := pubsubClient.CreateSubscription(ctx, id, pubsub.SubscriptionConfig{
+	pubsubSubscription, err = pubsubClient.CreateSubscription(ctx, id, pubsub.SubscriptionConfig{
 		Topic:            pubsubTopic,
 		AckDeadline:      10 * time.Second,
 		ExpirationPolicy: 24 * time.Hour,
@@ -1581,7 +1582,7 @@ func main() {
 		// roomCache will have the most up to date Passer objects so we can generate rooms without making remote reads more than once
 		//	roomCache = ccache.New(ccache.Configure())
 
-		err = sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
+		err = pubsubSubscription.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
 			// TODO: Handle message.
 			// NOTE: May be called concurrently; synchronize access to shared memory.
 
