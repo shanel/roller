@@ -22,28 +22,31 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/adamclerk/deck"
-	"github.com/beevik/etree"
-	"github.com/dustinkirkland/golang-petname"
-	"os"
-
-	"cloud.google.com/go/datastore"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"cloud.google.com/go/datastore"
+	"cloud.google.com/go/pubsub"
+	"github.com/adamclerk/deck"
+	"github.com/beevik/etree"
+	"github.com/dustinkirkland/golang-petname"
+	"github.com/karlseguin/ccache"
 )
 
 // TODO(shanel): Audit all the RunInTransaction calls and pass ReadOnly if only Get or GetMulti are happening.
 
 // If you have forked this and are running it yourself you might need to change this.
 const bucket = "dice-roller-174222.appspot.com"
+const pubsubTopicName = "room-updates"
 
 var (
 	// As we create urls for the die images, store them here so we don't keep making them
@@ -62,6 +65,10 @@ var (
 	suitMap      = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
 	previousSVGs = map[string][]byte{}
 	dsClient     *datastore.Client
+	updateCache  *ccache.Cache
+	//	roomCache    *ccache.Cache
+	pubsubTopic        *pubsub.Topic
+	pubsubSubscription *pubsub.Subscription
 )
 
 type Update struct {
@@ -406,8 +413,9 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 			d, err := deck.New(deck.Unshuffled)
 			if err != nil {
 				log.Printf("could not create deck: %v", err)
+			} else {
+				d.Shuffle()
 			}
-			d.Shuffle()
 			r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
 			_, err = tx.Put(roomKey, &r)
 			if err != nil {
@@ -437,6 +445,13 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 	})
 	if err != nil {
 		log.Printf("issue updating room: %v", err)
+		return
+	}
+	// Publish to the pubsub topic the room and the timestamp
+	if pubsubTopic != nil {
+		pubsubTopic.Publish(c, &pubsub.Message{Data: []byte(rk + "|" + strconv.Itoa(int(t)))})
+	} else {
+		log.Printf("PUBSUB TOPIC IS NIL!!")
 	}
 }
 
@@ -560,7 +575,23 @@ func removeCustomSet(c context.Context, rk, name string) {
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
-func refreshRoom(c context.Context, rk, fp string) string {
+func refreshRoom(c context.Context, rk, fp, ts string) string {
+	// TODO(shanel): For the stuff below - it should  instead store the Passer object in a second cache
+	var clientLastUpdate, serverLastUpdate int64
+	if ts != "" {
+		lu, err := strconv.Atoi(ts)
+		if err == nil {
+			clientLastUpdate = int64(lu)
+		}
+	}
+	cacheItem := updateCache.Get(rk)
+	if cacheItem != nil {
+		serverLastUpdate = cacheItem.Value().(int64)
+	}
+	if clientLastUpdate > serverLastUpdate {
+		return ""
+	}
+
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
 	if err != nil {
@@ -569,12 +600,12 @@ func refreshRoom(c context.Context, rk, fp string) string {
 	}
 	var r Room
 	var send []Update
+	now := time.Now().Unix()
 	_, err = dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
 		if err = tx.Get(roomKey, &r); err != nil {
 			return fmt.Errorf("could not find room %v for refresh: %v", rk, err)
 		}
 		keep := []Update{}
-		now := time.Now().Unix()
 		var umUpdates []Update
 		err = json.Unmarshal(r.Updates, &umUpdates)
 		if err != nil {
@@ -1346,7 +1377,6 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 				}
 			} else {
 				d.Result, d.ResultStr = getNewResult(d.Size)
-				log.Printf("result: %v; resultstr: %v", d.Result, d.ResultStr)
 			}
 			// SVG here
 			var svg []byte
@@ -1444,6 +1474,15 @@ func getNewResult(kind string) (int, string) {
 	return r, strconv.Itoa(r)
 }
 
+func onlyLetters(s string) bool {
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
 func main() {
 	//	func init() {
 	http.HandleFunc("/", Root)
@@ -1477,12 +1516,95 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	//	dsClient, err = datastore.NewClient(ctx, "just-another-dice-roller")
-	dsClient, err = datastore.NewClient(ctx, "dice-roller-174222")
+	//projectID := "just-another-dice-roller"
+	projectID := "dice-roller-174222"
+	dsClient, err = datastore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// pubsub client
+	pubsubClient, err := pubsub.NewClient(ctx, projectID)
+	if err != nil {
+		log.Printf("issue creating pubsub client, caching will not be working well: %v", err)
+	} else {
+		defer func() {
+			_ = pubsubClient.Close()
+		}()
+	}
+
+	updateCache = ccache.New(ccache.Configure())
+
+	// pubsub topic
+	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
+	defer pubsubTopic.Stop()
+
+	id := os.Getenv("GAE_SERVICE") + "-" + os.Getenv("GAE_VERSION") + "-" + os.Getenv("GAE_INSTANCE")
+
+	pubsubSubscription, err = pubsubClient.CreateSubscription(ctx, id, pubsub.SubscriptionConfig{
+		Topic:            pubsubTopic,
+		AckDeadline:      10 * time.Second,
+		ExpirationPolicy: 24 * time.Hour,
+	})
+	if err != nil {
+		log.Printf("issue creating pubsub subscriber, caching will not be working well: %v", err)
+	} else {
+
+		// TODO(shanel): Add a simple pubsub setup - topic messages will be rooms and their update timestamps.
+		// One subscriber per instance. A single topic. Subscriber will just dump the info into the local ccache instance.
+		// Messages will be published by any method that isn't just reading from the datastore (so datastore.Put()s or UpdateRoom calls).
+		// Ideally use ordered subscriber? Though might just make sense to - if get unordered - only use the newest (ie compare
+		// what has already been put in the cache before updating the cache - doing that would minimize the reads)
+		// Make sure to defer unsubscribing or shutting down the subscriber - don't want messages being saved if the instance dies off.
+
+		// roomCache will have the most up to date Passer objects so we can generate rooms without making remote reads more than once
+		//	roomCache = ccache.New(ccache.Configure())
+
+		go func() {
+			err = pubsubSubscription.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
+				// TODO: Handle message.
+				// NOTE: May be called concurrently; synchronize access to shared memory.
+
+				// Get the room and timestamp out of the message
+				messageData := string(m.Data)
+				// assumed structure is "MyRoomName|123456789"
+				messagePieces := strings.Split(messageData, "|")
+				switch count := len(messagePieces); count {
+				case 1:
+					// Check if it is a room name. If it is just insert with current timestamp;
+					if onlyLetters(messagePieces[0]) {
+						updateCache.Set(messagePieces[0], time.Now().Unix(), 5*time.Hour)
+					}
+				case 2:
+					var cacheTimestamp, messageTimestamp int64
+
+					// Do a Get of the room name, if it exists convert the value and the message timestamp to int64 and compare
+					// If message timestamp is newer, replace the current entry
+					got := updateCache.Get(messagePieces[0])
+					if got != nil {
+						cacheTimestamp = got.Value().(int64)
+					}
+					tempTS, err := strconv.Atoi(messagePieces[1])
+					if err == nil {
+						messageTimestamp = int64(tempTS)
+					} else {
+						log.Printf("problem converting message timestamp to int: %v", err)
+						messageTimestamp = time.Now().Unix()
+					}
+					if messageTimestamp > cacheTimestamp {
+						updateCache.Set(messagePieces[0], messageTimestamp, 5*time.Hour)
+					}
+				default:
+					// log an error
+					log.Printf("don't know what to do with this message: %v", messageData)
+				}
+				m.Ack()
+			})
+			if err != context.Canceled {
+				log.Printf("got unexpected error via Pubsub.Receive: %v", err)
+			}
+		}()
+	}
 	// [START setting_port]
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -1495,7 +1617,6 @@ func main() {
 		log.Fatal(err)
 	}
 	// [END setting_port]
-
 }
 
 func Root(w http.ResponseWriter, r *http.Request) {
@@ -1536,7 +1657,8 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		log.Printf("roomname wonkiness in refresh: %v", err)
 	}
 	fp := r.Form.Get("fp")
-	ref := refreshRoom(c, keyStr, fp)
+	ts := r.Form.Get("ts")
+	ref := refreshRoom(c, keyStr, fp, ts)
 	_, _ = fmt.Fprintf(w, "%v", ref)
 }
 
@@ -1840,6 +1962,8 @@ func Clear(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetRoom(w http.ResponseWriter, r *http.Request) {
+	// Somehow check if the most current version is cached?
+	// Would it actually be at this point - could be if this is first load?
 	c := r.Context()
 	room := path.Base(r.URL.Path)
 	if _, ok := repeatOffenders[room]; ok {

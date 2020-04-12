@@ -670,7 +670,8 @@
             var room = (window.location.pathname).split("/")[2];
             $.post("/refresh", {
                 id: room,
-                fp: fp
+                fp: fp,
+                ts: lastRealUpdate
             })
                 .done(function (data) {
                     var b = data;
@@ -713,7 +714,7 @@
                 });
         }
 
-        setInterval('autoRefresh_div()', 2000); // refresh div after 2 seconds
+        setInterval('autoRefresh_div()', 1000); // refresh div after 1 second
 
         // I don't love this code, but it gets the job done I guess.
         $(function () {
