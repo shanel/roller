@@ -575,8 +575,7 @@ func removeCustomSet(c context.Context, rk, name string) {
 	updateRoom(c, roomKey.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 }
 
-func refreshRoom(c context.Context, rk, fp, ts string) string {
-	// TODO(shanel): For the stuff below - it should  instead store the Passer object in a second cache
+func roomUpdateSinceTimestamp(rk, ts string) bool {
 	var clientLastUpdate, serverLastUpdate int64
 	if ts != "" {
 		lu, err := strconv.Atoi(ts)
@@ -589,6 +588,16 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 		serverLastUpdate = cacheItem.Value().(int64)
 	}
 	if clientLastUpdate > serverLastUpdate {
+		log.Printf("no change for room: '%s'", rk)
+		return false
+	}
+	log.Printf("found change for room: '%s'", rk)
+	return true
+}
+
+func refreshRoom(c context.Context, rk, fp, ts string) string {
+	// TODO(shanel): For the stuff below - it should  instead store the Passer object in a second cache
+	if !roomUpdateSinceTimestamp(rk, ts) {
 		return ""
 	}
 
@@ -1652,11 +1661,13 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	keyStr := r.Form.Get("id")
-	//keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	//if err != nil {
-	//	log.Printf("roomname wonkiness in refresh: %v", err)
-	//}
+	if !roomUpdateSinceTimestamp(r.Form.Get("id"), r.Form.Get("ts")) {
+		_, _ = fmt.Fprintf(w, "%v", "")
+	}
+	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	if err != nil {
+		log.Printf("roomname wonkiness in refresh: %v", err)
+	}
 	fp := r.Form.Get("fp")
 	ts := r.Form.Get("ts")
 	ref := refreshRoom(c, keyStr, fp, ts)
