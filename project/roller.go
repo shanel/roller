@@ -61,12 +61,12 @@ var (
 		"A♦": "ace_of_diamonds.png", "2♦": "2_of_diamonds.png", "3♦": "3_of_diamonds.png", "4♦": "4_of_diamonds.png", "5♦": "5_of_diamonds.png", "6♦": "6_of_diamonds.png", "7♦": "7_of_diamonds.png", "8♦": "8_of_diamonds.png", "9♦": "9_of_diamonds.png", "T♦": "10_of_diamonds.png", "J♦": "jack_of_diamonds.png", "Q♦": "queen_of_diamonds.png", "K♦": "king_of_diamonds.png",
 		"A♥": "ace_of_hearts.png", "2♥": "2_of_hearts.png", "3♥": "3_of_hearts.png", "4♥": "4_of_hearts.png", "5♥": "5_of_hearts.png", "6♥": "6_of_hearts.png", "7♥": "7_of_hearts.png", "8♥": "8_of_hearts.png", "9♥": "9_of_hearts.png", "T♥": "10_of_hearts.png", "J♥": "jack_of_hearts.png", "Q♥": "queen_of_hearts.png", "K♥": "king_of_hearts.png",
 		"A♠": "ace_of_spades.png", "2♠": "2_of_spades.png", "3♠": "3_of_spades.png", "4♠": "4_of_spades.png", "5♠": "5_of_spades.png", "6♠": "6_of_spades.png", "7♠": "7_of_spades.png", "8♠": "8_of_spades.png", "9♠": "9_of_spades.png", "T♠": "10_of_spades.png", "J♠": "jack_of_spades.png", "Q♠": "queen_of_spades.png", "K♠": "king_of_spades.png"}
-	faceMap      = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "T": 9, "J": 10, "Q": 11, "K": 12}
-	suitMap      = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
-	previousSVGs = map[string][]byte{}
-	dsClient     *datastore.Client
-	updateCache  *ccache.Cache
-	//	roomCache    *ccache.Cache
+	faceMap            = map[string]int{"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "T": 9, "J": 10, "Q": 11, "K": 12}
+	suitMap            = map[string]int{"♣": 0, "♦": 1, "♥": 2, "♠": 3}
+	previousSVGs       = map[string][]byte{}
+	dsClient           *datastore.Client
+	updateCache        *ccache.Cache
+	roomKeyCache       *ccache.Cache
 	pubsubTopic        *pubsub.Topic
 	pubsubSubscription *pubsub.Subscription
 )
@@ -380,15 +380,18 @@ func generateRoomName(wc int) string {
 }
 
 func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
-	q := datastore.NewQuery("Room").Filter("Slug =", name).Limit(1).KeysOnly()
-	k, err := dsClient.GetAll(c, q, nil)
-	if err != nil {
-		return name, fmt.Errorf("problem executing room (by Slug) query: %v", err)
-	}
-	if len(k) > 0 {
-		return k[0].Encode(), nil
-	}
-	return name, fmt.Errorf("couldn't find a room key for %v", name)
+	item, err := roomKeyCache.Fetch(name, 24*time.Hour, func() (interface{}, error) {
+		q := datastore.NewQuery("Room").Filter("Slug =", name).Limit(1).KeysOnly()
+		k, err := dsClient.GetAll(c, q, nil)
+		if err != nil {
+			return name, fmt.Errorf("problem executing room (by Slug) query: %v", err)
+		}
+		if len(k) > 0 {
+			return k[0].Encode(), nil
+		}
+		return name, fmt.Errorf("couldn't find a room key for %v", name)
+	})
+	return item.Value().(string), err
 }
 
 func updateRoom(c context.Context, rk string, u Update, modifier int) {
@@ -1543,6 +1546,7 @@ func main() {
 	}
 
 	updateCache = ccache.New(ccache.Configure())
+	roomKeyCache = ccache.New(ccache.Configure())
 
 	// pubsub topic
 	pubsubTopic = pubsubClient.Topic(pubsubTopicName)
@@ -1660,9 +1664,6 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 	if _, ok := repeatOffenders[r.Form.Get("id")]; ok {
 		http.NotFound(w, r)
 		return
-	}
-	if !roomUpdateSinceTimestamp(r.Form.Get("id"), r.Form.Get("ts")) {
-		_, _ = fmt.Fprintf(w, "%v", "")
 	}
 	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
 	if err != nil {
