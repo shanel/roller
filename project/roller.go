@@ -1516,8 +1516,8 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	//projectID := "just-another-dice-roller"
-	projectID := "dice-roller-174222"
+	projectID := "just-another-dice-roller"
+	//projectID := "dice-roller-174222"
 	dsClient, err = datastore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatal(err)
@@ -1652,10 +1652,11 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
-	if err != nil {
-		log.Printf("roomname wonkiness in refresh: %v", err)
-	}
+	keyStr := r.Form.Get("id")
+	//keyStr, err := getEncodedRoomKeyFromName(c, r.Form.Get("id"))
+	//if err != nil {
+	//	log.Printf("roomname wonkiness in refresh: %v", err)
+	//}
 	fp := r.Form.Get("fp")
 	ts := r.Form.Get("ts")
 	ref := refreshRoom(c, keyStr, fp, ts)
