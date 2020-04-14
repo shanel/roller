@@ -1522,8 +1522,8 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	projectID := "just-another-dice-roller"
-	//projectID := "dice-roller-174222"
+	//projectID := "just-another-dice-roller"
+	projectID := "dice-roller-174222"
 	dsClient, err = datastore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatal(err)
