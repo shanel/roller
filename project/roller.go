@@ -382,7 +382,13 @@ func generateRoomName(wc int) string {
 func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 	cacheItem := roomKeyCache.Get(name)
 	if cacheItem != nil {
-		return cacheItem.Value().(string), nil
+		val := cacheItem.Value().(string)
+		roomKey, err := datastore.DecodeKey(val)
+		if roomKey == nil || err != nil {
+			log.Printf("cached encoded room key (%s) for room %s is not decodable (will fetch fresh): %v", val, name, err)
+		} else {
+			return val, nil
+		}
 	}
 	q := datastore.NewQuery("Room").Filter("Slug =", name).Limit(1).KeysOnly()
 	k, err := dsClient.GetAll(c, q, nil)
@@ -391,7 +397,7 @@ func getEncodedRoomKeyFromName(c context.Context, name string) (string, error) {
 	}
 	if len(k) > 0 {
 		encoded := k[0].Encode()
-		roomKeyCache.Set(name, encoded, 24*time.Hour)
+		roomKeyCache.Set(name, encoded, time.Hour)
 		return encoded, nil
 	}
 	return name, fmt.Errorf("couldn't find a room key for %v", name)
