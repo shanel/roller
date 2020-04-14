@@ -595,10 +595,8 @@ func refreshRoom(c context.Context, rk, fp, ts string) string {
 		serverLastUpdate = cacheItem.Value().(int64)
 	}
 	if clientLastUpdate > serverLastUpdate {
-		log.Printf("no updates for room '%s'", rk)
 		return ""
 	}
-	log.Printf("looks like updates for room '%s'", rk)
 
 	roomKey, err := datastore.DecodeKey(rk)
 	out := ""
