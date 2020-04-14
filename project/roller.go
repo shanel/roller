@@ -1522,8 +1522,7 @@ func main() {
 
 	ctx := context.Background()
 	var err error
-	//projectID := "just-another-dice-roller"
-	projectID := "dice-roller-174222"
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	dsClient, err = datastore.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatal(err)
