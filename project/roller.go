@@ -1421,9 +1421,6 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 		}
 		return nil
 	})
-	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return err
 }
@@ -1456,9 +1453,6 @@ func decrementClock(c context.Context, encodedDieKey string) error {
 		}
 		return nil
 	})
-	// Fake updater so Safari will work?
-	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
-	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	updateRoom(c, k.Parent.Encode(), Update{Updater: "safari y u no work", Timestamp: time.Now().Unix(), UpdateAll: true}, 0)
 	return err
 }
