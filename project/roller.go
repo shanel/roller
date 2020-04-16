@@ -52,6 +52,7 @@ const svgIndentSpaces = 2
 const roomSlugWordLength = 3 // This will likely need to change in a few years - maybe in 2022?
 const updateCacheTTLHours = 5
 const maxObjectsInRoom = 500
+const clearAsColor = "lightblue"
 
 var (
 	// As we create urls for the die images, store them here so we don't keep making them
@@ -947,7 +948,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 					SVGBytes:  svg,
 				}
 				if color == "clear" {
-					d.Color = "lightblue"
+					d.Color = clearAsColor
 				}
 				if isFunky(size) {
 					d.ResultStr = fmt.Sprintf("%s (d%s)", d.ResultStr, size)
@@ -1282,13 +1283,13 @@ func getOldColor(u string) string {
 	if chunk == "tokens" {
 		c = strings.Split(strings.Split(u, "/")[6], "_")[0]
 		if c == "clear" {
-			return "lightblue"
+			return clearAsColor
 		}
 		return c
 	} else {
 		c = strings.Split(chunk, "-")[0]
 		if c == "clear" {
-			return "lightblue"
+			return clearAsColor
 		}
 		return c
 	}
