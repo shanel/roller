@@ -341,10 +341,6 @@ func (d *Die) updatePosition(x, y float64) {
 	d.New = false
 }
 
-func (d *Die) getPosition() (float64, float64) {
-	return d.X, d.Y
-}
-
 type Passer struct {
 	Dice                []Die
 	RoomTotal           int
@@ -1020,17 +1016,9 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 		count, err := strconv.Atoi(sizes["card"])
 		if err == nil {
 			cards, cardKeys := drawCards(c, count, roomKey, "", hidden, fp)
-			for _, card := range cards {
-				dice = append(dice, card)
-			}
-			for _, ck := range cardKeys {
-				keys = append(keys, ck)
-			}
+			dice = append(dice, cards...)
+			keys = append(keys, cardKeys...)
 		}
-	}
-	keyStrings := []string{}
-	for _, k := range keys {
-		keyStrings = append(keyStrings, k.Encode())
 	}
 	_, err := dsClient.RunInTransaction(c, func(tx *datastore.Transaction) error {
 		_, err := tx.PutMulti(keys, dice)
