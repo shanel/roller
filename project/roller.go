@@ -47,13 +47,17 @@ import (
 // If you have forked this and are running it yourself you might need to change this.
 const bucket = "dice-roller-174222.appspot.com"
 const pubsubTopicName = "room-updates"
+const refreshDelta = int64(2)
+const svgIndentSpaces = 2
+const roomSlugWordLength = 3 // This will likely need to change in a few years - maybe in 2022?
+const updateCacheTTLHours = 5
+const maxObjectsInRoom = 500
 
 var (
 	// As we create urls for the die images, store them here so we don't keep making them
-	diceURLs     = map[string]string{}
-	refreshDelta = int64(2)
-	lastRoll     = map[string]int{}
-	lastAction   = map[string]string{}
+	diceURLs   = map[string]string{}
+	lastRoll   = map[string]int{}
+	lastAction = map[string]string{}
 	// Keep track of attempts to hit non-existent rooms and only create a new room once
 	repeatOffenders = map[string]bool{}
 	cardToPNG       = map[string]string{
@@ -294,7 +298,7 @@ func createSVG(die, result, color string) ([]byte, error) {
 			text.SetText(result)
 		}
 	}
-	doc.Indent(2)
+	doc.Indent(svgIndentSpaces)
 	out, err := doc.WriteToBytes()
 	if err == nil {
 		previousSVGs[key] = out
@@ -424,7 +428,7 @@ func updateRoom(c context.Context, rk string, u Update, modifier int) {
 			} else {
 				d.Shuffle()
 			}
-			r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(3), Deck: d.GetSignature()}
+			r = Room{Updates: up, Timestamp: t, Slug: generateRoomName(roomSlugWordLength), Deck: d.GetSignature()}
 			_, err = tx.Put(roomKey, &r)
 			if err != nil {
 				return fmt.Errorf("could not create updated room %v: %v", rk, err)
@@ -682,7 +686,7 @@ func newRoom(c context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not marshal update: %v", err)
 	}
-	roomName := generateRoomName(3)
+	roomName := generateRoomName(roomSlugWordLength)
 	deck.Seed()
 	d, err := deck.New(deck.Unshuffled)
 	if err != nil {
@@ -897,7 +901,7 @@ func newRoll(c context.Context, sizes map[string]string, roomKey *datastore.Key,
 				continue
 			}
 			totalCount += count
-			if totalCount > 500 {
+			if totalCount > maxObjectsInRoom {
 				continue
 			}
 			var r int
@@ -1506,7 +1510,7 @@ func main() {
 	http.HandleFunc("/shuffle", Shuffle)
 
 	// Seed random number generator.
-	rand.Seed(int64(time.Now().Unix()))
+	rand.Seed(time.Now().Unix())
 
 	ctx := context.Background()
 	var err error
@@ -1567,7 +1571,7 @@ func main() {
 				case 1:
 					// Check if it is a room name. If it is just insert with current timestamp;
 					if onlyLetters(messagePieces[0]) {
-						updateCache.Set(messagePieces[0], time.Now().Unix(), 5*time.Hour)
+						updateCache.Set(messagePieces[0], time.Now().Unix(), updateCacheTTLHours*time.Hour)
 					}
 				case 2:
 					var cacheTimestamp, messageTimestamp int64
@@ -1586,7 +1590,7 @@ func main() {
 						messageTimestamp = time.Now().Unix()
 					}
 					if messageTimestamp > cacheTimestamp {
-						updateCache.Set(messagePieces[0], messageTimestamp, 5*time.Hour)
+						updateCache.Set(messagePieces[0], messageTimestamp, updateCacheTTLHours*time.Hour)
 					}
 				default:
 					// log an error
@@ -1770,7 +1774,7 @@ func AddImage(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	ts := time.Now().Unix()
-	lk := dieKey(roomKey, int64(ts))
+	lk := dieKey(roomKey, ts)
 	l := Die{
 		ResultStr:    "image",
 		Key:          lk,
