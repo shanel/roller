@@ -74,6 +74,12 @@ var (
 	roomKeyCache       *ccache.Cache
 	pubsubTopic        *pubsub.Topic
 	pubsubSubscription *pubsub.Subscription
+	clockSizes         = map[string]int{
+		"c4": 5,
+		"c6": 7,
+		"c8": 9,
+		"ct": 7,
+	}
 )
 
 type Update struct {
@@ -1218,6 +1224,10 @@ func fateReplace(in string) string {
 	return in
 }
 
+func isHideable(d Die) bool {
+	return d.IsCard || d.IsCustomItem || d.IsClock || d.IsImage || d.Size == "tokens"
+}
+
 // TODO(shanel): This will need to handle new cards
 func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 	k, err := datastore.DecodeKey(encodedDieKey)
@@ -1232,7 +1242,7 @@ func revealDieHelper(c context.Context, encodedDieKey, fp string) error {
 		if d.HiddenBy != fp && d.HiddenBy != "" {
 			return fmt.Errorf("item with key %v was not hidden by %v", encodedDieKey, fp)
 		}
-		if d.IsCard || d.IsCustomItem || d.IsImage || d.IsClock || d.Size == "tokens" {
+		if isHideable(d) {
 			d.IsHidden = false
 			d.HiddenBy = ""
 			_, err = tx.Put(k, &d)
@@ -1261,7 +1271,7 @@ func hideDieHelper(c context.Context, encodedDieKey, hiddenBy string) error {
 		if d.IsHidden && d.HiddenBy != "" {
 			return fmt.Errorf("item is already hidden")
 		}
-		if d.IsCard || d.IsCustomItem || d.IsClock || d.IsImage || d.Size == "tokens" {
+		if isHideable(d) {
 			d.IsHidden = true
 			d.HiddenBy = hiddenBy
 			_, err = tx.Put(k, &d)
@@ -1338,14 +1348,8 @@ func rerollDieHelper(c context.Context, encodedDieKey, room, fp string, white bo
 				log.Printf("error in deleteDieHelper: %v", err)
 			}
 		} else if d.IsClock {
-			sep := map[string]int{
-				"c4": 5,
-				"c6": 7,
-				"c8": 9,
-				"ct": 7,
-			}
 			oldResult := d.Result
-			d.Result = (d.Result + 1) % sep[d.Size]
+			d.Result = (d.Result + 1) % clockSizes[d.Size]
 			d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
 		} else {
 			if d.SVGPath == "" {
@@ -1428,17 +1432,11 @@ func decrementClock(c context.Context, encodedDieKey string) error {
 		if err = tx.Get(k, &d); err != nil {
 			return fmt.Errorf("could not find die with key %v: %v", encodedDieKey, err)
 		}
-		sep := map[string]int{
-			"c4": 5,
-			"c6": 7,
-			"c8": 9,
-			"ct": 7,
-		}
 		if d.Result == 0 { // No need to wrap around.
 			return nil
 		}
 		oldResult := d.Result
-		d.Result = (d.Result - 1) % sep[d.Size]
+		d.Result = (d.Result - 1) % clockSizes[d.Size]
 		d.Image = strings.Replace(d.Image, fmt.Sprintf("%d.png", oldResult), fmt.Sprintf("%d.png", d.Result), 1)
 		_, err = tx.Put(k, &d)
 		if err != nil {
