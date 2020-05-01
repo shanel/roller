@@ -129,8 +129,8 @@
 
         function dragMoveEnd(target) {
                 // keep the dragged position in the data-x/data-y attributes
-                var x = (parseFloat(target.getAttribute('data-x')) || 0),
-                y = (parseFloat(target.getAttribute('data-y')) || 0);
+                var x = (parseFloat(target.getAttribute('data-x')) || 0);
+                var y = (parseFloat(target.getAttribute('data-y')) || 0);
 
 
             // TODO(shanel): This is janky and annoying...
@@ -175,8 +175,8 @@
 
         function dragMoveListener(target, dx, dy) {
                 // keep the dragged position in the data-x/data-y attributes
-                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx,
-                y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
+                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx;
+                var y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
 
 
             // translate the element
@@ -1013,7 +1013,6 @@
 
     .refreshable {
         text-align: center;
-        position: relative;
     }
 
     img.card {
@@ -1646,6 +1645,7 @@
             background-image: url("{{.BgURL}}");
             background-position: center 5%;
             background-repeat: no-repeat;
+            position: relative;
         }
     </style>
     {{end}}
@@ -1654,7 +1654,7 @@
     {{else}}
     <p>Last Roll Total: {{.ModifiedRollTotal}} ({{.RollTotal}} + {{.Modifier}}) Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}} Changed: {{.LastChangeTimestamp}}</p>
     {{end}}
-    <div class="imagine" id="imagine">
+    <div class="imagine" id="imagine" style="position: relative;">
         {{range .Dice}}
         {{if .New}}
         {{if .IsLabel}}
