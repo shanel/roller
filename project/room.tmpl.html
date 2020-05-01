@@ -129,8 +129,8 @@
 
         function dragMoveEnd(target) {
                 // keep the dragged position in the data-x/data-y attributes
-                var x = (parseFloat(target.getAttribute('data-x')) || 0);
-                var y = (parseFloat(target.getAttribute('data-y')) || 0);
+                var x = (parseFloat(target.getAttribute('data-x')) || 0),
+                y = (parseFloat(target.getAttribute('data-y')) || 0);
 
 
             // TODO(shanel): This is janky and annoying...
@@ -175,8 +175,8 @@
 
         function dragMoveListener(target, dx, dy) {
                 // keep the dragged position in the data-x/data-y attributes
-                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx;
-                var y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
+                var x = (parseFloat(target.getAttribute('data-x')) || 0) + dx,
+                y = (parseFloat(target.getAttribute('data-y')) || 0) + dy;
 
 
             // translate the element
@@ -187,7 +187,7 @@
                         target.style.transform =
                             'translate(' + x + 'px, ' + y + 'px)';
             } else {
-                //target.style = null;
+                target.style = null;
                 target.style.position = 'absolute';
                 target.style.top = y + 'px';
                 target.style.left = x + 'px';
@@ -1645,7 +1645,6 @@
             background-image: url("{{.BgURL}}");
             background-position: center 5%;
             background-repeat: no-repeat;
-            position: relative;
         }
     </style>
     {{end}}
@@ -1654,7 +1653,7 @@
     {{else}}
     <p>Last Roll Total: {{.ModifiedRollTotal}} ({{.RollTotal}} + {{.Modifier}}) Room Total: {{.RoomTotal}} Tokens: {{.TokenCount}} Playing Cards Left: {{.CardsLeft}} Changed: {{.LastChangeTimestamp}}</p>
     {{end}}
-    <div class="imagine" id="imagine" style="position: relative;">
+    <div class="imagine" id="imagine">
         {{range .Dice}}
         {{if .New}}
         {{if .IsLabel}}
