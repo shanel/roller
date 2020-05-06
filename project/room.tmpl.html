@@ -69,12 +69,11 @@
             var transformer = target.style.transform;
             if (transformer.search("px") !== -1) {
                 target.setAttribute('start-y', 0);
-                target.setAttribute('start-x', 0);
             } else {
                 target.setAttribute('start-y', y);
-                target.setAttribute('start-x', x);
             }
             // update the position attributes
+            target.setAttribute('start-x', x);
         }
 
         // target elements with the "draggable" class
